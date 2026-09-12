@@ -2,18 +2,18 @@ import streamlit as st
 import requests
 
 st.title("💰 Extraction des Primes")
-st.markdown("Isole la **4ème colonne (Résultat NET)** de votre tableau pour l'attribution des primes.")
+st.markdown("Isole la **4ème colonne (Résultat NET)** et l'envoie sur le salon Discord dédié.")
 
-url_webhook = st.text_input("1. Collez l'URL de votre Webhook Discord :", type="password", key="webhook_primes")
-donnees_brutes = st.text_area("2. Collez votre tableau complet ici :", height=250, key="data_primes")
+donnees_brutes = st.text_area("Collez votre tableau complet ici :", height=300, key="data_primes")
 
 if st.button("🚀 Envoyer les Primes sur Discord", use_container_width=True):
-    if not url_webhook or "://discord.com" not in url_webhook:
-        st.error("❌ URL de Webhook Discord invalide.")
-    elif not donnees_brutes.strip():
+    if not donnees_brutes.strip():
         st.error("❌ Le tableau est vide.")
     else:
         try:
+            # Récupération automatique du Webhook depuis les Secrets
+            url_webhook = st.secrets["webhooks"]["primes"]
+            
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = ["Filiale\tPrimes"]
             
@@ -22,10 +22,10 @@ if st.button("🚀 Envoyer les Primes sur Discord", use_container_width=True):
             for ligne in lignes[debut_index:]:
                 if not ligne.strip(): continue
                 colonnes = ligne.split('\t')
-                if len(colonnes) < 4: continue  # Vérifie qu'il y a assez de colonnes
+                if len(colonnes) < 4: continue
                 
                 nom_filiale = colonnes[0].strip()
-                primes = colonnes[3].strip()  # 4ème colonne (Résultat NET)
+                primes = colonnes[3].strip()  # 4ème colonne
                 lignes_finales.append(f"{nom_filiale}\t{primes}")
 
             contenu_crlf = "\r\n".join(lignes_finales) + "\r\n"
@@ -35,9 +35,9 @@ if st.button("🚀 Envoyer les Primes sur Discord", use_container_width=True):
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Primes envoyées sur Discord avec succès !")
+                st.success("🎉 Envoyé avec succès dans le salon des Primes !")
                 st.download_button("📥 Télécharger localement", data=contenu_crlf, file_name="primes_import.txt", mime="text/plain")
             else:
-                st.error(f"🤖 Erreur Discord : {reponse.status_code}")
+                st.error(f"🤖 Erreur Discord : {reponse.status_code}. Vérifiez vos Secrets Streamlit.")
         except Exception as e:
             st.error(f"⚠️ Erreur : {str(e)}")
