@@ -56,7 +56,7 @@ if st.button("🚀 Transformer et Envoyer sur Discord", use_container_width=True
             
             reponse = requests.post(url_webhook, data=donnees_webhook, files=fichiers)
             
-            if reponse.status_code in:
+            if reponse.status_code == 200:
                 st.success("🎉 Succès ! Le fichier et le texte copiable ont été envoyés sur votre salon Discord.")
                 st.download_button(label="📥 Télécharger le fichier généré localement", data=contenu_crlf, file_name="frais_gestion_import.txt", mime="text/plain")
             else:
