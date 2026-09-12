@@ -39,7 +39,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # --- 🛠️ ETAPE 1 : EXTRACTION DU TABLEAU DES DIRECTEURS (Filtres PDG, Grego73, BTP, Constructions) ---
+            # --- 🛠️ ETAPE 1 : EXTRACTION DU TABLEAU DES DIRECTEURS ---
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
             index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
@@ -52,23 +52,18 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 nom_filiale = colonnes[0].strip()
                 poste = colonnes[1].strip()
                 directeur = colonnes[2].strip()
-                raw_prime_max = colonnes[3].strip() # 4ème colonne : Prime Max
+                raw_prime_max = colonnes[3].strip()
                 
-                # SÉCURITÉ 1 : On ne garde STRICTEMENT que si le poste est PDG
                 if poste.upper() == "PDG":
-                    # EXCLUSION 1 : On ignore le directeur Grego73
                     if directeur.upper() == "GREGO73":
                         continue
-                    
-                    # EXCLUSION 2 : On ignore directement Constructions et BTP
                     if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
                         continue
                         
                     valeur_plafond = int(raw_prime_max) if raw_prime_max.isdigit() else 0
-                    # On mémorise la filiale admissible
                     plafonds_extraits[nom_filiale] = valeur_plafond
 
-            # --- 🛠️ ETAPE 2 : TRAITEMENT DU TABLEAU FINANCIER (Calculs & Croisement) ---
+            # --- 🛠️ ETAPE 2 : CALCULS ET CROISEMENT ---
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             import_primes = ["Filiale\tPrimes"]
             lignes_rapport_comparatif = ["--- RAPPORT COMPARATIF DES PRIMES ---"]
@@ -83,11 +78,10 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 
-                # LE FILTRE ABSOLU : Si cette filiale n'a pas survécu à nos filtres d'exclusions du Tableau 2, on l'IGNORE
                 if nom_filiale not in plafonds_extraits:
                     continue
                     
-                raw_valeur = colonnes[2].strip() # 3ème colonne : Résultat d'exploitation
+                raw_valeur = colonnes[2].strip() # 3ème colonne
                 valeur_exploitation = int(raw_valeur) if raw_valeur.isdigit() else 0
                 valeur_prime_calculee = int(valeur_exploitation * (pct_prime / 100))
                 
@@ -95,22 +89,24 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 prime_finale_envoyee = valeur_prime_calculee
                 status_texte = "✅ OK"
                 
-                # Si la prime calculée dépasse le plafond Max du PDG
                 if valeur_prime_calculee > plafond_max:
                     prime_finale_envoyee = plafond_max
                     status_texte = "🚨 BRIDÉ"
-                    alertes_blocage.append(f"⚠️ **{nom_filiale}** : Bridée de {valeur_prime_calculee} ➡️ **{plafond_max}** (Max)")
+                    # Modification du message d'alerte à l'écran pour bien afficher "Prime calculée"
+                    alertes_blocage.append(
+                        f"⚠️ **{nom_filiale}** : Prime calculée de **{valeur_prime_calculee}** ({pct_prime}%) "
+                        f"bridée ➡️ **{plafond_max}** (Max autorisé)"
+                    )
 
                 import_primes.append(f"{nom_filiale}\t{prime_finale_envoyee}")
                 
                 lignes_rapport_comparatif.append(
                     f"🏢 {nom_filiale} :\n"
-                    f"  - Prime calculee : {valeur_prime_calculee}\n"
+                    f"  - Prime calculee ({pct_prime}%) : {valeur_prime_calculee}\n"
                     f"  - Prime Max autorisee : {plafond_max}\n"
                     f"  - Statut : {status_texte}\n"
                 )
             
-            # Formatage final du fichier d'importation (CRLF)
             crlf_primes = "\r\n".join(import_primes) + "\r\n"
             
             lignes_rapport_comparatif.append("\n\n--- TABLEAU D'IMPORT FINAL ---")
@@ -125,7 +121,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n"
                 for alerte in alertes_blocage:
                     texte_discord += f"{alerte}\n"
-                    st.warning(alerte)
+                    st.warning(alerte) # Affiche le nouveau message clair sur Streamlit
                 texte_discord += "\n"
             else:
                 st.success("✅ Toutes les filiales valides respectent les plafonds du jour !")
