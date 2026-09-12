@@ -39,7 +39,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # --- 🛠️ ETAPE 1 : EXTRACTION DYNAMIQUE DES PDG UNIQUEMENT ---
+            # --- 🛠️ ETAPE 1 : EXTRACTION ET FILTRAGE STRICT DES PDG ---
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
             index_debut_plafonds = 1 if lignes_plafonds and "poste" in lignes_plafonds[0].lower() else 0
@@ -53,15 +53,16 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 poste = colonnes[1].strip()
                 raw_prime_max = colonnes[3].strip()
                 
-                # RÈGLE 1 : On ne garde STRICTEMENT que s'il y a un PDG
+                # Exclusion immédiate de Constructions et BTP
+                if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
+                    continue
+                
+                # On enregistre le plafond UNIQUEMENT si le poste est strictement "PDG"
                 if poste.upper() == "PDG":
-                    # RÈGLE 2 : On ignore explicitement Constructions et BTP
-                    if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
-                        continue
                     valeur_plafond = int(raw_prime_max) if raw_prime_max.isdigit() else 0
                     plafonds_extraits[nom_filiale] = valeur_plafond
 
-            # --- 🛠️ ETAPE 2 : CALCULS ET COMPARAISONS ---
+            # --- 🛠️ ETAPE 2 : CALCULS ET FILTRAGE DU TABLEAU FINANCIER ---
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             import_primes = ["Filiale\tPrimes"]
             lignes_rapport_comparatif = ["--- RAPPORT COMPARATIF DES PRIMES ---"]
@@ -76,7 +77,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 
-                # RÈGLE 3 : Si la filiale n'a pas de PDG configuré (ou a été ignorée), on passe à la suite
+                # SÉCURITÉ : Si la filiale n'est pas enregistrée dans notre liste de PDG valides, on l'ignore COMPLÈTEMENT
                 if nom_filiale not in plafonds_extraits:
                     continue
                     
@@ -95,7 +96,6 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
 
                 import_primes.append(f"{nom_filiale}\t{prime_finale_envoyee}")
                 
-                # Écriture du comparatif pour le fichier texte
                 lignes_rapport_comparatif.append(
                     f"🏢 {nom_filiale} :\n"
                     f"  - Prime calculee : {valeur_prime_calculee}\n"
@@ -103,31 +103,29 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                     f"  - Statut : {status_texte}\n"
                 )
             
-            # Formatage du fichier final d'importation (CRLF)
+            # Formatage du fichier d'importation (CRLF)
             crlf_primes = "\r\n".join(import_primes) + "\r\n"
             
-            # Création du fichier de rapport complet à joindre (pour éviter le spam texte Discord)
             lignes_rapport_comparatif.append("\n\n--- TABLEAU D'IMPORT FINAL ---")
             lignes_rapport_comparatif.append(crlf_primes)
             contenu_fichier_complet = "\r\n".join(lignes_rapport_comparatif) + "\r\n"
             
-            # --- 🛠️ ETAPE 3 : ENVOI SÉCURISÉ SUR DISCORD ---
-            # Le texte du message est volontairement court pour ne jamais bloquer la limite Discord
+            # --- 🛠️ ETAPE 3 : ENVOI DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
-            texte_discord += "Les filiales sans PDG, Constructions et BTP ont été automatiquement ignorées.\n\n"
+            texte_discord += "Seules les filiales possédant un PDG actif (hors BTP/Constructions) ont été calculées.\n\n"
             
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n"
                 for alerte in alertes_blocage:
                     texte_discord += f"{alerte}\n"
-                    st.warning(alerte) # Reste affiché sur l'application Web
+                    st.warning(alerte)
+                texte_discord += "\n"
             else:
                 st.success("✅ Toutes les filiales respectent les plafonds du jour !")
                 texte_discord += "✅ Aucun dépassement détecté.\n"
                 
             texte_discord += "\n📥 *Le détail complet ainsi que le texte d'importation se trouvent dans le fichier joint ci-dessous.*"
             
-            # Envoi du fichier unique consolidé
             fichiers = {'file': ('primes_et_rapport_import.txt', contenu_fichier_complet, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
