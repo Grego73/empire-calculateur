@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 st.title("💰 Gestion & Contrôle des Primes")
-st.markdown("Calcule la part des primes en fonction du tableau financier, et applique un filtrage et plafonnement strict basé sur le poste **PDG** du tableau des directeurs.")
+st.markdown("Calcule la part des primes en fonction du tableau financier, et applique un filtrage et plafonnement strict basé sur le poste **PDG** (en excluant Grego73, BTP et Constructions).")
 
 # --- PARAMÈTRES DE RÉPARTITION ---
 st.subheader("🎛️ Choix de la répartition des gains")
@@ -13,7 +13,7 @@ with col2:
     pct_prime = 100 - pct_holding
     st.metric(label="Pourcentage pour la Prime (%)", value=f"{pct_prime}%")
 
-# --- ZONES DE SAISIE CORRIGÉES ---
+# --- ZONES DE SAISIE ---
 st.subheader("📋 Saisie des données du jour")
 
 donnees_exploitation = st.text_area(
@@ -24,7 +24,7 @@ donnees_exploitation = st.text_area(
 )
 
 donnees_plafonds = st.text_area(
-    "2. Collez ici le tableau des directeurs (contenant la colonne 'Poste' et 'Prime Max') :", 
+    "2. Collez ici le tableau des directeurs (contenant la colonne 'Poste', 'Directeur' et 'Prime Max') :", 
     height=250, 
     key="data_tab_plafonds",
     placeholder="Filiale\tPoste\tDirecteur\tPrime Max..."
@@ -39,7 +39,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # --- 🛠️ ETAPE 1 : EXTRACTION DU TABLEAU DES DIRECTEURS (Filtre PDG + Exclusions) ---
+            # --- 🛠️ ETAPE 1 : EXTRACTION DU TABLEAU DES DIRECTEURS (Filtres PDG, Grego73, BTP, Constructions) ---
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
             index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
@@ -51,11 +51,16 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 poste = colonnes[1].strip()
+                directeur = colonnes[2].strip()
                 raw_prime_max = colonnes[3].strip() # 4ème colonne : Prime Max
                 
-                # SÉCURITÉ : On ne garde STRICTEMENT que si le poste est PDG
+                # SÉCURITÉ 1 : On ne garde STRICTEMENT que si le poste est PDG
                 if poste.upper() == "PDG":
-                    # EXCLUSIONS : On ignore directement Constructions et BTP
+                    # EXCLUSION 1 : On ignore le directeur Grego73
+                    if directeur.upper() == "GREGO73":
+                        continue
+                    
+                    # EXCLUSION 2 : On ignore directement Constructions et BTP
                     if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
                         continue
                         
@@ -78,7 +83,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 
-                # LE FILTRE ABSOLU : Si cette filiale n'a pas de PDG valide dans le Tableau 2, on l'IGNORE complètement !
+                # LE FILTRE ABSOLU : Si cette filiale n'a pas survécu à nos filtres d'exclusions du Tableau 2, on l'IGNORE
                 if nom_filiale not in plafonds_extraits:
                     continue
                     
@@ -114,7 +119,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             
             # --- 🛠️ ETAPE 3 : ENVOI DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
-            texte_discord += "Calculs basés sur le Résultat d'exploitation (Tab 1) croisé avec le filtre PDG (Tab 2).\n\n"
+            texte_discord += "Calculs basés sur le Résultat d'exploitation. Exclusions appliquées : Non-PDG, Grego73, BTP et Constructions.\n\n"
             
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n"
@@ -123,13 +128,13 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                     st.warning(alerte)
                 texte_discord += "\n"
             else:
-                st.success("✅ Toutes les filiales respectent les plafonds du jour !")
+                st.success("✅ Toutes les filiales valides respectent les plafonds du jour !")
                 texte_discord += "✅ Aucun dépassement détecté.\n"
                 
             texte_discord += "\n📥 *Le détail complet ainsi que le texte d'importation se trouvent dans le fichier joint ci-dessous.*"
             
             fichiers = {'file': ('primes_et_rapport_import.txt', contenu_fichier_complet, 'text/plain')}
-            reponse = requests.post(url_webhook, data={'content': text_discord}, files=fichiers)
+            reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
                 st.success("🎉 Calculs réussis et transmis à Discord sans erreur !")
