@@ -42,7 +42,9 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             # --- 🛠️ ETAPE 1 : EXTRACTION ET FILTRAGE STRICT DES PDG ---
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
-            index_debut_plafonds = 1 if lignes_plafonds and "poste" in lignes_plafonds[0].lower() else 0
+            
+            # Correction ici : détection sur le texte brut global
+            index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
             
             for ligne in lignes_plafonds[index_debut_plafonds:]:
                 if not ligne.strip(): continue
@@ -60,7 +62,9 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 # On enregistre le plafond UNIQUEMENT si le poste est strictement "PDG"
                 if poste.upper() == "PDG":
                     valeur_plafond = int(raw_prime_max) if raw_prime_max.isdigit() else 0
-                    plafonds_extraits[nom_filiale] = valeur_plafond
+                    # On n'ajoute que si le plafond max est strictement supérieur à 0
+                    if valeur_plafond > 0:
+                        plafonds_extraits[nom_filiale] = valeur_plafond
 
             # --- 🛠️ ETAPE 2 : CALCULS ET FILTRAGE DU TABLEAU FINANCIER ---
             lignes_exploitation = donnees_exploitation.strip().split('\n')
@@ -68,7 +72,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             lignes_rapport_comparatif = ["--- RAPPORT COMPARATIF DES PRIMES ---"]
             alertes_blocage = []
             
-            index_debut_exploitation = 1 if lignes_exploitation and ("filiale" in lignes_exploitation[0].lower() or "trésorerie" in lignes_exploitation[0].lower()) else 0
+            index_debut_exploitation = 1 if ("filiale" in donnees_exploitation.lower() or "trésorerie" in donnees_exploitation.lower()) else 0
             
             for ligne in lignes_exploitation[index_debut_exploitation:]:
                 if not ligne.strip(): continue
@@ -77,7 +81,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 
-                # SÉCURITÉ : Si la filiale n'est pas enregistrée dans notre liste de PDG valides, on l'ignore COMPLÈTEMENT
+                # FILTRE ABSOLU : Si la filiale n'a pas de PDG valide avec un plafond > 0, on l'IGNORE
                 if nom_filiale not in plafonds_extraits:
                     continue
                     
@@ -112,7 +116,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             
             # --- 🛠️ ETAPE 3 : ENVOI DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
-            texte_discord += "Seules les filiales possédant un PDG actif (hors BTP/Constructions) ont été calculées.\n\n"
+            texte_discord += "Seules les filiales possédant un PDG actif avec un droit de prime (hors BTP/Constructions) ont été calculées.\n\n"
             
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n"
