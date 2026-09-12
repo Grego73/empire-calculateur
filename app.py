@@ -26,7 +26,7 @@ if st.button("🚀 Transformer et Envoyer sur Discord", use_container_width=True
             lignes_finales = ["Filiale\tFrais de gestion"]
             
             # Détection et retrait automatique d'une éventuelle en-tête d'origine
-            premiere_ligne = lignes[0].lower()
+            premiere_ligne = lignes.lower()
             debut_index = 1 if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne else 0
 
             for ligne in lignes[debut_index:]:
@@ -37,23 +37,27 @@ if st.button("🚀 Transformer et Envoyer sur Discord", use_container_width=True
                 if len(colonnes) < 3:
                     continue  # Ignore les lignes incorrectes
                     
-                nom_filiale = colonnes[0].strip()
-                frais_de_gestion = colonnes[2].strip()  # Extraction de la 3ème colonne
+                nom_filiale = colonnes.strip()
+                frais_de_gestion = colonnes.strip()  # Extraction de la 3ème colonne
                 
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
-            # Création du contenu au format strict CRLF (\r\n)
+            # Création du contenu au format strict CRLF (\r\n) pour le fichier
             contenu_crlf = "\r\n".join(lignes_finales) + "\r\n"
 
-            # Envoi vers Discord
+            # Préparation du texte à afficher directement dans Discord (dans un bloc de code text)
+            texte_discord = "✅ **Nouveau fichier d'importation des frais de gestion généré !**\n"
+            texte_discord += "Vous pouvez copier le texte ci-dessous directement :\n"
+            texte_discord += f"```text\n{contenu_crlf}```"
+
+            # Envoi vers Discord (Fichier joint + Texte directement copiable dans le corps du message)
             fichiers = {'file': ('frais_gestion_import.txt', contenu_crlf, 'text/plain')}
-            donnees_webhook = {'content': "✅ **Nouveau fichier d'importation des frais de gestion généré depuis l'application Web !**"}
+            donnees_webhook = {'content': texte_discord}
             
             reponse = requests.post(url_webhook, data=donnees_webhook, files=fichiers)
             
-            if reponse.status_code in [200, 204]:
-                st.success("🎉 Succès ! Le fichier a été correctement envoyé sur votre salon Discord.")
-                # Optionnel : Permet aussi de télécharger le fichier directement depuis le site web
+            if reponse.status_code in:
+                st.success("🎉 Succès ! Le fichier et le texte copiable ont été envoyés sur votre salon Discord.")
                 st.download_button(label="📥 Télécharger le fichier généré localement", data=contenu_crlf, file_name="frais_gestion_import.txt", mime="text/plain")
             else:
                 st.error(f"🤖 Erreur Discord (Code {reponse.status_code}). Vérifiez la validité de votre Webhook.")
