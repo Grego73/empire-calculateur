@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 st.title("💰 Gestion & Contrôle des Primes")
-st.markdown("Calcule la part des primes, applique les filtres d'exclusion et bride selon le plafond du tableau des PDG.")
+st.markdown("Calcule la part des primes en fonction du tableau financier, et applique un filtrage et plafonnement strict basé sur le poste **PDG** du tableau des directeurs.")
 
 # --- PARAMÈTRES DE RÉPARTITION ---
 st.subheader("🎛️ Choix de la répartition des gains")
@@ -13,37 +13,35 @@ with col2:
     pct_prime = 100 - pct_holding
     st.metric(label="Pourcentage pour la Prime (%)", value=f"{pct_prime}%")
 
-# --- ZONES DE SAISIE ---
+# --- ZONES DE SAISIE CORRIGÉES ---
 st.subheader("📋 Saisie des données du jour")
 
-donnees_plafonds = st.text_area(
-    "1. Collez ici le tableau des directeurs (contenant la colonne 'Prime Max') :", 
-    height=200, 
-    key="data_tab_plafonds",
-    placeholder="Filiale\tPoste\tDirecteur\tPrime Max..."
-)
-
 donnees_exploitation = st.text_area(
-    "2. Collez ici le tableau financier classique (contenant le 'Résultat d'exploitation') :", 
+    "1. Collez ici le tableau financier classique (contenant le 'Résultat d'exploitation') :", 
     height=250, 
     key="data_tab_exploitation",
     placeholder="Filiale\tTrésorerie\tRésultat d'exploitation..."
 )
 
+donnees_plafonds = st.text_area(
+    "2. Collez ici le tableau des directeurs (contenant la colonne 'Poste' et 'Prime Max') :", 
+    height=250, 
+    key="data_tab_plafonds",
+    placeholder="Filiale\tPoste\tDirecteur\tPrime Max..."
+)
+
 if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_width=True):
-    if not donnees_plafonds.strip():
-        st.error("❌ Le tableau des Primes Max (Tableau 1) est vide.")
-    elif not donnees_exploitation.strip():
-        st.error("❌ Le tableau financier classique (Tableau 2) est vide.")
+    if not donnees_exploitation.strip():
+        st.error("❌ Le tableau financier classique (Tableau 1) est vide.")
+    elif not donnees_plafonds.strip():
+        st.error("❌ Le tableau des directeurs (Tableau 2) est vide.")
     else:
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # --- 🛠️ ETAPE 1 : EXTRACTION ET FILTRAGE STRICT DES PDG ---
+            # --- 🛠️ ETAPE 1 : EXTRACTION DU TABLEAU DES DIRECTEURS (Filtre PDG + Exclusions) ---
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
-            
-            # Correction ici : détection sur le texte brut global
             index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
             
             for ligne in lignes_plafonds[index_debut_plafonds:]:
@@ -53,20 +51,19 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 poste = colonnes[1].strip()
-                raw_prime_max = colonnes[3].strip()
+                raw_prime_max = colonnes[3].strip() # 4ème colonne : Prime Max
                 
-                # Exclusion immédiate de Constructions et BTP
-                if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
-                    continue
-                
-                # On enregistre le plafond UNIQUEMENT si le poste est strictement "PDG"
+                # SÉCURITÉ : On ne garde STRICTEMENT que si le poste est PDG
                 if poste.upper() == "PDG":
+                    # EXCLUSIONS : On ignore directement Constructions et BTP
+                    if "CONSTRUCTIONS" in nom_filiale.upper() or "BTP" in nom_filiale.upper():
+                        continue
+                        
                     valeur_plafond = int(raw_prime_max) if raw_prime_max.isdigit() else 0
-                    # On n'ajoute que si le plafond max est strictement supérieur à 0
-                    if valeur_plafond > 0:
-                        plafonds_extraits[nom_filiale] = valeur_plafond
+                    # On mémorise la filiale admissible
+                    plafonds_extraits[nom_filiale] = valeur_plafond
 
-            # --- 🛠️ ETAPE 2 : CALCULS ET FILTRAGE DU TABLEAU FINANCIER ---
+            # --- 🛠️ ETAPE 2 : TRAITEMENT DU TABLEAU FINANCIER (Calculs & Croisement) ---
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             import_primes = ["Filiale\tPrimes"]
             lignes_rapport_comparatif = ["--- RAPPORT COMPARATIF DES PRIMES ---"]
@@ -81,11 +78,11 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 
                 nom_filiale = colonnes[0].strip()
                 
-                # FILTRE ABSOLU : Si la filiale n'a pas de PDG valide avec un plafond > 0, on l'IGNORE
+                # LE FILTRE ABSOLU : Si cette filiale n'a pas de PDG valide dans le Tableau 2, on l'IGNORE complètement !
                 if nom_filiale not in plafonds_extraits:
                     continue
                     
-                raw_valeur = colonnes[2].strip() # 3ème colonne
+                raw_valeur = colonnes[2].strip() # 3ème colonne : Résultat d'exploitation
                 valeur_exploitation = int(raw_valeur) if raw_valeur.isdigit() else 0
                 valeur_prime_calculee = int(valeur_exploitation * (pct_prime / 100))
                 
@@ -93,10 +90,11 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 prime_finale_envoyee = valeur_prime_calculee
                 status_texte = "✅ OK"
                 
+                # Si la prime calculée dépasse le plafond Max du PDG
                 if valeur_prime_calculee > plafond_max:
                     prime_finale_envoyee = plafond_max
                     status_texte = "🚨 BRIDÉ"
-                    alertes_blocage.append(f"⚠️ **{nom_filiale}** : Bridée de {valeur_prime_calculee} ➡️ **{plafond_max}**")
+                    alertes_blocage.append(f"⚠️ **{nom_filiale}** : Bridée de {valeur_prime_calculee} ➡️ **{plafond_max}** (Max)")
 
                 import_primes.append(f"{nom_filiale}\t{prime_finale_envoyee}")
                 
@@ -107,7 +105,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                     f"  - Statut : {status_texte}\n"
                 )
             
-            # Formatage du fichier d'importation (CRLF)
+            # Formatage final du fichier d'importation (CRLF)
             crlf_primes = "\r\n".join(import_primes) + "\r\n"
             
             lignes_rapport_comparatif.append("\n\n--- TABLEAU D'IMPORT FINAL ---")
@@ -116,7 +114,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             
             # --- 🛠️ ETAPE 3 : ENVOI DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
-            texte_discord += "Seules les filiales possédant un PDG actif avec un droit de prime (hors BTP/Constructions) ont été calculées.\n\n"
+            texte_discord += "Calculs basés sur le Résultat d'exploitation (Tab 1) croisé avec le filtre PDG (Tab 2).\n\n"
             
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n"
@@ -131,7 +129,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             texte_discord += "\n📥 *Le détail complet ainsi que le texte d'importation se trouvent dans le fichier joint ci-dessous.*"
             
             fichiers = {'file': ('primes_et_rapport_import.txt', contenu_fichier_complet, 'text/plain')}
-            reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
+            reponse = requests.post(url_webhook, data={'content': text_discord}, files=fichiers)
             
             if reponse.status_code == 200:
                 st.success("🎉 Calculs réussis et transmis à Discord sans erreur !")
@@ -140,6 +138,6 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
                 
         except ValueError:
-            st.error("❌ Erreur : Format de nombre incorrect dans l'un des tableaux.")
+            st.error("❌ Erreur : Format de nombre incorrect dans l'un des deux tableaux.")
         except Exception as e:
             st.error(f"⚠️ Erreur système : {str(e)}")
