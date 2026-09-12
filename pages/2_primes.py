@@ -149,4 +149,3 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
         except Exception as e:
             st.error(f"⚠️ Erreur système : {str(e)}")
-S
