@@ -25,9 +25,13 @@ if st.button("🚀 Transformer et Envoyer sur Discord", use_container_width=True
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = ["Filiale\tFrais de gestion"]
             
-            # Détection et retrait automatique d'une éventuelle en-tête d'origine
-            premiere_ligne = lignes.lower()
-            debut_index = 1 if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne else 0
+            # Vérification de la première ligne pour voir si c'est une en-tête
+            if lignes:
+                premiere_ligne_texte = lignes[0].lower()
+                # Si la ligne contient des mots clés d'en-tête, on commence à la ligne suivante
+                debut_index = 1 if ("filiale" in premiere_ligne_texte or "trésorerie" in premiere_ligne_texte) else 0
+            else:
+                debut_index = 0
 
             for ligne in lignes[debut_index:]:
                 if not ligne.strip():
@@ -35,10 +39,10 @@ if st.button("🚀 Transformer et Envoyer sur Discord", use_container_width=True
                 
                 colonnes = ligne.split('\t')
                 if len(colonnes) < 3:
-                    continue  # Ignore les lignes incorrectes
+                    continue  # Ignore les lignes incorrectes ou mal formées
                     
-                nom_filiale = colonnes.strip()
-                frais_de_gestion = colonnes.strip()  # Extraction de la 3ème colonne
+                nom_filiale = colonnes[0].strip()
+                frais_de_gestion = colonnes[2].strip()  # Extraction stricte de la 3ème colonne
                 
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
