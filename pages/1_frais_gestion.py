@@ -18,20 +18,21 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
 
             for ligne in lignes[debut_index:]:
-                # Nettoie les espaces au début et à la fin de la ligne complète
                 ligne_nettoye = ligne.strip()
                 if not ligne_nettoye: continue
                 
-                # Découpage par tabulation ET nettoyage strict de chaque élément
-                # On ne garde que les colonnes qui contiennent du texte (supprime les tabulations successives)
+                # Découpage par tabulation en supprimant les colonnes vides
                 colonnes = [col.strip() for col in ligne_nettoye.split('\t') if col.strip()]
                 if len(colonnes) < 2: continue
                 
-                # Nettoyage final : on s'assure qu'aucun espace parasite ne reste
-                nom_filiale = colonnes[0].replace('\t', ' ').strip()
-                frais_de_gestion = colonnes[-1].strip()
+                # Sécurité absolue :
+                nom_filiale = colonnes[0] # Toujours le premier élément
+                frais_de_gestion = colonnes[-1] # Toujours le tout dernier élément (le montant)
                 
-                # Écriture chirurgicale : CHAINE + UN SEUL \t + CHAINE (aucun espace autour)
+                # Nettoyage des espaces et symboles dans le montant
+                frais_de_gestion = frais_de_gestion.replace(" ", "").replace("€", "")
+                
+                # Écriture chirurgicale exigée : Filiale [TAB] Frais
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
             # Contenu d'importation pur au format CRLF (\r\n)
