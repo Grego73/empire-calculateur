@@ -5,10 +5,6 @@ import re
 st.title("⚖️ Équilibrage de la Valeur Réelle")
 st.markdown("Calculez les injections nécessaires pour équilibrer la **Somme Globale (Trésorerie + Capitaux Propres)** de vos filiales.")
 
-# Initialisation de la version du composant pour forcer la mise à jour visuelle
-if "version_calcul" not in st.session_state:
-    st.session_state["version_calcul"] = 0
-
 # 1. FONCTION DE CONVERSION EN MONNAIE EMPIRE (SENS : NOMBRE -> TEXTE)
 def formater_monnaie_empire(nombre):
     try:
@@ -59,14 +55,6 @@ def convertir_saisie_en_nombre(saisie_texte):
             return 0
     return 0
 
-# Fonction qui force le changement de version ET vide la mémoire pour permettre la baisse du chiffre
-def declencher_recalcul():
-    st.session_state["version_calcul"] += 1
-    # On efface dynamiquement toutes les anciennes clés de saisie en cache
-    for cle in list(st.session_state.keys()):
-        if "input_cible_ver_" in cle:
-            del st.session_state[cle]
-
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
@@ -84,9 +72,8 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
-            nom_filiale = colonnes[0]
-            # CORRECTION : On applique le .replace sur l'élément texte colonnes[1]
-            treso = int(colonnes[1].replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes
+            treso = int(colonnes.replace(" ", "").replace("€", ""))
             data_fin[nom_filiale] = treso
 
         # 2. Extraction du Capital (Tableau Capital)
@@ -98,10 +85,9 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
-            nom_filiale = colonnes[0]
-            # CORRECTION : On applique le .replace sur les éléments textes spécifiques de la liste
-            apport = int(colonnes[1].replace(" ", "").replace("€", ""))
-            capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes
+            apport = int(colonnes.replace(" ", "").replace("€", ""))
+            capitaux_propres = int(colonnes.replace(" ", "").replace("€", ""))
             data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
 
         # 3. Fusion et calcul de la Valeur Globale (Trésorerie + Capitaux Propres)
@@ -129,8 +115,7 @@ else:
         filiales_choisies = st.multiselect(
             "Filiales cibles :", 
             options=all_filiales, 
-            default=all_filiales,
-            on_change=declencher_recalcul
+            default=all_filiales
         )
         
         if not filiales_choisies:
@@ -145,21 +130,13 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE DYNAMIQUE COMPLET ---
+            # --- MODE 1 : ÉQUILIBRAGE AUTOMATIQUE VERS LA VALEUR MAX DES FILIALES COCHÉES ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
-                valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
-                cle_dynamique = f"input_cible_ver_{st.session_state['version_calcul']}"
+                # Calcul automatique pur (monte et baisse en temps réel sans blocage)
+                montant_cible = int(df_filtre["Valeur Totale Actuelle RAW"].max())
                 
-                # On force la nouvelle valeur max calculée si la case est vide ou vient d'être réinitialisée
-                if cle_dynamique not in st.session_state:
-                    st.session_state[cle_dynamique] = str(valeur_max_actuelle)
-                
-                saisie_cible = st.text_input(
-                    "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
-                    key=cle_dynamique
-                )
-                montant_cible = convertir_saisie_en_nombre(saisie_cible)
-                st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
+                # Affichage clair de la cible automatique
+                st.info(f"🎯 **Valeur Cible Automatique (Filiale la plus haute cochée)** : {formater_monnaie_empire(montant_cible)}")
                 
                 for _, row in df_filtre.iterrows():
                     ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
@@ -171,8 +148,8 @@ else:
                         "Montant à Injecter RAW": ecart_brut,
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
                     })
-
-            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
+            
+            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE SAISIE ---
             else:
                 saisie_enveloppe = st.text_input(
                     "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
