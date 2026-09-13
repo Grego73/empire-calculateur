@@ -73,8 +73,6 @@ else:
     try:
         # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
         lignes_fin = tab_finance.strip().split('\n')
-        
-        # CORRECTION DU BUG LOWER SUR LA LISTE : On teste sur tab_finance (le texte brut)
         idx_debut_fin = 1 if "filiale" in tab_finance.lower() or "trésorerie" in tab_finance.lower() else 0
         
         data_fin = {}
@@ -82,14 +80,13 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
-            nom_filiale = colonnes
-            treso = int(colonnes.replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes[0]
+            # CORRECTION : On applique le .replace sur l'élément texte colonnes[1]
+            treso = int(colonnes[1].replace(" ", "").replace("€", ""))
             data_fin[nom_filiale] = treso
 
         # 2. Extraction du Capital (Tableau Capital)
         lignes_cap = tab_capital.strip().split('\n')
-        
-        # CORRECTION DU BUG LOWER ICI AUSSI : On teste sur tab_capital (le texte brut)
         idx_debut_cap = 1 if "filiale" in tab_capital.lower() or "apport" in tab_capital.lower() else 0
         
         data_cap = {}
@@ -97,9 +94,10 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
-            nom_filiale = colonnes
-            apport = int(colonnes.replace(" ", "").replace("€", ""))
-            capitaux_propres = int(colonnes.replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes[0]
+            # CORRECTION : On applique le .replace sur les éléments textes spécifiques de la liste
+            apport = int(colonnes[1].replace(" ", "").replace("€", ""))
+            capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
             data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
 
         # 3. Fusion et calcul de la Valeur Globale (Trésorerie + Capitaux Propres)
