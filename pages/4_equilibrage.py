@@ -31,7 +31,7 @@ def formater_monnaie_empire(nombre):
 # 2. FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
 def convertir_saisie_en_nombre(saisie_texte):
     texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
-    if not texte_propre:
+    if not text_propre:
         return 0
         
     dictionnaire_paliers = {
@@ -55,6 +55,11 @@ def convertir_saisie_en_nombre(saisie_texte):
             return 0
     return 0
 
+# Fonction déclenchée à chaque changement de case pour forcer le recalcul de la cible
+def reinitialiser_saisie():
+    if "saisie_cible_val" in st.session_state:
+        del st.session_state["saisie_cible_val"]
+
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
@@ -65,12 +70,7 @@ else:
     try:
         # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
         lignes_fin = tab_finance.strip().split('\n')
-        
-        idx_debut_fin = 0
-        if lignes_fin and len(lignes_fin) > 0:
-            premiere_ligne = lignes_fin[0].lower()
-            if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne:
-                idx_debut_fin = 1
+        idx_debut_fin = 1 if lignes_fin and ("filiale" in lignes_fin[0].lower() or "trésorerie" in lignes_fin[0].lower()) else 0
         
         data_fin = {}
         for ligne in lignes_fin[idx_debut_fin:]:
@@ -83,12 +83,7 @@ else:
 
         # 2. Extraction du Capital (Tableau Capital)
         lignes_cap = tab_capital.strip().split('\n')
-        
-        idx_debut_cap = 0
-        if lignes_cap and len(lignes_cap) > 0:
-            premiere_ligne_cap = lignes_cap[0].lower()
-            if "filiale" in premiere_ligne_cap or "apport" in premiere_ligne_cap:
-                idx_debut_cap = 1
+        idx_debut_cap = 1 if lignes_cap and ("filiale" in lignes_cap[0].lower() or "apport" in lignes_cap[0].lower()) else 0
         
         data_cap = {}
         for ligne in lignes_cap[idx_debut_cap:]:
@@ -121,12 +116,18 @@ else:
         
         st.markdown("**1. Cochez les filiales à inclure dans l'opération :**")
         all_filiales = df_base["Filiale"].tolist()
-        filiales_choisies = st.multiselect("Filiales cibles :", options=all_filiales, default=all_filiales)
+        
+        # L'ajout de on_change appelle notre fonction de réinitialisation pour mettre à jour le chiffre du haut
+        filiales_choisies = st.multiselect(
+            "Filiales cibles :", 
+            options=all_filiales, 
+            default=all_filiales,
+            on_change=reinitialiser_saisie
+        )
         
         if not filiales_choisies:
             st.warning("⚠️ Veuillez sélectionner au moins une filiale.")
         else:
-            # FILTRAGE DÉPLACÉ ICI : On isole d'abord les filiales sélectionnées
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
             
             mode = st.radio(
@@ -136,26 +137,27 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE RECALCULÉ ---
+            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE RECALCULÉ DYNAMIQUE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
-                # La valeur max s'adapte dynamiquement UNIQUEMENT sur les filiales cochées
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
+                
+                # Gestion de la valeur par défaut dynamique via session_state
+                if "saisie_cible_val" not in st.session_state:
+                    st.session_state["saisie_cible_val"] = str(valeur_max_actuelle)
                 
                 saisie_cible = st.text_input(
                     "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
-                    value=str(valeur_max_actuelle)
+                    key="saisie_cible_val"
                 )
                 montant_cible = convertir_saisie_en_nombre(saisie_cible)
                 st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
                 
                 for _, row in df_filtre.iterrows():
                     ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
-                    plafond_max = row["Capitaux Propres RAW"]
-                    
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
-                        "Capitaux Propres": formater_monnaie_empire(plafond_max),
+                        "Capitaux Propres": formater_monnaie_empire(row["Capitaux Propres RAW"]),
                         "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
                         "Montant à Injecter RAW": ecart_brut,
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
@@ -170,17 +172,14 @@ else:
                 enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
                 st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
                 
-                # Le nombre de filiales s'ajuste lui aussi automatiquement au clic
                 nb_filiales = len(df_filtre)
                 part_egale = int(enveloppe_globale // nb_filiales)
                 
                 for _, row in df_filtre.iterrows():
-                    plafond_max = row["Capitaux Propres RAW"]
-                    
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
-                        "Capitaux Propres": formater_monnaie_empire(plafond_max),
+                        "Capitaux Propres": formater_monnaie_empire(row["Capitaux Propres RAW"]),
                         "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
                         "Montant à Injecter RAW": part_egale,
                         "Montant à Injecter (TAB)": formater_monnaie_empire(part_egale)
@@ -206,7 +205,7 @@ else:
             st.markdown("Cliquez en haut à droite du bloc noir pour copier la liste, puis collez-la directement dans Empire Immo :")
             st.code(contenu_crlf_pur, language="text")
             
-            st.text_area("Alternative de copie rapide (CTRL+A puis CTRL+C) :", value=contenu_crlf_pur, height=150, key="copie_secours_eq")
+            # SUPPRESSION EFFECTUÉE DE LA ZONE ALTERNATIVE SUIVANT VOTRE DEMANDE
             st.download_button("📥 Télécharger le fichier d'import pur (.txt)", data=contenu_crlf_pur, file_name="equilibrage_valeur_empire.txt", mime="text/plain")
 
     except Exception as e:
