@@ -16,8 +16,12 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = ["Filiale\tFrais de gestion"]
             
-            # Détection ultra-simple de l'en-tête basée sur la première ligne
-            debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
+            # CORRECTION : On vérifie si la PREMIÈRE LIGNE de texte contient les mots-clés (et pas la liste entière)
+            debut_index = 0
+            if lignes and len(lignes) > 0:
+                premiere_ligne = lignes[0].lower()
+                if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne:
+                    debut_index = 1
 
             for ligne in lignes[debut_index:]:
                 if not ligne.strip(): continue
@@ -45,7 +49,13 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             
             if reponse.status_code == 200:
                 st.success("🎉 Envoyé sur Discord avec le bloc texte copiable !")
-                st.download_button("📥 Télécharger le fichier d'import pur", data=contenu_crlf_pur, file_name="frais_gestion_import_officiel.txt", mime="text/plain")
+                # Le bouton de téléchargement Streamlit
+                st.download_button(
+                    label="📥 Télécharger le fichier d'import pur", 
+                    data=contenu_crlf_pur, 
+                    file_name="frais_gestion_import_officiel.txt", 
+                    mime="text/plain"
+                )
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
                 
