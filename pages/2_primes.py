@@ -37,16 +37,22 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             # Étape 2 : Calculs du tableau financier pur pour l'importateur
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             
-            # CORRECTION : L'en-tête officielle pour les primes doit être "Filiale\tPrimes"
-            import_primes = ["Filiale\tPrimes"] 
+            import_primes = [] # Pas d'en-tête pour s'aligner sur le comportement le plus sûr
             alertes_blocage = []
             
             index_debut_exploitation = 1 if ("filiale" in donnees_exploitation.lower() or "trésorerie" in donnees_exploitation.lower()) else 0
             for ligne in lignes_exploitation[index_debut_exploitation:]:
-                if not ligne.strip(): continue
-                colonnes = ligne.split('\t')
-                if len(colonnes) < 3: continue
-                nom_filiale, raw_valeur = colonnes[0].strip(), colonnes[2].strip()
+                # Nettoie les espaces au début et à la fin de la ligne complète
+                ligne_nettoye = ligne.strip()
+                if not ligne_nettoye: continue
+                
+                # Découpage par tabulation ET nettoyage strict de chaque élément
+                colonnes = [col.strip() for col in ligne_nettoye.split('\t') if col.strip()]
+                if len(colonnes) < 2: continue
+                
+                nom_filiale = colonnes[0].replace('\t', ' ').strip()
+                raw_valeur = colonnes[-1].strip()
+                
                 if nom_filiale not in plafonds_extraits: continue
                 
                 valeur_exploitation = int(raw_valeur) if raw_valeur.isdigit() else 0
@@ -58,9 +64,11 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                     prime_finale = plafond_max
                     alertes_blocage.append(f"⚠️ **{nom_filiale}** : Calculé **{valeur_prime_calculee}** ➡️ Bridé à **{plafond_max}** (Max)")
 
+                # Écriture chirurgicale : CHAINE + UN SEUL \t + CHAINE (aucun espace autour)
                 import_primes.append(f"{nom_filiale}\t{prime_finale}")
-            
+
             crlf_primes_pur = "\r\n".join(import_primes) + "\r\n"
+
             
             # --- STRUCTURE DU MESSAGE DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"

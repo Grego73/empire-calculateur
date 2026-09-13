@@ -13,26 +13,26 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
         try:
             url_webhook = st.secrets["webhooks"]["frais_gestion"]
             lignes = donnees_brutes.strip().split('\n')
-            lignes_finales = ["Filiale\tFrais de gestion"]
+            lignes_finales = [] # Pas d'en-tête pour éviter tout conflit avec le site
             
             debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
 
             for ligne in lignes[debut_index:]:
-                if not ligne.strip(): continue
-                # Séparation par tabulation et nettoyage des espaces vides
-                colonnes = [col.strip() for col in ligne.split('\t') if col.strip()]
-                if len(colonnes) < 2: continue # Sécurité si la ligne est incomplète
+                # Nettoie les espaces au début et à la fin de la ligne complète
+                ligne_nettoye = ligne.strip()
+                if not ligne_nettoye: continue
                 
-                # On prend le premier élément (nom) et le dernier ou le 3ème élément (frais)
-                # Pour être sûr de ne pas prendre de colonne vide intermédiaire
-                nom_filiale = colonnes[0]
-                # Si le tableau d'origine avait 3 colonnes ou plus, les frais sont souvent en dernier
-                frais_de_gestion = colonnes[-1] 
+                # Découpage par tabulation ET nettoyage strict de chaque élément
+                # On ne garde que les colonnes qui contiennent du texte (supprime les tabulations successives)
+                colonnes = [col.strip() for col in ligne_nettoye.split('\t') if col.strip()]
+                if len(colonnes) < 2: continue
                 
-                # Écriture stricte : AUCUNE tabulation dans le nom de la filiale
-                nom_filiale_nettoye = nom_filiale.replace('\t', ' ')
-                lignes_finales.append(f"{nom_filiale_nettoye}\t{frais_de_gestion}")
-
+                # Nettoyage final : on s'assure qu'aucun espace parasite ne reste
+                nom_filiale = colonnes[0].replace('\t', ' ').strip()
+                frais_de_gestion = colonnes[-1].strip()
+                
+                # Écriture chirurgicale : CHAINE + UN SEUL \t + CHAINE (aucun espace autour)
+                lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
             # Contenu d'importation pur au format CRLF (\r\n)
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
@@ -41,7 +41,6 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             texte_discord = "✅ **Nouveau fichier d'importation des FRAIS DE GESTION !**\n"
             texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
             
-            # Si le texte brut ne dépasse pas la limite de Discord (2000 caractères), on l'intègre au message
             if len(texte_discord) + len(contenu_crlf_pur) < 1900:
                 texte_discord += f"```text\n{contenu_crlf_pur}```"
             else:
