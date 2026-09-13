@@ -19,12 +19,20 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
 
             for ligne in lignes[debut_index:]:
                 if not ligne.strip(): continue
-                colonnes = ligne.split('\t')
-                if len(colonnes) < 3: continue
+                # Séparation par tabulation et nettoyage des espaces vides
+                colonnes = [col.strip() for col in ligne.split('\t') if col.strip()]
+                if len(colonnes) < 2: continue # Sécurité si la ligne est incomplète
                 
-                nom_filiale = colonnes[0].strip()
-                frais_de_gestion = colonnes[2].strip()
-                lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
+                # On prend le premier élément (nom) et le dernier ou le 3ème élément (frais)
+                # Pour être sûr de ne pas prendre de colonne vide intermédiaire
+                nom_filiale = colonnes[0]
+                # Si le tableau d'origine avait 3 colonnes ou plus, les frais sont souvent en dernier
+                frais_de_gestion = colonnes[-1] 
+                
+                # Écriture stricte : AUCUNE tabulation dans le nom de la filiale
+                nom_filiale_nettoye = nom_filiale.replace('\t', ' ')
+                lignes_finales.append(f"{nom_filiale_nettoye}\t{frais_de_gestion}")
+
 
             # Contenu d'importation pur au format CRLF (\r\n)
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
