@@ -129,12 +129,11 @@ else:
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
             
             mode = st.radio(
-                "**2. Choose calculation method :**",
+                "**2. Choisissez la méthode de calcul :**",
                 ["⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)", "💰 Diviser et injecter une enveloppe globale"]
             )
             
             import_rows = []
-            alertes_securite = []
             
             # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
@@ -150,24 +149,15 @@ else:
                 for _, row in df_filtre.iterrows():
                     ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
                     plafond_max = row["Capitaux Propres RAW"]
-                    apport_init = row["Apport Initial RAW"]
                     
-                    injection_finale = ecart_brut
-                    
-                    if float(plafond_max) < float(apport_init):
-                        injection_finale = 0
-                        alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
-                    elif ecart_brut > plafond_max:
-                        injection_finale = plafond_max
-                        alertes_securite.append(f"🚨 **{row['Filiale']}** : Écart bridé à **{formater_monnaie_empire(plafond_max)}** pour protéger les Capitaux Propres")
-
+                    # Plus de bridage restrictif sur les capitaux propres de la filiale ici
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
                         "Capitaux Propres": formater_monnaie_empire(plafond_max),
                         "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
-                        "Montant à Injecter RAW": injection_finale,
-                        "Montant à Injecter (TAB)": formater_monnaie_empire(injection_finale)
+                        "Montant à Injecter RAW": ecart_brut,
+                        "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
                     })
             
             # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
@@ -184,35 +174,19 @@ else:
                 
                 for _, row in df_filtre.iterrows():
                     plafond_max = row["Capitaux Propres RAW"]
-                    apport_init = row["Apport Initial RAW"]
                     
-                    injection_finale = part_egale
-                    
-                    if float(plafond_max) < float(apport_init):
-                        injection_finale = 0
-                        alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
-                    elif part_egale > plafond_max:
-                        injection_finale = plafond_max
-                        alertes_securite.append(f"🚨 **{row['Filiale']}** : Part bridée à **{formater_monnaie_empire(plafond_max)}** (Limite Capitaux Propres)")
-
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
                         "Capitaux Propres": formater_monnaie_empire(plafond_max),
                         "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
-                        "Montant à Injecter RAW": injection_finale,
-                        "Montant à Injecter (TAB)": formater_monnaie_empire(injection_finale)
+                        "Montant à Injecter RAW": part_egale,
+                        "Montant à Injecter (TAB)": formater_monnaie_empire(part_egale)
                     })
 
-            # --- RENDU DE SÉCURITÉ ET AFFICHAGE ---
+            # --- RENDU ET AFFICHAGE ---
             df_resultat = pd.DataFrame(import_rows)
-            
-            if alertes_securite:
-                st.error("⚠️ **CONTRÔLE DE FLUX :** Ajustements appliqués pour protéger la structure financière de vos filiales.")
-                for alerte in alertes_securite:
-                    st.warning(alerte)
-            else:
-                st.success("✅ Sécurité vérifiée : Toutes les filiales balancées respectent les équilibres comptables.")
+            st.success("✅ Calculs d'équilibrage basés sur le capital général de la Holding complétés avec succès.")
 
             st.subheader("📊 Plan d'importation validé")
             df_affichage = df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]]
