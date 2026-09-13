@@ -48,3 +48,37 @@ def convertir_saisie_en_nombre(saisie_texte):
         except:
             return 0
     return 0
+def verifier_concordance_rapport(texte_rapport):
+    lines = texte_rapport.strip().split('\n')
+    data = {}
+    
+    # Extraction chirurgicale des chiffres en ignorant les textes et symboles Ø
+    for line in lines:
+        if not line.strip(): continue
+        # Nettoyage des espaces doubles pour éviter les décalages
+        line_clean = " ".join(line.split())
+        
+        # Correspondance des lignes clés
+        if "Résultat avant impôts" in line_clean:
+            data["avant_impots"] = int("".join(filter(str.isdigit, line_clean)))
+        elif "Impôts sur le résultat" in line_clean or "Impôt sur le résultat" in line_clean:
+            data["impots"] = int("".join(filter(str.isdigit, line_clean)))
+        elif "Résultat NET" in line_clean:
+            data["net"] = int("".join(filter(str.isdigit, line_clean)))
+        elif "Total Actif" in line_clean:
+            data["actif"] = int("".join(filter(str.isdigit, line_clean)))
+        elif "Total Passif" in line_clean:
+            data["passif"] = int("".join(filter(str.isdigit, line_clean)))
+            
+    # Vérification des règles comptables
+    erreurs = []
+    if "avant_impots" in data and "impots" in data and "net" in data:
+        calcul_net = data["avant_impots"] - data["impots"]
+        if abs(calcul_net - data["net"]) > 10: # Tolérance de 10 unités pour les arrondis du jeu
+            erreurs.append(f"❌ Écart Résultat : Avant Impôts - Impôts devrait faire {calcul_net:,}, mais le rapport indique {data['net']:,}")
+            
+    if "actif" in data and "passif" in data:
+        if abs(data["actif"] - data["passif"]) > 10:
+            erreurs.append(f"❌ Écart Bilan : Le Total Actif ({data['actif']:,}) n'est pas égal au Total Passif ({data['passif']:,})")
+            
+    return erreurs, data
