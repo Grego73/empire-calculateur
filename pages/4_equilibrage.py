@@ -73,7 +73,6 @@ else:
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
             nom_filiale = colonnes[0]
-            # SÉCURITÉ : Application du .replace sur la bonne colonne (index 1)
             treso = int(colonnes[1].replace(" ", "").replace("€", ""))
             data_fin[nom_filiale] = treso
 
@@ -87,7 +86,6 @@ else:
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
             nom_filiale = colonnes[0]
-            # SÉCURITÉ : Application du .replace sur les bonnes colonnes (index 1 et 2)
             apport = int(colonnes[1].replace(" ", "").replace("€", ""))
             capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
             data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
@@ -132,23 +130,31 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE AUTOMATIQUE ---
+            # --- MODE 1 : CALCUL DE LA DIFFÉRENCE ET DE L'ENVELOPPE MINIMALE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
-                montant_cible = int(df_filtre["Valeur Totale Actuelle RAW"].max())
-                st.info(f"🎯 **Valeur Cible Automatique (Filiale la plus haute cochée)** : {formater_monnaie_empire(montant_cible)}")
+                valeur_max_cible = int(df_filtre["Valeur Totale Actuelle RAW"].max())
+                
+                # Calcul de la somme totale brute nécessaire pour combler tous les écarts
+                enveloppe_minimale_requise = 0
+                for _, row in df_filtre.iterrows():
+                    enveloppe_minimale_requise += max(0, valeur_max_cible - row["Valeur Totale Actuelle RAW"])
+                
+                # AFFICHAGE DU CHIFFRE DU HAUT RECALCULÉ EN TEMPS RÉEL
+                # Fait exactement 0 si 1 seule filiale est cochée, et monte/baisse selon la liste !
+                st.info(f"💵 **Montant total minimal à injecter de la Holding pour équilibrer** : {formater_monnaie_empire(enveloppe_minimale_requise)}")
                 
                 for _, row in df_filtre.iterrows():
-                    ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
+                    ecart_individuel = max(0, valeur_max_cible - row["Valeur Totale Actuelle RAW"])
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
                         "Capitaux Propres": formater_monnaie_empire(row["Capitaux Propres RAW"]),
                         "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
-                        "Montant à Injecter RAW": ecart_brut,
-                        "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
+                        "Montant à Injecter RAW": ecart_individuel,
+                        "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_individuel)
                     })
             
-            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
+            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE SAISIE ---
             else:
                 saisie_enveloppe = st.text_input(
                     "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
