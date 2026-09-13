@@ -15,45 +15,40 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = []
             
-            # On détecte l'en-tête pour ne pas l'inclure
             debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
 
             for ligne in lignes[debut_index:]:
                 if not ligne.strip(): continue
                 
-                # Découpage par n'importe quel groupe d'espaces ou tabulations d'origine
+                # Découpage intelligent par n'importe quel espace ou tabulation
                 elements = [el.strip() for el in ligne.split() if el.strip()]
                 if len(elements) < 2: continue
                 
-                # Le montant est TOUJOURS le dernier élément
+                # Le montant est le dernier élément, le nom est tout ce qu'il y a avant
                 frais = elements[-1].replace(" ", "").replace("€", "")
                 if not frais.isdigit(): continue
                 
-                # Le nom de la filiale est TOUT ce qui précède le montant
-                # Exemple : "ATAV00", "-", "Exorciste11" devient "ATAV00 - Exorciste11"
                 nom_filiale = " ".join(elements[:-1])
-                
-                # On assemble STRICTEMENT avec un vrai caractère tabulation \t
                 lignes_finales.append(f"{nom_filiale}\t{frais}")
 
-            # Génération au format CRLF demandé par la fiche (\r\n)
+            # Contenu d'importation pur au format CRLF (\r\n)
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
             
-            # Message Discord réduit au strict minimum pour éviter que Discord ne modifie le format
-            texte_discord = "✅ **Fichier d'importation des FRAIS DE GESTION prêt**"
+            # --- RETOUR À VOTRE RAPPORTS DISCORD D'ORIGINE ---
+            texte_discord = "✅ **Nouveau fichier d'importation des FRAIS DE GESTION !**\n"
+            texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
+            
+            if len(texte_discord) + len(contenu_crlf_pur) < 1900:
+                texte_discord += f"```text\n{contenu_crlf_pur}```"
+            else:
+                texte_discord += "⚠️ *Le tableau est trop long pour être affiché en texte sur Discord. Utilisez le fichier joint.*"
 
             fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Envoyé sur Discord ! ÉVITEZ de copier le texte sur Discord. Téléchargez directement le fichier ci-dessous :")
-                # Le bouton de téléchargement garantit à 100% que le fichier contiendra la vraie tabulation
-                st.download_button(
-                    label="📥 TÉLÉCHARGER LE FICHIER .TXT OFFICIEL", 
-                    data=contenu_crlf_pur, 
-                    file_name="frais_gestion_import_officiel.txt", 
-                    mime="text/plain"
-                )
+                st.success("🎉 Envoyé sur Discord avec le bloc texte copiable !")
+                st.download_button("📥 Télécharger le fichier d'import pur", data=contenu_crlf_pur, file_name="frais_gestion_import_officiel.txt", mime="text/plain")
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
                 
