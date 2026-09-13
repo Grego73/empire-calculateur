@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 # Titre et description de la page
 st.title("📉 Extraction des Frais de Gestion")

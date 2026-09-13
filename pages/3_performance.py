@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("📊 Statistiques Générales des Filiales")
 st.markdown("Analyse croisée et indicateurs financiers complets pour l'ensemble des filiales de votre Empire.")

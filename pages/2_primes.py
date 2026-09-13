@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("💰 Gestion & Contrôle des Primes")
 st.markdown("Calcule la part des primes et applique le filtrage et plafonnement strict basé sur le poste **PDG**.")

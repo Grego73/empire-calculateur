@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("⚖️ Équilibrage de la Valeur Réelle")
 st.markdown("Calculez les injections nécessaires pour équilibrer la **Somme Globale (Trésorerie + Capitaux Propres)** de vos filiales.")
@@ -28,32 +29,6 @@ def formater_monnaie_empire(nombre):
             
     return f"{n:,}".replace(",", " ")
 
-# 2. FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
-def convertir_saisie_en_nombre(saisie_texte):
-    texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
-    if not texte_propre:
-        return 0
-        
-    dictionnaire_paliers = {
-        "G": 10**3,  "T": 10**6,  "P": 10**9,  "E": 10**12,
-        "Z": 10**15, "Y": 10**18, "R": 10**21, "Q": 10**24,
-        "U": 10**27, "S": 10**30, "X": 10**33, "N": 10**36,
-        "D": 10**39
-    }
-    
-    match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
-    if match:
-        nombre_partie = match.group(1).replace(",", ".")
-        suffixe_partie = match.group(2)
-        
-        try:
-            valeur_num = float(nombre_partie)
-            if suffixe_partie in dictionnaire_paliers:
-                return int(valeur_num * dictionnaire_paliers[suffixe_partie])
-            return int(valeur_num)
-        except:
-            return 0
-    return 0
 
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
