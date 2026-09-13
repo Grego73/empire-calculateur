@@ -6,7 +6,9 @@ st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="ce
 # Définition des pages de navigation
 page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📉")
 page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
+page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", icon="📊")
+page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
 
-# Lancement de la navigation (crée automatiquement un menu à gauche)
-pg = st.navigation([page_frais, page_primes])
+# Lancement de la navigation
+pg = st.navigation([page_frais, page_primes, page_perf, page_equilibre])
 pg.run()
