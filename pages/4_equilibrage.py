@@ -28,13 +28,12 @@ def formater_monnaie_empire(nombre):
             
     return f"{n:,}".replace(",", " ")
 
-# 2. NOUVEAUTÉ : FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
+# 2. FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
 def convertir_saisie_en_nombre(saisie_texte):
     texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
     if not texte_propre:
         return 0
         
-    # Mapping des lettres de l'Empire vers leurs puissances de 10
     dictionnaire_paliers = {
         "G": 10**3,  "T": 10**6,  "P": 10**9,  "E": 10**12,
         "Z": 10**15, "Y": 10**18, "R": 10**21, "Q": 10**24,
@@ -42,7 +41,6 @@ def convertir_saisie_en_nombre(saisie_texte):
         "D": 10**39
     }
     
-    # Regex pour isoler le nombre (qui peut être décimal, ex: 1.5Y) et le suffixe
     match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
     if match:
         nombre_partie = match.group(1).replace(",", ".")
@@ -131,7 +129,7 @@ else:
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
             
             mode = st.radio(
-                "**2. Choisissez la méthode de calcul :**",
+                "**2. Choose calculation method :**",
                 ["⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)", "💰 Diviser et injecter une enveloppe globale"]
             )
             
@@ -142,14 +140,11 @@ else:
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
                 
-                # Remplacement du number_input par un text_input pour accepter les lettres (ex: 1500E ou 100Y)
                 saisie_cible = st.text_input(
                     "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
                     value=str(valeur_max_actuelle)
                 )
                 montant_cible = convertir_saisie_en_nombre(saisie_cible)
-                
-                # Affichage de confirmation pour que l'utilisateur valide ce que le script a compris
                 st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
                 
                 for _, row in df_filtre.iterrows():
@@ -159,7 +154,7 @@ else:
                     
                     injection_finale = ecart_brut
                     
-                    if plafond_max < apport_init:
+                    if float(plafond_max) < float(apport_init):
                         injection_finale = 0
                         alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
                     elif ecart_brut > plafond_max:
@@ -193,41 +188,7 @@ else:
                     
                     injection_finale = part_egale
                     
-                    if plafond_max < apport_init:
-                        injection_finale = 0
-                        alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
-                    elif part_egale > plafond_max:
-                        injection_finale = plafond_max
-                        alertes_securite.append(f"🚨 **{row['Filiale']}** : Part bridée à **{formater_monnaie_empire(plafond_max)}** (Limite Capitaux Propres)")
-
-                    import_rows.append({
-                        "Filiale": row["Filiale"],
-                        "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
-                        "Capitaux Propres": formater_monnaie_empire(plafond_max),
-                        "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
-                        "Montant à Injecter RAW": injection_finale,
-                        "Montant à Injecter (TAB)": formater_monnaie_empire(injection_finale)
-                    })
-            
-            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
-            else:
-                saisie_enveloppe = st.text_input(
-                    "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
-                    value="10000000"
-                )
-                enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
-                st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
-                
-                nb_filiales = len(df_filtre)
-                part_egale = int(enveloppe_globale // nb_filiales)
-                
-                for _, row in df_filtre.iterrows():
-                    plafond_max = row["Capitaux Propres RAW"]
-                    apport_init = row["Apport Initial RAW"]
-                    
-                    injection_finale = part_egale
-                    
-                    if plafond_max < apport_init:
+                    if float(plafond_max) < float(apport_init):
                         injection_finale = 0
                         alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
                     elif part_egale > plafond_max:
