@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+import re
 
 st.title("⚖️ Équilibrage de la Valeur Réelle")
 st.markdown("Calculez les injections nécessaires pour équilibrer la **Somme Globale (Trésorerie + Capitaux Propres)** de vos filiales.")
 
-# FONCTION LOGIQUE DE CONVERSION EN MONNAIE EMPIRE
+# 1. FONCTION DE CONVERSION EN MONNAIE EMPIRE (SENS : NOMBRE -> TEXTE)
 def formater_monnaie_empire(nombre):
     try:
         n = int(nombre)
@@ -27,6 +28,35 @@ def formater_monnaie_empire(nombre):
             
     return f"{n:,}".replace(",", " ")
 
+# 2. NOUVEAUTÉ : FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
+def convertir_saisie_en_nombre(saisie_texte):
+    texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
+    if not texte_propre:
+        return 0
+        
+    # Mapping des lettres de l'Empire vers leurs puissances de 10
+    dictionnaire_paliers = {
+        "G": 10**3,  "T": 10**6,  "P": 10**9,  "E": 10**12,
+        "Z": 10**15, "Y": 10**18, "R": 10**21, "Q": 10**24,
+        "U": 10**27, "S": 10**30, "X": 10**33, "N": 10**36,
+        "D": 10**39
+    }
+    
+    # Regex pour isoler le nombre (qui peut être décimal, ex: 1.5Y) et le suffixe
+    match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
+    if match:
+        nombre_partie = match.group(1).replace(",", ".")
+        suffixe_partie = match.group(2)
+        
+        try:
+            valeur_num = float(nombre_partie)
+            if suffixe_partie in dictionnaire_paliers:
+                return int(valeur_num * dictionnaire_paliers[suffixe_partie])
+            return int(valeur_num)
+        except:
+            return 0
+    return 0
+
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
@@ -38,10 +68,10 @@ else:
         # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
         lignes_fin = tab_finance.strip().split('\n')
         
-        # CORRECTION DU .LOWER() ICI (On vérifie la première ligne si elle existe)
         idx_debut_fin = 0
         if lignes_fin and len(lignes_fin) > 0:
-            if "filiale" in lignes_fin[0].lower() or "trésorerie" in lignes_fin[0].lower():
+            premiere_ligne = lignes_fin[0].lower()
+            if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne:
                 idx_debut_fin = 1
         
         data_fin = {}
@@ -56,10 +86,10 @@ else:
         # 2. Extraction du Capital (Tableau Capital)
         lignes_cap = tab_capital.strip().split('\n')
         
-        # CORRECTION DU .LOWER() ICI AUSSI
         idx_debut_cap = 0
         if lignes_cap and len(lignes_cap) > 0:
-            if "filiale" in lignes_cap[0].lower() or "apport" in lignes_cap[0].lower():
+            premiere_ligne_cap = lignes_cap[0].lower()
+            if "filiale" in premiere_ligne_cap or "apport" in premiere_ligne_cap:
                 idx_debut_cap = 1
         
         data_cap = {}
@@ -91,7 +121,7 @@ else:
 
         st.subheader("⚙️ Configuration de l'opération")
         
-        st.markdown("**1. Cochez les filiales à les inclure dans l'opération :**")
+        st.markdown("**1. Cochez les filiales à inclure dans l'opération :**")
         all_filiales = df_base["Filiale"].tolist()
         filiales_choisies = st.multiselect("Filiales cibles :", options=all_filiales, default=all_filiales)
         
@@ -111,12 +141,16 @@ else:
             # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
-                montant_cible = st.number_input(
-                    "Définissez la Valeur Totale souhaitée pour chaque filiale :",
-                    min_value=0,
-                    value=valeur_max_actuelle,
-                    step=1000000
+                
+                # Remplacement du number_input par un text_input pour accepter les lettres (ex: 1500E ou 100Y)
+                saisie_cible = st.text_input(
+                    "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
+                    value=str(valeur_max_actuelle)
                 )
+                montant_cible = convertir_saisie_en_nombre(saisie_cible)
+                
+                # Affichage de confirmation pour que l'utilisateur valide ce que le script a compris
+                st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
                 
                 for _, row in df_filtre.iterrows():
                     ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
@@ -143,12 +177,46 @@ else:
             
             # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
             else:
-                enveloppe_globale = st.number_input(
-                    "Montant total de l'enveloppe à distribuer :",
-                    min_value=0,
-                    value=10000000,
-                    step=1000000
+                saisie_enveloppe = st.text_input(
+                    "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
+                    value="10000000"
                 )
+                enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
+                st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
+                
+                nb_filiales = len(df_filtre)
+                part_egale = int(enveloppe_globale // nb_filiales)
+                
+                for _, row in df_filtre.iterrows():
+                    plafond_max = row["Capitaux Propres RAW"]
+                    apport_init = row["Apport Initial RAW"]
+                    
+                    injection_finale = part_egale
+                    
+                    if plafond_max < apport_init:
+                        injection_finale = 0
+                        alertes_securite.append(f"❌ **{row['Filiale']}** : **BLOCAGE STRICT** - Plus de valeur immobilière. Injection annulée.")
+                    elif part_egale > plafond_max:
+                        injection_finale = plafond_max
+                        alertes_securite.append(f"🚨 **{row['Filiale']}** : Part bridée à **{formater_monnaie_empire(plafond_max)}** (Limite Capitaux Propres)")
+
+                    import_rows.append({
+                        "Filiale": row["Filiale"],
+                        "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
+                        "Capitaux Propres": formater_monnaie_empire(plafond_max),
+                        "Valeur Totale Actuelle": formater_monnaie_empire(row["Valeur Totale Actuelle RAW"]),
+                        "Montant à Injecter RAW": injection_finale,
+                        "Montant à Injecter (TAB)": formater_monnaie_empire(injection_finale)
+                    })
+            
+            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
+            else:
+                saisie_enveloppe = st.text_input(
+                    "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
+                    value="10000000"
+                )
+                enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
+                st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
                 
                 nb_filiales = len(df_filtre)
                 part_egale = int(enveloppe_globale // nb_filiales)
@@ -186,11 +254,10 @@ else:
                 st.success("✅ Sécurité vérifiée : Toutes les filiales balancées respectent les équilibres comptables.")
 
             st.subheader("📊 Plan d'importation validé")
-            # Affichage propre sans coupure grâce au formatage texte string pré-géré
             df_affichage = df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]]
             st.dataframe(df_affichage, use_container_width=True)
             
-            # Génération du texte d'importation au format brut (sans lettres) exigé par Empire Immo (Filiale[TAB]Montant)
+            # Génération du texte d'importation pur au format brut exigé par le jeu (Filiale[TAB]Montant entier)
             lignes_import = []
             for _, row in df_resultat.iterrows():
                 if row["Montant à Injecter RAW"] > 0:
