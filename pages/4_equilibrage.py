@@ -126,6 +126,7 @@ else:
         if not filiales_choisies:
             st.warning("⚠️ Veuillez sélectionner au moins une filiale.")
         else:
+            # FILTRAGE DÉPLACÉ ICI : On isole d'abord les filiales sélectionnées
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
             
             mode = st.radio(
@@ -135,8 +136,9 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE ---
+            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE RECALCULÉ ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
+                # La valeur max s'adapte dynamiquement UNIQUEMENT sur les filiales cochées
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
                 
                 saisie_cible = st.text_input(
@@ -150,7 +152,6 @@ else:
                     ecart_brut = max(0, montant_cible - row["Valeur Totale Actuelle RAW"])
                     plafond_max = row["Capitaux Propres RAW"]
                     
-                    # Plus de bridage restrictif sur les capitaux propres de la filiale ici
                     import_rows.append({
                         "Filiale": row["Filiale"],
                         "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
@@ -169,6 +170,7 @@ else:
                 enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
                 st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
                 
+                # Le nombre de filiales s'ajuste lui aussi automatiquement au clic
                 nb_filiales = len(df_filtre)
                 part_egale = int(enveloppe_globale // nb_filiales)
                 
@@ -186,13 +188,13 @@ else:
 
             # --- RENDU ET AFFICHAGE ---
             df_resultat = pd.DataFrame(import_rows)
-            st.success("✅ Calculs d'équilibrage basés sur le capital général de la Holding complétés avec succès.")
+            st.success("✅ Calculs mis à jour en temps réel selon les filiales sélectionnées.")
 
             st.subheader("📊 Plan d'importation validé")
             df_affichage = df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]]
             st.dataframe(df_affichage, use_container_width=True)
             
-            # Génération du texte d'importation pur au format brut exigé par le jeu (Filiale[TAB]Montant entier)
+            # Génération du texte d'importation pur (Filiale[TAB]Montant entier)
             lignes_import = []
             for _, row in df_resultat.iterrows():
                 if row["Montant à Injecter RAW"] > 0:
