@@ -37,22 +37,16 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             # Étape 2 : Calculs du tableau financier pur pour l'importateur
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             
-            import_primes = [] # Pas d'en-tête pour s'aligner sur le comportement le plus sûr
+            # L'en-tête officielle pour les primes doit être "Filiale\tPrimes"
+            import_primes = ["Filiale\tPrimes"] 
             alertes_blocage = []
             
             index_debut_exploitation = 1 if ("filiale" in donnees_exploitation.lower() or "trésorerie" in donnees_exploitation.lower()) else 0
             for ligne in lignes_exploitation[index_debut_exploitation:]:
-                # Nettoie les espaces au début et à la fin de la ligne complète
-                ligne_nettoye = ligne.strip()
-                if not ligne_nettoye: continue
-                
-                # Découpage par tabulation ET nettoyage strict de chaque élément
-                colonnes = [col.strip() for col in ligne_nettoye.split('\t') if col.strip()]
-                if len(colonnes) < 2: continue
-                
-                nom_filiale = colonnes[0].replace('\t', ' ').strip()
-                raw_valeur = colonnes[-1].strip()
-                
+                if not ligne.strip(): continue
+                colonnes = ligne.split('\t')
+                if len(colonnes) < 3: continue
+                nom_filiale, raw_valeur = colonnes[0].strip(), colonnes[2].strip()
                 if nom_filiale not in plafonds_extraits: continue
                 
                 valeur_exploitation = int(raw_valeur) if raw_valeur.isdigit() else 0
@@ -64,13 +58,11 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                     prime_finale = plafond_max
                     alertes_blocage.append(f"⚠️ **{nom_filiale}** : Calculé **{valeur_prime_calculee}** ➡️ Bridé à **{plafond_max}** (Max)")
 
-                # Écriture chirurgicale : CHAINE + UN SEUL \t + CHAINE (aucun espace autour)
                 import_primes.append(f"{nom_filiale}\t{prime_finale}")
-
-            crlf_primes_pur = "\r\n".join(import_primes) + "\r\n"
-
             
-            # --- STRUCTURE DU MESSAGE DISCORD ---
+            crlf_primes_pur = "\r\n".join(import_primes) + "\r\n"
+            
+            # --- STRUCTURE DU MESSAGE DISCORD ADAPTÉE ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n" + "\n".join(alertes_blocage) + "\n\n"
@@ -78,18 +70,14 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             else:
                 st.success("✅ Toutes les filiales valides respectent les plafonds !")
 
-            texte_discord += "📋 **Texte d'importation prêt à être copié (Copiez bien TOUT le bloc gris d'un coup) :**\n"
-            if len(texte_discord) + len(crlf_primes_pur) < 1900:
-                texte_discord += f"```text\n{crlf_primes_pur}```"
-            else:
-                texte_discord += "⚠️ *Tableau trop long pour l'affichage plein texte Discord. Utilisez impérativement le fichier joint.*"
+            texte_discord += "📥 **Téléchargez directement le fichier joint ci-dessous** pour l'importer sur Empire Immo (le bouton copier de Discord casse le format)."
             
-            # Envoi vers Discord du fichier joint et du texte
+            # Envoi vers Discord du fichier joint et du texte explicatif
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Calculs réussis ! Le fichier d'importation officiel et le texte copiable ont été actualisés.")
+                st.success("🎉 Calculs réussis ! Le fichier d'importation officiel a été envoyé sur Discord.")
                 st.download_button("📥 Télécharger le fichier d'import pur", data=crlf_primes_pur, file_name="primes_import_officiel.txt", mime="text/plain")
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
