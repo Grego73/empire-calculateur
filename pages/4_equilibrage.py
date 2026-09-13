@@ -31,14 +31,15 @@ def formater_monnaie_empire(nombre):
 # 2. FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
 def convertir_saisie_en_nombre(saisie_texte):
     texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
-    if not text_propre:
+    # CORRECTION DE LA FAUTE DE FRAPPE ICI :
+    if not texte_propre:
         return 0
         
     dictionnaire_paliers = {
-        "G": 10**3,  "T": 10**6,  "P": 10**9,  "E": 10**12,
-        "Z": 10**15, "Y": 10**18, "R": 10**21, "Q": 10**24,
-        "U": 10**27, "S": 10**30, "X": 10**33, "N": 10**36,
-        "D": 10**39
+        "G": 1**3,  "T": 1**6,  "P": 1**9,  "E": 1**12,
+        "Z": 1**15, "Y": 1**18, "R": 1**21, "Q": 1**24,
+        "U": 1**27, "S": 1**30, "X": 1**33, "N": 1**36,
+        "D": 1**39
     }
     
     match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
