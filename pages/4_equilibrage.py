@@ -59,9 +59,13 @@ def convertir_saisie_en_nombre(saisie_texte):
             return 0
     return 0
 
-# Fonction qui force le changement de version de la case de texte
+# Fonction qui force le changement de version ET vide la mémoire pour permettre la baisse du chiffre
 def declencher_recalcul():
     st.session_state["version_calcul"] += 1
+    # On efface dynamiquement toutes les anciennes clés de saisie en cache
+    for cle in list(st.session_state.keys()):
+        if "input_cible_ver_" in cle:
+            del st.session_state[cle]
 
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
@@ -144,11 +148,15 @@ else:
             # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE DYNAMIQUE COMPLET ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
+                cle_dynamique = f"input_cible_ver_{st.session_state['version_calcul']}"
+                
+                # On force la nouvelle valeur max calculée si la case est vide ou vient d'être réinitialisée
+                if cle_dynamique not in st.session_state:
+                    st.session_state[cle_dynamique] = str(valeur_max_actuelle)
                 
                 saisie_cible = st.text_input(
                     "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
-                    value=str(valeur_max_actuelle),
-                    key=f"input_cible_ver_{st.session_state['version_calcul']}"
+                    key=cle_dynamique
                 )
                 montant_cible = convertir_saisie_en_nombre(saisie_cible)
                 st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
@@ -163,7 +171,7 @@ else:
                         "Montant à Injecter RAW": ecart_brut,
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
                     })
-            
+
             # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
             else:
                 saisie_enveloppe = st.text_input(
