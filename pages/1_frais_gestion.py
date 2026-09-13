@@ -16,7 +16,7 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = ["Filiale\tFrais de gestion"]
             
-            # CORRECTION : On vérifie si la PREMIÈRE LIGNE de texte contient les mots-clés (et pas la liste entière)
+            # Détection corrigée de l'en-tête sur la première ligne
             debut_index = 0
             if lignes and len(lignes) > 0:
                 premiere_ligne = lignes[0].lower()
@@ -35,10 +35,8 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             # Contenu d'importation pur au format CRLF (\r\n)
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
             
-            # --- STRUCTURE DU MESSAGE AVEC BLOC COPIABLE DISCORD ---
+            # --- ENVOI DISCORD ---
             texte_discord = "✅ **Nouveau fichier d'importation des FRAIS DE GESTION !**\n"
-            texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
-            
             if len(texte_discord) + len(contenu_crlf_pur) < 1900:
                 texte_discord += f"```text\n{contenu_crlf_pur}```"
             else:
@@ -48,8 +46,14 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Envoyé sur Discord avec le bloc texte copiable !")
-                # Le bouton de téléchargement Streamlit
+                st.success("🎉 Traitement réussi et envoyé sur Discord !")
+                
+                # --- NOUVEAUTÉ : BLOC DE CODE SUR LE SITE AVEC BOUTON COPIER ---
+                st.subheader("📋 Résultat prêt à être copié :")
+                st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier le texte :")
+                st.code(contenu_crlf_pur, language="text")
+                
+                # Bouton de téléchargement de secours
                 st.download_button(
                     label="📥 Télécharger le fichier d'import pur", 
                     data=contenu_crlf_pur, 
