@@ -15,39 +15,31 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = []
             
-            debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
+            debut_index = 1 if lignes and ("filiale" in lignes.lower() or "trésorerie" in lignes.lower()) else 0
 
             for ligne in lignes[debut_index:]:
                 if not ligne.strip(): continue
                 
-                # Découpage strict par tabulation pour respecter la structure Excel
                 colonnes = ligne.split('\t')
                 if len(colonnes) < 3: continue
                 
-                # Extraction propre de la 1ère colonne (Filiale) et 3ème colonne (Frais)
                 nom_filiale = colonnes[0].strip()
                 frais_de_gestion = colonnes[2].strip()
                 
-                # Construction de la ligne avec une seule et unique tabulation brute
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
-            # Contenu d'importation au format CRLF (\r\n) attendu par le site
+            # Contenu au format strict CRLF (\r\n) pour le fichier joint
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
             
-            # STRUCTURE DU MESSAGE D'ORIGINE SUR DISCORD
+            # Message Discord optimisé pour le téléchargement direct du fichier
             texte_discord = "✅ **Nouveau fichier d'importation des FRAIS DE GESTION !**\n"
-            texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
-            
-            if len(texte_discord) + len(contenu_crlf_pur) < 1900:
-                texte_discord += f"```text\n{contenu_crlf_pur}```"
-            else:
-                texte_discord += "⚠️ *Le tableau est trop long pour être affiché en texte sur Discord. Utilisez le fichier joint.*"
+            texte_discord += "📥 **Téléchargez directement le fichier joint ci-dessous** pour l'importer sur Empire Immo (le bouton copier de Discord casse le format)."
 
             fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Envoyé sur Discord avec le bloc texte copiable !")
+                st.success("🎉 Envoyé sur Discord ! Vous pouvez utiliser le fichier joint directement.")
                 st.download_button("📥 Télécharger le fichier d'import pur", data=contenu_crlf_pur, file_name="frais_gestion_import_officiel.txt", mime="text/plain")
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
