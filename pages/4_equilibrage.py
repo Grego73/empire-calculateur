@@ -5,6 +5,10 @@ import re
 st.title("⚖️ Équilibrage de la Valeur Réelle")
 st.markdown("Calculez les injections nécessaires pour équilibrer la **Somme Globale (Trésorerie + Capitaux Propres)** de vos filiales.")
 
+# Initialisation de la version du composant pour forcer la mise à jour visuelle
+if "version_calcul" not in st.session_state:
+    st.session_state["version_calcul"] = 0
+
 # 1. FONCTION DE CONVERSION EN MONNAIE EMPIRE (SENS : NOMBRE -> TEXTE)
 def formater_monnaie_empire(nombre):
     try:
@@ -31,15 +35,14 @@ def formater_monnaie_empire(nombre):
 # 2. FONCTION DE TRADUCTION INVERSÉE (SENS : TEXTE ABREGE -> ENTIER PUR)
 def convertir_saisie_en_nombre(saisie_texte):
     texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
-    # CORRECTION DE LA FAUTE DE FRAPPE ICI :
     if not texte_propre:
         return 0
         
     dictionnaire_paliers = {
-        "G": 1**3,  "T": 1**6,  "P": 1**9,  "E": 1**12,
-        "Z": 1**15, "Y": 1**18, "R": 1**21, "Q": 1**24,
-        "U": 1**27, "S": 1**30, "X": 1**33, "N": 1**36,
-        "D": 1**39
+        "G": 10**3,  "T": 10**6,  "P": 10**9,  "E": 10**12,
+        "Z": 10**15, "Y": 10**18, "R": 10**21, "Q": 10**24,
+        "U": 10**27, "S": 10**30, "X": 10**33, "N": 10**36,
+        "D": 10**39
     }
     
     match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
@@ -56,10 +59,9 @@ def convertir_saisie_en_nombre(saisie_texte):
             return 0
     return 0
 
-# Fonction déclenchée à chaque changement de case pour forcer le recalcul de la cible
-def reinitialiser_saisie():
-    if "saisie_cible_val" in st.session_state:
-        del st.session_state["saisie_cible_val"]
+# Fonction qui force le changement de version de la case de texte
+def declencher_recalcul():
+    st.session_state["version_calcul"] += 1
 
 # Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
@@ -71,29 +73,29 @@ else:
     try:
         # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
         lignes_fin = tab_finance.strip().split('\n')
-        idx_debut_fin = 1 if lignes_fin and ("filiale" in lignes_fin[0].lower() or "trésorerie" in lignes_fin[0].lower()) else 0
+        idx_debut_fin = 1 if lignes_fin and ("filiale" in lignes_fin.lower() or "trésorerie" in lignes_fin.lower()) else 0
         
         data_fin = {}
         for ligne in lignes_fin[idx_debut_fin:]:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
-            nom_filiale = colonnes[0]
-            treso = int(colonnes[1].replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes
+            treso = int(colonnes.replace(" ", "").replace("€", ""))
             data_fin[nom_filiale] = treso
 
         # 2. Extraction du Capital (Tableau Capital)
         lignes_cap = tab_capital.strip().split('\n')
-        idx_debut_cap = 1 if lignes_cap and ("filiale" in lignes_cap[0].lower() or "apport" in lignes_cap[0].lower()) else 0
+        idx_debut_cap = 1 if lignes_cap and ("filiale" in lignes_cap.lower() or "apport" in lignes_cap.lower()) else 0
         
         data_cap = {}
         for ligne in lignes_cap[idx_debut_cap:]:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
-            nom_filiale = colonnes[0]
-            apport = int(colonnes[1].replace(" ", "").replace("€", ""))
-            capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes
+            apport = int(colonnes.replace(" ", "").replace("€", ""))
+            capitaux_propres = int(colonnes.replace(" ", "").replace("€", ""))
             data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
 
         # 3. Fusion et calcul de la Valeur Globale (Trésorerie + Capitaux Propres)
@@ -118,12 +120,12 @@ else:
         st.markdown("**1. Cochez les filiales à inclure dans l'opération :**")
         all_filiales = df_base["Filiale"].tolist()
         
-        # L'ajout de on_change appelle notre fonction de réinitialisation pour mettre à jour le chiffre du haut
+        # On attache la fonction pour détecter le clic et le décochage
         filiales_choisies = st.multiselect(
             "Filiales cibles :", 
             options=all_filiales, 
             default=all_filiales,
-            on_change=reinitialiser_saisie
+            on_change=declencher_recalcul
         )
         
         if not filiales_choisies:
@@ -138,17 +140,16 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE RECALCULÉ DYNAMIQUE ---
+            # --- MODE 1 : ÉQUILIBRAGE VERS CIBLE DYNAMIQUE COMPLET ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
                 
-                # Gestion de la valeur par défaut dynamique via session_state
-                if "saisie_cible_val" not in st.session_state:
-                    st.session_state["saisie_cible_val"] = str(valeur_max_actuelle)
-                
+                # Le paramètre key inclut le numéro de version de calcul, ce qui force Streamlit
+                # à rafraîchir complètement la valeur par défaut du champ lors d'une modification
                 saisie_cible = st.text_input(
                     "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
-                    key="saisie_cible_val"
+                    value=str(valeur_max_actuelle),
+                    key=f"input_cible_ver_{st.session_state['version_calcul']}"
                 )
                 montant_cible = convertir_saisie_en_nombre(saisie_cible)
                 st.caption(f"ℹ️ Valeur cible interprétée : **{formater_monnaie_empire(montant_cible)}**")
@@ -206,7 +207,6 @@ else:
             st.markdown("Cliquez en haut à droite du bloc noir pour copier la liste, puis collez-la directement dans Empire Immo :")
             st.code(contenu_crlf_pur, language="text")
             
-            # SUPPRESSION EFFECTUÉE DE LA ZONE ALTERNATIVE SUIVANT VOTRE DEMANDE
             st.download_button("📥 Télécharger le fichier d'import pur (.txt)", data=contenu_crlf_pur, file_name="equilibrage_valeur_empire.txt", mime="text/plain")
 
     except Exception as e:
