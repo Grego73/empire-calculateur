@@ -73,7 +73,9 @@ else:
     try:
         # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
         lignes_fin = tab_finance.strip().split('\n')
-        idx_debut_fin = 1 if lignes_fin and ("filiale" in lignes_fin.lower() or "trésorerie" in lignes_fin.lower()) else 0
+        
+        # CORRECTION DU BUG LOWER SUR LA LISTE : On teste sur tab_finance (le texte brut)
+        idx_debut_fin = 1 if "filiale" in tab_finance.lower() or "trésorerie" in tab_finance.lower() else 0
         
         data_fin = {}
         for ligne in lignes_fin[idx_debut_fin:]:
@@ -86,7 +88,9 @@ else:
 
         # 2. Extraction du Capital (Tableau Capital)
         lignes_cap = tab_capital.strip().split('\n')
-        idx_debut_cap = 1 if lignes_cap and ("filiale" in lignes_cap.lower() or "apport" in lignes_cap.lower()) else 0
+        
+        # CORRECTION DU BUG LOWER ICI AUSSI : On teste sur tab_capital (le texte brut)
+        idx_debut_cap = 1 if "filiale" in tab_capital.lower() or "apport" in tab_capital.lower() else 0
         
         data_cap = {}
         for ligne in lignes_cap[idx_debut_cap:]:
@@ -120,7 +124,6 @@ else:
         st.markdown("**1. Cochez les filiales à inclure dans l'opération :**")
         all_filiales = df_base["Filiale"].tolist()
         
-        # On attache la fonction pour détecter le clic et le décochage
         filiales_choisies = st.multiselect(
             "Filiales cibles :", 
             options=all_filiales, 
@@ -144,8 +147,6 @@ else:
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_actuelle = int(df_filtre["Valeur Totale Actuelle RAW"].max())
                 
-                # Le paramètre key inclut le numéro de version de calcul, ce qui force Streamlit
-                # à rafraîchir complètement la valeur par défaut du champ lors d'une modification
                 saisie_cible = st.text_input(
                     "Définissez la Valeur Totale souhaitée (Exemples valides : 100Y, 1500E, ou un nombre brut) :",
                     value=str(valeur_max_actuelle),
