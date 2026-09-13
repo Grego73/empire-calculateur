@@ -2,27 +2,36 @@ import streamlit as st
 import requests
 
 st.title("💰 Gestion & Contrôle des Primes")
-st.markdown("Calcule la part des primes en fonction du tableau financier, et applique un filtrage et plafonnement strict basé sur le poste **PDG**.")
+st.markdown("Calcule la part des primes et applique le filtrage et plafonnement strict basé sur le poste **PDG**.")
 
-col1, col2 = st.columns(2)
-with col1:
-    pct_holding = st.slider("Pourcentage pour la Holding (%)", min_value=0, max_value=100, value=50, step=5)
-with col2:
-    pct_prime = 100 - pct_holding
-    st.metric(label="Pourcentage pour la Prime (%)", value=f"{pct_prime}%")
+# Vérification si les données ont bien été synchronisées depuis l'accueil
+if not st.session_state.get("donnees_chargees", False):
+    st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
+else:
+    # Récupération automatique des données depuis la mémoire centrale
+    donnees_exploitation = st.session_state.get("tab_finance", "")
+    donnees_plafonds = st.session_state.get("tab_primes", "")
 
-st.subheader("📋 Saisie des données du jour")
-donnees_exploitation = st.text_area("1. Collez ici le tableau financier classique :", height=250, key="data_tab_exploitation")
-donnees_plafonds = st.text_area("2. Collez ici le tableau des directeurs :", height=250, key="data_tab_plafonds")
+    # Réglage des pourcentages (Slider dynamique)
+    col1, col2 = st.columns(2)
+    with col1:
+        pct_holding = st.slider("Pourcentage pour la Holding (%)", min_value=0, max_value=100, value=50, step=5)
+    with col2:
+        pct_prime = 100 - pct_holding
+        st.metric(label="Pourcentage pour la Prime (%)", value=f"{pct_prime}%")
 
-if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_width=True):
-    if not donnees_exploitation.strip() or not donnees_plafonds.strip():
-        st.error("❌ L'un des deux tableaux est vide.")
-    else:
+    # Rappel visuel des données récupérées sous forme d'onglets discrets
+    tab1, tab2 = st.tabs(["🔍 Tableau Finance connecté", "🔍 Tableau Plafonds connecté"])
+    with tab1:
+        st.text(donnees_exploitation)
+    with tab2:
+        st.text(donnees_plafonds)
+
+    if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_width=True):
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # Étape 1 : Plafonds
+            # Étape 1 : Extraction et filtrage des plafonds
             plafonds_extraits = {}
             lignes_plafonds = donnees_plafonds.strip().split('\n')
             index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
@@ -30,14 +39,20 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 if not ligne.strip(): continue
                 colonnes = ligne.split('\t')
                 if len(colonnes) < 4: continue
-                nom_filiale, poste, directeur, raw_prime_max = colonnes[0].strip(), colonnes[1].strip(), colonnes[2].strip(), colonnes[3].strip()
+                
+                nom_filiale = colonnes[0].strip()
+                poste = colonnes[1].strip()
+                directeur = colonnes[2].strip()
+                raw_prime_max = colonnes[3].strip()
+                
+                # Règle stricte : Poste PDG uniquement, pas Grego73, pas de Constructions, pas de BTP
                 if poste.upper() == "PDG" and directeur.upper() != "GREGO73" and "CONSTRUCTIONS" not in nom_filiale.upper() and "BTP" not in nom_filiale.upper():
                     plafonds_extraits[nom_filiale] = int(raw_prime_max) if raw_prime_max.isdigit() else 0
 
             # Étape 2 : Calculs du tableau financier pur pour l'importateur
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             
-            # L'en-tête officielle pour les primes doit être "Filiale\tPrimes"
+            # L'en-tête officielle obligatoire pour les primes
             import_primes = ["Filiale\tPrimes"] 
             alertes_blocage = []
             
@@ -46,7 +61,10 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
                 if not ligne.strip(): continue
                 colonnes = ligne.split('\t')
                 if len(colonnes) < 3: continue
-                nom_filiale, raw_valeur = colonnes[0].strip(), colonnes[2].strip()
+                
+                nom_filiale = colonnes[0].strip()
+                raw_valeur = colonnes[2].strip() # Résultat d'exploitation (3ème colonne)
+                
                 if nom_filiale not in plafonds_extraits: continue
                 
                 valeur_exploitation = int(raw_valeur) if raw_valeur.isdigit() else 0
@@ -76,20 +94,30 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             else:
                 texte_discord += "⚠️ *Tableau trop long pour l'affichage plein texte Discord. Utilisez impérativement le fichier joint.*"
             
-            # Envoi vers Discord du fichier joint et du texte
+            # Envoi vers Discord du fichier joint et du texte du rapport
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code == 200:
-                st.success("🎉 Calculs réussis ! Le fichier d'importation officiel et le texte copiable ont été actualisés.")
+            if reponse.status_code == 200 or reponse.status_code == 204:
+                st.success("🎉 Calculs réussis et rapport envoyé sur Discord !")
                 
-                # --- LE BLOC DE CODE SUR LE SITE AVEC BOUTON COPIER POUR LES PRIMES ---
+                # --- AFFICHAGE SUR LE SITE AVEC LES OPTIONS DE COPIE ---
                 st.subheader("📋 Résultat prêt à être copié :")
                 st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier les primes :")
                 st.code(crlf_primes_pur, language="text")
                 
-                st.download_button("📥 Télécharger le fichier d'import pur", data=crlf_primes_pur, file_name="primes_import_officiel.txt", mime="text/plain")
+                # Zone alternative pour le CTRL+A / CTRL+C tactile/rapide
+                st.text_area("Alternative de copie rapide (Faites CTRL+A puis CTRL+C dedans) :", value=crlf_primes_pur, height=150, key="copie_secours_primes")
+                
+                # Téléchargement sécurisé du fichier physique
+                st.download_button(
+                    label="📥 Télécharger le fichier d'import pur", 
+                    data=crlf_primes_pur, 
+                    file_name="primes_import_officiel.txt", 
+                    mime="text/plain"
+                )
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
+                
         except Exception as e:
             st.error(f"⚠️ Erreur système : {str(e)}")
