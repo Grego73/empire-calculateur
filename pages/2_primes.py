@@ -62,7 +62,7 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             
             crlf_primes_pur = "\r\n".join(import_primes) + "\r\n"
             
-            # --- STRUCTURE DU MESSAGE DISCORD ADAPTÉE ---
+            # --- STRUCTURE DU MESSAGE DISCORD ---
             texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
             if alertes_blocage:
                 texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n" + "\n".join(alertes_blocage) + "\n\n"
@@ -70,14 +70,24 @@ if st.button("🚀 Calculer, Filtrer et Envoyer sur Discord", use_container_widt
             else:
                 st.success("✅ Toutes les filiales valides respectent les plafonds !")
 
-            texte_discord += "📥 **Téléchargez directement le fichier joint ci-dessous** pour l'importer sur Empire Immo (le bouton copier de Discord casse le format)."
+            texte_discord += "📋 **Texte d'importation prêt à être copié (Copiez bien TOUT le bloc gris d'un coup) :**\n"
+            if len(texte_discord) + len(crlf_primes_pur) < 1900:
+                texte_discord += f"```text\n{crlf_primes_pur}```"
+            else:
+                texte_discord += "⚠️ *Tableau trop long pour l'affichage plein texte Discord. Utilisez impérativement le fichier joint.*"
             
-            # Envoi vers Discord du fichier joint et du texte explicatif
+            # Envoi vers Discord du fichier joint et du texte
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             if reponse.status_code == 200:
-                st.success("🎉 Calculs réussis ! Le fichier d'importation officiel a été envoyé sur Discord.")
+                st.success("🎉 Calculs réussis ! Le fichier d'importation officiel et le texte copiable ont été actualisés.")
+                
+                # --- LE BLOC DE CODE SUR LE SITE AVEC BOUTON COPIER POUR LES PRIMES ---
+                st.subheader("📋 Résultat prêt à être copié :")
+                st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier les primes :")
+                st.code(crlf_primes_pur, language="text")
+                
                 st.download_button("📥 Télécharger le fichier d'import pur", data=crlf_primes_pur, file_name="primes_import_officiel.txt", mime="text/plain")
             else:
                 st.error(f"🤖 Erreur Discord : {reponse.status_code}")
