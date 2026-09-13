@@ -21,18 +21,25 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
                 ligne_nettoye = ligne.strip()
                 if not ligne_nettoye: continue
                 
-                # Découpage par tabulation en supprimant les colonnes vides
-                colonnes = [col.strip() for col in ligne_nettoye.split('\t') if col.strip()]
-                if len(colonnes) < 2: continue
+                # ÉTAPE 1 : Découper par n'importe quel espace (espace, plusieurs espaces ou tabulation)
+                # Cela permet de nettoyer la ligne proprement peu importe la source
+                elements = [el.strip() for el in ligne_nettoye.split() if el.strip()]
+                if len(elements) < 2: continue
                 
-                # Sécurité absolue :
-                nom_filiale = colonnes[0] # Toujours le premier élément
-                frais_de_gestion = colonnes[-1] # Toujours le tout dernier élément (le montant)
+                # ÉTAPE 2 : Sécurité chirurgicale
+                # La filiale est TOUJOURS le premier mot (ex: ATAV00)
+                nom_filiale = elements[0]
                 
-                # Nettoyage des espaces et symboles dans le montant
+                # Les frais sont TOUJOURS le tout dernier élément numérique de la ligne
+                frais_de_gestion = elements[-1]
+                # Nettoyage des caractères parasites si nécessaire
                 frais_de_gestion = frais_de_gestion.replace(" ", "").replace("€", "")
                 
-                # Écriture chirurgicale exigée : Filiale [TAB] Frais
+                # ÉTAPE 3 : On s'assure que la valeur finale est bien un nombre valide
+                if not frais_de_gestion.isdigit():
+                    continue # Ignore la ligne si le dernier élément n'est pas un chiffre
+                
+                # ÉCRITURE STRICTE : Uniquement la filiale, un seul \t, et le chiffre
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
             # Contenu d'importation pur au format CRLF (\r\n)
