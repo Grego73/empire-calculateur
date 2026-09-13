@@ -18,28 +18,14 @@ if st.button("🚀 Envoyer les Frais sur Discord", use_container_width=True):
             debut_index = 1 if lignes and ("filiale" in lignes[0].lower() or "trésorerie" in lignes[0].lower()) else 0
 
             for ligne in lignes[debut_index:]:
-                ligne_nettoye = ligne.strip()
-                if not ligne_nettoye: continue
+                if not ligne.strip(): continue
+                colonnes = ligne.split('\t')
+                if len(colonnes) < 3: continue
                 
-                # ÉTAPE 1 : Découper par n'importe quel espace (espace, plusieurs espaces ou tabulation)
-                # Cela permet de nettoyer la ligne proprement peu importe la source
-                elements = [el.strip() for el in ligne_nettoye.split() if el.strip()]
-                if len(elements) < 2: continue
+                nom_filiale = colonnes[0].strip()
+                # On applique .strip() sur les frais pour nettoyer l'espace invisible en fin de ligne
+                frais_de_gestion = colonnes[2].strip()
                 
-                # ÉTAPE 2 : Sécurité chirurgicale
-                # La filiale est TOUJOURS le premier mot (ex: ATAV00)
-                nom_filiale = elements[0]
-                
-                # Les frais sont TOUJOURS le tout dernier élément numérique de la ligne
-                frais_de_gestion = elements[-1]
-                # Nettoyage des caractères parasites si nécessaire
-                frais_de_gestion = frais_de_gestion.replace(" ", "").replace("€", "")
-                
-                # ÉTAPE 3 : On s'assure que la valeur finale est bien un nombre valide
-                if not frais_de_gestion.isdigit():
-                    continue # Ignore la ligne si le dernier élément n'est pas un chiffre
-                
-                # ÉCRITURE STRICTE : Uniquement la filiale, un seul \t, et le chiffre
                 lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
 
             # Contenu d'importation pur au format CRLF (\r\n)
