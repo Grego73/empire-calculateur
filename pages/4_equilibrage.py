@@ -72,8 +72,9 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
-            nom_filiale = colonnes
-            treso = int(colonnes.replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes[0]
+            # SÉCURITÉ : Application du .replace sur la bonne colonne (index 1)
+            treso = int(colonnes[1].replace(" ", "").replace("€", ""))
             data_fin[nom_filiale] = treso
 
         # 2. Extraction du Capital (Tableau Capital)
@@ -85,9 +86,10 @@ else:
             if not ligne.strip(): continue
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
-            nom_filiale = colonnes
-            apport = int(colonnes.replace(" ", "").replace("€", ""))
-            capitaux_propres = int(colonnes.replace(" ", "").replace("€", ""))
+            nom_filiale = colonnes[0]
+            # SÉCURITÉ : Application du .replace sur les bonnes colonnes (index 1 et 2)
+            apport = int(colonnes[1].replace(" ", "").replace("€", ""))
+            capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
             data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
 
         # 3. Fusion et calcul de la Valeur Globale (Trésorerie + Capitaux Propres)
@@ -130,12 +132,9 @@ else:
             
             import_rows = []
             
-            # --- MODE 1 : ÉQUILIBRAGE AUTOMATIQUE VERS LA VALEUR MAX DES FILIALES COCHÉES ---
+            # --- MODE 1 : ÉQUILIBRAGE AUTOMATIQUE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
-                # Calcul automatique pur (monte et baisse en temps réel sans blocage)
                 montant_cible = int(df_filtre["Valeur Totale Actuelle RAW"].max())
-                
-                # Affichage clair de la cible automatique
                 st.info(f"🎯 **Valeur Cible Automatique (Filiale la plus haute cochée)** : {formater_monnaie_empire(montant_cible)}")
                 
                 for _, row in df_filtre.iterrows():
@@ -149,7 +148,7 @@ else:
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_brut)
                     })
             
-            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE SAISIE ---
+            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE ---
             else:
                 saisie_enveloppe = st.text_input(
                     "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
@@ -179,7 +178,6 @@ else:
             df_affichage = df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]]
             st.dataframe(df_affichage, use_container_width=True)
             
-            # Génération du texte d'importation pur (Filiale[TAB]Montant entier)
             lignes_import = []
             for _, row in df_resultat.iterrows():
                 if row["Montant à Injecter RAW"] > 0:
