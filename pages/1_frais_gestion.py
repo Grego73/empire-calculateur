@@ -37,10 +37,18 @@ else:
                 if len(colonnes) < 3: continue
                 
                 nom_filiale = colonnes[0].strip()
-                frais_de_gestion = colonnes[2].strip()
-                lignes_finales.append(f"{nom_filiale}\t{frais_de_gestion}")
+                raw_frais = colonnes[2].strip()
+                
+                # Traduction via l'outil central si la valeur contient une lettre
+                frais_numerique = convertir_saisie_en_nombre(raw_frais)
+                
+                # SÉCURITÉ EN CAS DE VALEUR NÉGATIVE : Force à 0
+                if frais_numerique < 0:
+                    frais_numerique = 0
+                
+                lignes_finales.append(f"{nom_filiale}\t{frais_numerique}")
 
-            # Contenu d'importation pur au format CRLF (\r\n) pour Empire Immo
+            # Contenu d'importation au format CRLF (\r\n) pour Empire Immo
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
             
             # --- STRUCTURE DU MESSAGE DISCORD ---
@@ -56,16 +64,13 @@ else:
             fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code == 200 or reponse.status_code == 204:
+            if reponse.status_code in:
                 st.success("🎉 Traitement réussi et envoyé sur Discord !")
                 
                 # --- AFFICHAGE DU BLOC NOIR AVEC BOUTON COPIER DIRECT SUR LE SITE ---
                 st.subheader("📋 Résultat prêt à être copié :")
                 st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier le texte :")
                 st.code(contenu_crlf_pur, language="text")
-                
-                # Zone de texte alternative en cas de problème de survol de souris
-                st.text_area("Alternative de copie rapide (Faites CTRL+A puis CTRL+C dedans) :", value=contenu_crlf_pur, height=150, key="copie_secours_frais")
                 
                 # Bouton de téléchargement direct du fichier .txt pur
                 st.download_button(
