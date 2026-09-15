@@ -64,7 +64,7 @@ else:
             fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code in:
+            if reponse.status_code in [200, 204]:
                 st.success("🎉 Traitement réussi et envoyé sur Discord !")
                 
                 # --- AFFICHAGE DU BLOC NOIR AVEC BOUTON COPIER DIRECT SUR LE SITE ---
