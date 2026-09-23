@@ -5,7 +5,7 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("📉 Extraction des Frais de Gestion")
 st.markdown("Cette page utilise automatiquement le tableau **Finance** collé sur l'accueil pour isoler la colonne d'exploitation.")
 
-if not st.session_state.get("donnees_chargees", False):
+if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     # Récupération automatique du tableau Finance depuis la mémoire centrale
