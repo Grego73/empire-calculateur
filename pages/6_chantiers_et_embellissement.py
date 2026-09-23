@@ -14,7 +14,6 @@ def calculer_pourcentage_grands_nombres(numerateur_brut, denominateur_brut):
     if denominateur_brut <= 0:
         return 0.0
     try:
-        # Si les nombres sont trop grands, on extrait la partie numérique avant le suffixe
         return float(numerateur_brut) / float(denominateur_brut) * 100
     except:
         return 0.0
@@ -116,14 +115,12 @@ else:
                 duree_chantier = c_info["duree_mois"]
                 frais_terrain_pendant_chantier = (t_frais["charges"] + t_frais["impots"]) * duree_chantier
                 
-                # COÛT REEL GLOBAL DE L'OPÉRATION
                 cout_total_construction = c_info["cout_chantier"] + t_frais["prix"] + frais_terrain_pendant_chantier
                 prix_marche = loc_info["prix_marche"]
                 
                 rev_net_mensuel = loc_info["loyer"] - loc_info["charges"] - loc_info["impots"]
                 rev_net_annuel = rev_net_mensuel * 12
                 
-                # Utilisation de la fonction de sécurité anti-débordement
                 renta_construction_reelle = calculer_pourcentage_grands_nombres(rev_net_annuel, cout_total_construction)
                 
                 economie_construction = prix_marche - cout_total_construction if prix_marche > 0 else 0
@@ -179,45 +176,7 @@ else:
                 
                 t_focus = dictionnaire_terrains_dynamique.get(bat_c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
                 frais_dormants = (t_focus["charges"] + t_focus["impots"]) * bat_c_info["duree_mois"]
-                    st.write(f"• ⏳ Charges ({t_focus['charges']}€) & Impôts ({t_focus['impots']}€) du terrain cumulés durant les {bat_c_info['duree_mois']} mois de travaux : `{formater_monnaie_empire(frais_dormants)}`")
-                    st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
-                    
-                    st.markdown("---")
-                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Prix Clé en Main (Achat)']}`")
-                    
-                    prix_marche_raw = row_focus['Prix Marché RAW']
-                    if prix_marche_raw > 0:
-                        # Utilisation sécurisée de la fonction de ratio pour éviter les milliards de pourcents
-                        renta_achat = calculer_pourcentage_grands_nombres(focus_net_annuel, prix_marche_raw)
-                        st.write(f"   * *Rendement Locatif si acheté sur le marché : {renta_achat:.2f}%*")
-                        st.write(f"   * *Rendement Locatif si construit de A à Z : {row_focus['Rentabilité Locative (%)']:.2f}%*")
-                        
-                        gain_brut = prix_marche_raw - (bat_c_info['cout_chantier'] + t_focus['prix'] + frais_dormants)
-                        if gain_brut > 0:
-                            st.markdown(f"🟢 **Bilan : Auto-construire vous fait économiser `{formater_monnaie_empire(gain_brut)}` ({row_focus['Rentabilité/Valeur (%)']:.2f}% de plus-value) !**")
-                        else:
-                            st.markdown(f"🔴 **Bilan : L'achat direct est moins cher de `{formater_monnaie_empire(abs(gain_brut))}` !**")
-                    else:
-                        st.write("• ⚠️ Aucun prix d'achat trouvé sur le marché pour ce bien dans le Cadre 5.")
-
-            # --- TABLEAU DE BORD GLOBAL ---
-            st.markdown("---")
-            st.subheader("📋 Vue d'ensemble comparative")
-            recherche = st.text_input("Filtrer le tableau comparatif par mot-clé :", value="", key="recherche_comparatif")
-            df_filtre = df_tri_renta[df_tri_renta["Bâtiment"].str.contains(recherche, case=False)]
-            
-            df_affichage = df_filtre.copy()
-            df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
-            df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
-            
-            # Nettoyage final des valeurs brutes internes de tri
-            df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
-            
-            st.dataframe(df_affichage, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"⚠️ Erreur lors du croisement des fiches : {str(e)}")
-
+                
                 with st.expander("🔍 Décomposition du coût de construction réel de ce bien", expanded=True):
                     st.write(f"• 🏗️ Devis Chantier de base : `{formater_monnaie_empire(bat_c_info['cout_chantier'])}`")
                     st.write(f"• 🗺️ Achat du terrain ({bat_c_info['terrain']}) [extrait du Cadre 5] : `{formater_monnaie_empire(t_focus['prix'])}`")
@@ -229,7 +188,6 @@ else:
                     
                     prix_marche_raw = row_focus['Prix Marché RAW']
                     if prix_marche_raw > 0:
-                        # Utilisation sécurisée de la fonction de ratio pour éviter les milliards de pourcents
                         renta_achat = calculer_pourcentage_grands_nombres(focus_net_annuel, prix_marche_raw)
                         st.write(f"   * *Rendement Locatif si acheté sur le marché : {renta_achat:.2f}%*")
                         st.write(f"   * *Rendement Locatif si construit de A à Z : {row_focus['Rentabilité Locative (%)']:.2f}%*")
@@ -245,14 +203,13 @@ else:
             # --- TABLEAU DE BORD GLOBAL ---
             st.markdown("---")
             st.subheader("📋 Vue d'ensemble comparative")
-            recherche = st.text_input("Filtrer le tableau comparatif par mot-clé :", value="", key="recherche_comparatif")
+            recherche = st.text_input("Filtrer le tableau comparatif par mot-clé :", value="", key="recherche_6")
             df_filtre = df_tri_renta[df_tri_renta["Bâtiment"].str.contains(recherche, case=False)]
             
             df_affichage = df_filtre.copy()
             df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
             
-            # Nettoyage final des valeurs brutes internes de tri
             df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
             
             st.dataframe(df_affichage, use_container_width=True)
