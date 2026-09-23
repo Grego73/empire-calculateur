@@ -25,8 +25,8 @@ page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", ic
 page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
 
 # Pôle 2 : Nouvelles pages de Rentabilité (À créer pour vos projets)
-page_renta_const = st.Page("pages/5_rentabilite_construction.py", title="Rentabilité Construction", icon="🏗️")
-page_renta_reno = st.Page("pages/6_rentabilite_renovation.py", title="Rentabilité Rénovation", icon="🛠️")
+page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
+page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
 
 
 # 🏠 DÉFINITION DE LA PAGE D'ACCUEIL CENTRALISÉE
@@ -82,5 +82,4 @@ pg = st.navigation({
     "🏛️ Gestion Holding": [page_frais, page_primes, page_perf, page_equilibre],
     "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno]
 })
-
 pg.run()
