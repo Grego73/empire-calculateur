@@ -26,17 +26,26 @@ def formater_monnaie_empire(nombre):
     return f"{n:,}".replace(",", " ")
 
 def convertir_saisie_en_nombre(saisie_texte):
-    texte_propre = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
-    if not texte_propre:
+    # Nettoyage de la chaîne de caractères
+    texte_brut = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
+    if not texte_brut:
         return 0
         
-    match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_propre)
+    # --- AJOUT SÉCURITÉ : Détection de la notation scientifique Excel (ex: 2.88E+23) ---
+    if "E+" in texte_brut or "E-" in texte_brut or ( "E" in texte_brut and any(x in texte_brut for x in ["0","1","2","3","4","5","6","7","8","9"]) and not any(suffixe in texte_brut for suffixe in ["K","M","G","T","P"])):
+        try:
+            # Python sait convertir nativement le format "2.8855536461972E+23" en float, puis on le convertit en int très grand
+            return int(float(texte_brut))
+        except:
+            pass
+
+    # --- Analyse classique pour vos suffixes personnalisés de l'Empire (K, M, Z, Z, etc.) ---
+    match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_brut)
     if match:
         nombre_partie = match.group(1).replace(",", ".")
         suffixe_partie = match.group(2)
         
         try:
-            # Sécurité anti-arrondi : si c'est un entier, on reste en int (précision infinie en Python)
             if "." not in nombre_partie:
                 valeur_num = int(nombre_partie)
             else:
@@ -48,6 +57,7 @@ def convertir_saisie_en_nombre(saisie_texte):
         except:
             return 0
     return 0
+
 
 def verifier_concordance_rapport(rapport_texte):
     """
