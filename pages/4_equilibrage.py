@@ -62,15 +62,22 @@ else:
             st.warning("⚠️ Veuillez sélectionner au moins une filiale.")
         else:
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
-            mode = st.radio("**2. Choisissez la méthode de calcul :**", ["⚖️ Équilibrer vers une Valeur Cible unique (Capitaux Propres)", "💰 Diviser et injecter une enveloppe globale"])
+            nb_filiales = len(df_filtre)
+            
+            mode = st.radio(
+                "**2. Choisissez la méthode de calcul :**",
+                [
+                    "⚖️ Équilibrer vers une Valeur Cible unique (Capitaux Propres)", 
+                    "💰 Diviser et injecter une enveloppe globale",
+                    "🔄 Diviser et équilibrer (Nivellement + Distribution du reste)"
+                ]
+            )
             
             import_rows = []
+            capitaux_max_cible = int(df_filtre["Capitaux Propres RAW"].max())
             
-            # --- MODE 1 : ÉQUILIBRAGE STRICT SUR LES CAPITAUX PROPRES ---
+            # --- MODE 1 : ÉQUILIBRAGE STRICT (SANS ENVELOPPE FIXE) ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Capitaux Propres)":
-                # On cherche la valeur maximale uniquement dans les Capitaux Propres
-                capitaux_max_cible = int(df_filtre["Capitaux Propres RAW"].max())
-                
                 enveloppe_minimale_requise = 0
                 for _, row in df_filtre.iterrows():
                     enveloppe_minimale_requise += max(0, capitaux_max_cible - row["Capitaux Propres RAW"])
@@ -78,7 +85,6 @@ else:
                 st.info(f"💵 **Montant total minimal à injecter de la Holding pour équilibrer les Capitaux Propres** : {formater_monnaie_empire(enveloppe_minimale_requise)}")
                 
                 for _, row in df_filtre.iterrows():
-                    # Calcul de l'écart basé uniquement sur les Capitaux Propres
                     ecart_individuel = max(0, capitaux_max_cible - row["Capitaux Propres RAW"])
                     import_rows.append({
                         "Filiale": row["Filiale"],
@@ -88,13 +94,12 @@ else:
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_individuel)
                     })
                     
-            # --- MODE 2 : INJECTION GLOBALE ÉQUITABLE ---
-            else:
+            # --- MODE 2 : DIVISION STRICTEMENT ÉGALE ---
+            elif mode == "💰 Diviser et injecter une enveloppe globale":
                 saisie_enveloppe = st.text_input("Montant total de l'enveloppe à distribuer :", value="10000000")
                 enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
                 st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
                 
-                nb_filiales = len(df_filtre)
                 part_egale = int(enveloppe_globale // nb_filiales)
                 
                 for _, row in df_filtre.iterrows():
@@ -106,14 +111,47 @@ else:
                         "Montant à Injecter (TAB)": formater_monnaie_empire(part_egale)
                     })
 
+            # --- MODE 3 : DIVISER ET ÉQUILIBRER (NIVELLEMENT + RESTE) ---
+            else:
+                saisie_enveloppe = st.text_input("Montant total de l'enveloppe à distribuer :", value="1R")
+                enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
+                st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
+                
+                # Calcul de la première étape (combien coûte la mise à niveau de base)
+                cout_mise_a_niveau = 0
+                ecarts = {}
+                for _, row in df_filtre.iterrows():
+                    diff = max(0, capitaux_max_cible - row["Capitaux Propres RAW"])
+                    ecarts[row["Filiale"]] = diff
+                    cout_mise_a_niveau += diff
+                
+                if enveloppe_globale < cout_mise_a_niveau:
+                    st.error(f"❌ L'enveloppe saisie ({formater_monnaie_empire(enveloppe_globale)}) est insuffisante pour équilibrer les filiales. Le minimum requis est de {formater_monnaie_empire(cout_mise_a_niveau)}.")
+                    # Par sécurité, on force l'injection à couvrir l'écart de base sans distribuer de reste
+                    reste_par_filiale = 0
+                else:
+                    argent_restant = enveloppe_globale - cout_mise_a_niveau
+                    reste_par_filiale = int(argent_restant // nb_filiales)
+                    st.info(f"💡 Coût de la mise à niveau : **{formater_monnaie_empire(cout_mise_a_niveau)}** | Surplus distribué équitablement : **{formater_monnaie_empire(argent_restant)}** ({formater_monnaie_empire(reste_par_filiale)} / filiale)")
+
+                for _, row in df_filtre.iterrows():
+                    # Total = Écart individuel pour atteindre le sommet + Sa part équitable du surplus
+                    total_injection_filiale = ecarts[row["Filiale"]] + reste_par_filiale
+                    import_rows.append({
+                        "Filiale": row["Filiale"],
+                        "Trésorerie Actuelle": formater_monnaie_empire(row["Trésorerie Actuelle RAW"]),
+                        "Capitaux Propres Actuels": formater_monnaie_empire(row["Capitaux Propres RAW"]),
+                        "Montant à Injecter RAW": total_injection_filiale,
+                        "Montant à Injecter (TAB)": formater_monnaie_empire(total_injection_filiale)
+                    })
+
             df_resultat = pd.DataFrame(import_rows)
-            st.success("✅ Calculs mis à jour en fonction des Capitaux Propres.")
+            st.success("✅ Calculs mis à jour avec succès.")
 
             st.subheader("📊 Plan d'importation validé")
-            # Affichage du tableau nettoyé sans la colonne superflue de la valeur totale actuelle
             st.dataframe(df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres Actuels", "Montant à Injecter (TAB)"]], use_container_width=True)
             
-            # Génération du bloc d'importation au format Empire Immo (Filiale + Tabulation + Chiffre brut)
+            # Génération du bloc d'importation
             lignes_import = []
             for _, row in df_resultat.iterrows():
                 if row["Montant à Injecter RAW"] > 0:
