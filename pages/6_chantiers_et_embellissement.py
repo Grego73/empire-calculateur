@@ -159,6 +159,11 @@ else:
             if choix_bat:
                 row_focus = df_global[df_global["Bâtiment"] == choix_bat].iloc[0]
                 bat_c_info = data_construction[choix_bat]
+                l_focus = data_locatif.get(choix_bat, {"prix_marche": 0, "loyer": 0, "charges": 0, "impots": 0})
+                
+                # Correction du calcul du revenu net propre au bâtiment sélectionné
+                focus_net_mensuel = l_focus["loyer"] - l_focus["charges"] - l_focus["impots"]
+                focus_net_annuel = focus_net_mensuel * 12
                 
                 t_focus = dictionnaire_terrains_dynamique.get(bat_c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
                 frais_dormants = (t_focus["charges"] + t_focus["impots"]) * bat_c_info["duree_mois"]
@@ -169,18 +174,16 @@ else:
                     st.write(f"• ⏳ Charges ({t_focus['charges']}€) & Impôts ({t_focus['impots']}€) du terrain cumulés durant les {bat_c_info['duree_mois']} mois de travaux : `{formater_monnaie_empire(frais_dormants)}`")
                     st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
                     
-                    # --- NOUVELLES LIGNES DE COMPARAISON INTÉGRÉES ---
                     st.markdown("---")
                     st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Prix Clé en Main (Achat)']}`")
                     
-                    # Calcul de la rentabilité de l'option achat direct pour comparer
                     prix_marche_raw = row_focus['Prix Marché RAW']
                     if prix_marche_raw > 0:
-                        renta_achat = (rev_net_annuel / prix_marche_raw * 100)
+                        # Recalcul précis basé sur le bien sélectionné uniquement
+                        renta_achat = (focus_net_annuel / prix_marche_raw * 100)
                         st.write(f"   * *Rendement si acheté directement : {renta_achat:.2f}%*")
                         st.write(f"   * *Rendement si construit de A à Z : {row_focus['Rentabilité à la Const. (%)']:.2f}%*")
                         
-                        # Calcul du gain réel
                         gain_brut = prix_marche_raw - (bat_c_info['cout_chantier'] + t_focus['prix'] + frais_dormants)
                         if gain_brut > 0:
                             st.markdown(f"🟢 **Bilan : Auto-construire vous fait économiser `{formater_monnaie_empire(gain_brut)}` !**")
