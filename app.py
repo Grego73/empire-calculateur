@@ -113,13 +113,13 @@ page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injecti
 # Catégorie 2 : Calculs de Rentabilité
 page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
 page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
+# --- NOUVELLE PAGE DE SYNTHÈSE ---
+page_synthese = st.Page("pages/7_synthese_opportunites.py", title="🏆 Top Opportunités", icon="✨")
 
-# 🗺️ CONFIGURATION DE LA NAVIGATION ET DU MENU PAR CATÉGORIES
+# 🗺️ CONFIGURATION DE LA NAVIGATION TOUT À LA FIN DU FICHIER
 pg = st.navigation({
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [page_frais, page_primes, page_perf, page_equilibre],
-    "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno]
+    "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno, page_synthese] # Ajoutée ici
 })
-
-# Lancement de l'application
 pg.run()
