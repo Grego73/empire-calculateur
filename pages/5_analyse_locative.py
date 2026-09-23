@@ -10,7 +10,7 @@ if not st.session_state.get("projets_charges", False):
     st.warning("⚠️ Veuillez d'abord coller vos fiches et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     # Récupération de la zone de texte 5 de l'accueil
-    donnees_brutes = st.session_state.get("tab_projets_construction", "")
+    donnees_brutes = st.session_state.get("tab_projets_achat_loc", "")
 
     if not donnees_brutes.strip():
         st.info("💡 Le bloc 5 (Fiches Construction / Locatif) est vide sur la page d'accueil. Collez-y vos données pour activer l'analyse.")
