@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils import formater_monnaie_empire, convertir_saisie_en_nombre, calculer_pourcentage_grands_nombres
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("🏗️ Analyse des Chantiers & Embellissements")
 st.markdown("Identifiez les constructions les plus rentables de l'Empire en extrayant dynamiquement le prix et les charges des terrains.")
