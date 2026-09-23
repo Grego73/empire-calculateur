@@ -1,36 +1,10 @@
 import streamlit as st
 import pandas as pd
-import re
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("⚖️ Équilibrage de la Valeur Réelle")
 st.markdown("Calculez les injections nécessaires pour équilibrer la **Somme Globale (Trésorerie + Capitaux Propres)** de vos filiales.")
 
-# 1. FONCTION DE CONVERSION EN MONNAIE EMPIRE (SENS : NOMBRE -> TEXTE)
-def formater_monnaie_empire(nombre):
-    try:
-        n = int(nombre)
-    except:
-        return str(nombre)
-        
-    abs_n = abs(n)
-    paliers = [
-        (10**39, "D"), (10**36, "N"), (10**33, "X"), (10**30, "S"),
-        (10**27, "U"), (10**24, "Q"), (10**21, "R"), (10**18, "Y"),
-        (10**15, "Z"), (10**12, "E"), (10**9, "P"), (10**6, "T"),
-        (10**3, "G")
-    ]
-    
-    for valeur, suffixe in paliers:
-        if abs_n >= valeur:
-            reste = abs_n / valeur
-            signe = "-" if n < 0 else ""
-            return f"{signe}{reste:,.2f} {suffixe}".replace(",", " ")
-            
-    return f"{n:,}".replace(",", " ")
-
-
-# Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
@@ -38,7 +12,7 @@ else:
     tab_capital = st.session_state.get("tab_capital", "")
 
     try:
-        # 1. Extraction des filiales et de leur trésorerie actuelle (Tableau Finance)
+        # 1. Extraction des trésoreries
         lignes_fin = tab_finance.strip().split('\n')
         idx_debut_fin = 1 if "filiale" in tab_finance.lower() or "trésorerie" in tab_finance.lower() else 0
         
@@ -48,10 +22,9 @@ else:
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 2: continue
             nom_filiale = colonnes[0]
-            treso = int(colonnes[1].replace(" ", "").replace("€", ""))
-            data_fin[nom_filiale] = treso
+            data_fin[nom_filiale] = convertir_saisie_en_nombre(colonnes[1])
 
-        # 2. Extraction du Capital (Tableau Capital)
+        # 2. Extraction du Capital
         lignes_cap = tab_capital.strip().split('\n')
         idx_debut_cap = 1 if "filiale" in tab_capital.lower() or "apport" in tab_capital.lower() else 0
         
@@ -61,11 +34,12 @@ else:
             colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
             if len(colonnes) < 3: continue
             nom_filiale = colonnes[0]
-            apport = int(colonnes[1].replace(" ", "").replace("€", ""))
-            capitaux_propres = int(colonnes[2].replace(" ", "").replace("€", ""))
-            data_cap[nom_filiale] = {"apport": apport, "propres": capitaux_propres}
+            data_cap[nom_filiale] = {
+                "apport": convertir_saisie_en_nombre(colonnes[1]),
+                "propres": convertir_saisie_en_nombre(colonnes[2])
+            }
 
-        # 3. Fusion et calcul de la Valeur Globale (Trésorerie + Capitaux Propres)
+        # 3. Fusion
         filiales_jointes = []
         for nom, treso_actuelle in data_fin.items():
             if nom in data_cap:
@@ -83,40 +57,24 @@ else:
         df_base = pd.DataFrame(filiales_jointes)
 
         st.subheader("⚙️ Configuration de l'opération")
-        
-        st.markdown("**1. Cochez les filiales à inclure dans l'opération :**")
         all_filiales = df_base["Filiale"].tolist()
-        
-        filiales_choisies = st.multiselect(
-            "Filiales cibles :", 
-            options=all_filiales, 
-            default=all_filiales
-        )
+        filiales_choisies = st.multiselect("Filiales cibles :", options=all_filiales, default=all_filiales)
         
         if not filiales_choisies:
             st.warning("⚠️ Veuillez sélectionner au moins une filiale.")
         else:
             df_filtre = df_base[df_base["Filiale"].isin(filiales_choisies)].copy()
-            
-            mode = st.radio(
-                "**2. Choisissez la méthode de calcul :**",
-                ["⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)", "💰 Diviser et injecter une enveloppe globale"]
-            )
+            mode = st.radio("**2. Choisissez la méthode de calcul :**", ["⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)", "💰 Diviser et injecter une enveloppe globale"])
             
             import_rows = []
             
-            # --- MODE 1 : CALCUL DE LA DIFFÉRENCE ET DE L'ENVELOPPE MINIMALE ---
             if mode == "⚖️ Équilibrer vers une Valeur Cible unique (Trésorerie + Capitaux)":
                 valeur_max_cible = int(df_filtre["Valeur Totale Actuelle RAW"].max())
-                
-                # Calcul de la somme totale brute nécessaire pour combler tous les écarts
                 enveloppe_minimale_requise = 0
                 for _, row in df_filtre.iterrows():
                     enveloppe_minimale_requise += max(0, valeur_max_cible - row["Valeur Totale Actuelle RAW"])
                 
-                # AFFICHAGE DU CHIFFRE DU HAUT RECALCULÉ EN TEMPS RÉEL
-                # Fait exactement 0 si 1 seule filiale est cochée, et monte/baisse selon la liste !
-                st.info(f"💵 **Montant total minimal à injecter de la Holding pour équilibrer** : {formater_monnaie_empire(enveloppe_minimale_requise)}")
+                st.info(f"💵 **Montant total minimal à injecter de la Holding** : {formater_monnaie_empire(enveloppe_minimale_requise)}")
                 
                 for _, row in df_filtre.iterrows():
                     ecart_individuel = max(0, valeur_max_cible - row["Valeur Totale Actuelle RAW"])
@@ -128,13 +86,8 @@ else:
                         "Montant à Injecter RAW": ecart_individuel,
                         "Montant à Injecter (TAB)": formater_monnaie_empire(ecart_individuel)
                     })
-            
-            # --- MODE 2 : INJECTION ENVELOPPE GLOBALE SAISIE ---
             else:
-                saisie_enveloppe = st.text_input(
-                    "Montant total de l'enveloppe à distribuer (Exemples valides : 50Y, 2000P, ou un nombre brut) :",
-                    value="10000000"
-                )
+                saisie_enveloppe = st.text_input("Montant total de l'enveloppe à distribuer :", value="10000000")
                 enveloppe_globale = convertir_saisie_en_nombre(saisie_enveloppe)
                 st.caption(f"ℹ️ Enveloppe globale interprétée : **{formater_monnaie_empire(enveloppe_globale)}**")
                 
@@ -151,13 +104,11 @@ else:
                         "Montant à Injecter (TAB)": formater_monnaie_empire(part_egale)
                     })
 
-            # --- RENDU ET AFFICHAGE ---
             df_resultat = pd.DataFrame(import_rows)
-            st.success("✅ Calculs mis à jour en temps réel selon les filiales sélectionnées.")
+            st.success("✅ Calculs mis à jour en temps réel.")
 
             st.subheader("📊 Plan d'importation validé")
-            df_affichage = df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]]
-            st.dataframe(df_affichage, use_container_width=True)
+            st.dataframe(df_resultat[["Filiale", "Trésorerie Actuelle", "Capitaux Propres", "Valeur Totale Actuelle", "Montant à Injecter (TAB)"]], use_container_width=True)
             
             lignes_import = []
             for _, row in df_resultat.iterrows():
@@ -165,12 +116,9 @@ else:
                     lignes_import.append(f"{row['Filiale']}\t{row['Montant à Injecter RAW']}")
             
             contenu_crlf_pur = "\r\n".join(lignes_import) + "\r\n"
-            
             st.subheader("📋 Bloc d'importation direct")
-            st.markdown("Cliquez en haut à droite du bloc noir pour copier la liste, puis collez-la directement dans Empire Immo :")
             st.code(contenu_crlf_pur, language="text")
-            
-            st.download_button("📥 Télécharger le fichier d'import pur (.txt)", data=contenu_crlf_pur, file_name="equilibrage_valeur_empire.txt", mime="text/plain")
+            st.download_button("📥 Télécharger le fichier (.txt)", data=contenu_crlf_pur, file_name="equilibrage_valeur_empire.txt", mime="text/plain")
 
     except Exception as e:
         st.error(f"⚠️ Erreur lors du calcul de l'équilibrage : {str(e)}")
