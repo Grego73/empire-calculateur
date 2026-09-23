@@ -89,7 +89,7 @@ else:
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code in:
+            if reponse.status_code in [200, 204]:
                 st.success("🎉 Calculs réussis et rapport envoyé sur Discord !")
                 st.code(crlf_primes_pur, language="text")
                 st.download_button(label="📥 Télécharger le fichier .txt", data=crlf_primes_pur, file_name="primes_import_officiel.txt", mime="text/plain")
