@@ -18,6 +18,11 @@ else:
         pct_prime = 100 - pct_holding
         st.metric(label="Pourcentage pour la Prime (%)", value=f"{pct_prime}%")
 
+    # --- OPTION DE MISE À ZÉRO GLOBALE POUR TOUTES LES FILIALES ---
+    st.markdown("---")
+    forcer_zero = st.checkbox("🛑 Forcer TOUTES les filiales à zéro pour cet import (Mise à zéro générale)", value=False)
+    st.markdown("---")
+
     tab1, tab2 = st.tabs(["🔍 Tableau Finance connecté", "🔍 Tableau Plafonds connecté"])
     with tab1: st.text(donnees_exploitation)
     with tab2: st.text(donnees_plafonds)
@@ -26,25 +31,25 @@ else:
         try:
             url_webhook = st.secrets["webhooks"]["primes"]
             
-            # Étape 1 : Extraction et filtrage sécurisé des plafonds
+            # Étape 1 : Extraction et filtrage sécurisé des plafonds (Utile uniquement si forcer_zero est Faux)
             plafonds_extraits = {}
-            lignes_plafonds = donnees_plafonds.strip().split('\n')
-            index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
-            for ligne in lignes_plafonds[index_debut_plafonds:]:
-                if not ligne.strip(): continue
-                colonnes = ligne.split('\t')
-                if len(colonnes) < 4: continue
-                
-                nom_filiale = colonnes[0].strip()
-                poste = colonnes[1].strip()
-                directeur = colonnes[2].strip()
-                raw_prime_max = colonnes[3].strip()
-                
-                # Règle stricte PDG
-                if poste.upper() == "PDG" and directeur.upper() != "GREGO73" and "CONSTRUCTIONS" not in nom_filiale.upper() and "BTP" not in nom_filiale.upper():
-                    plafonds_extraits[nom_filiale] = convertir_saisie_en_nombre(raw_prime_max)
+            if not forcer_zero:
+                lignes_plafonds = donnees_plafonds.strip().split('\n')
+                index_debut_plafonds = 1 if "poste" in donnees_plafonds.lower() else 0
+                for ligne in lignes_plafonds[index_debut_plafonds:]:
+                    if not ligne.strip(): continue
+                    colonnes = ligne.split('\t')
+                    if len(colonnes) < 4: continue
+                    
+                    nom_filiale = colonnes[0].strip()
+                    poste = colonnes[1].strip()
+                    directeur = colonnes[2].strip()
+                    raw_prime_max = colonnes[3].strip()
+                    
+                    if poste.upper() == "PDG" and directeur.upper() != "GREGO73" and "CONSTRUCTIONS" not in nom_filiale.upper() and "BTP" not in nom_filiale.upper():
+                        plafonds_extraits[nom_filiale] = convertir_saisie_en_nombre(raw_prime_max)
 
-            # Étape 2 : Calculs du tableau financier
+            # Étape 2 : Traitement des filiales du tableau financier
             lignes_exploitation = donnees_exploitation.strip().split('\n')
             import_primes = ["Filiale\tPrimes"] 
             alertes_blocage = []
@@ -58,27 +63,37 @@ else:
                 nom_filiale = colonnes[0].strip()
                 raw_valeur = colonnes[2].strip()
                 
-                if nom_filiale not in plafonds_extraits: continue
-                
-                valeur_exploitation = convertir_saisie_en_nombre(raw_valeur)
-                valeur_prime_calculee = int(valeur_exploitation * (pct_prime / 100))
-                plafond_max = plafonds_extraits[nom_filiale]
-                
-                prime_finale = valeur_prime_calculee
-                if valeur_prime_calculee > plafond_max:
-                    prime_finale = plafond_max
-                    alertes_blocage.append(f"⚠️ **{nom_filiale}** : Calculé **{formater_monnaie_empire(valeur_prime_calculee)}** ➡️ Bridé à **{formater_monnaie_empire(plafond_max)}**")
+                # LOGIQUE DE MISE À ZÉRO GÉNÉRALE : Prend TOUTES les filiales du tableau
+                if forcer_zero:
+                    import_primes.append(f"{nom_filiale}\t0")
+                else:
+                    # Logique classique filtrée par les critères PDG
+                    if nom_filiale not in plafonds_extraits: continue
+                    
+                    valeur_exploitation = convertir_saisie_en_nombre(raw_valeur)
+                    valeur_prime_calculee = int(valeur_exploitation * (pct_prime / 100))
+                    plafond_max = plafonds_extraits[nom_filiale]
+                    
+                    prime_finale = valeur_prime_calculee
+                    if valeur_prime_calculee > plafond_max:
+                        prime_finale = plafond_max
+                        alertes_blocage.append(f"⚠️ **{nom_filiale}** : Calculé **{formater_monnaie_empire(valeur_prime_calculee)}** ➡️ Bridé à **{formater_monnaie_empire(plafond_max)}**")
 
-                import_primes.append(f"{nom_filiale}\t{prime_finale}")
+                    import_primes.append(f"{nom_filiale}\t{prime_finale}")
             
             crlf_primes_pur = "\r\n".join(import_primes) + "\r\n"
-            texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
             
-            if alertes_blocage:
-                texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n" + "\n".join(alertes_blocage) + "\n\n"
-                for alerte in alertes_blocage: st.warning(alerte)
+            # Message Discord adaptatif
+            if forcer_zero:
+                texte_discord = "🛑 **RAPPORT GÉNÉRAL : TOUTES LES FILIALES DE L'EMPIRE ONT ÉTÉ FORCÉES À 0 !**\n"
+                st.info("ℹ️ Remise à niveau globale : L'intégralité des filiales a été injectée à 0 dans le fichier d'import.")
             else:
-                st.success("✅ Toutes les filiales respectent les plafonds !")
+                texte_discord = f"📊 **RAPPORT DE CONTRÔLE DES PRIMES ({pct_holding}/{pct_prime})**\n"
+                if alertes_blocage:
+                    texte_discord += "🚨 **MODIFICATIONS APPLIQUÉES (PLAFOND ATTEINT) :**\n" + "\n".join(alertes_blocage) + "\n\n"
+                    for alerte in alertes_blocage: st.warning(alerte)
+                else:
+                    st.success("✅ Toutes les filiales valides respectent les plafonds !")
 
             texte_discord += "📋 **Texte d'importation prêt à être copié :**\n"
             if len(texte_discord) + len(crlf_primes_pur) < 1900:
@@ -89,7 +104,7 @@ else:
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code in [200, 204]:
+            if reponse.status_code == 200 or reponse.status_code == 204:
                 st.success("🎉 Calculs réussis et rapport envoyé sur Discord !")
                 st.code(crlf_primes_pur, language="text")
                 st.download_button(label="📥 Télécharger le fichier .txt", data=crlf_primes_pur, file_name="primes_import_officiel.txt", mime="text/plain")
