@@ -5,32 +5,6 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("📊 Statistiques Générales des Filiales")
 st.markdown("Analyse croisée et indicateurs financiers complets pour l'ensemble des filiales de votre Empire.")
 
-# FONCTION LOGIQUE DE CONVERSION EN MONNAIE EMPIRE
-def formater_monnaie_empire(nombre):
-    try:
-        n = int(nombre)
-    except:
-        return str(nombre)
-        
-    abs_n = abs(n)
-    
-    # Définition des paliers de l'Empire (du plus grand au plus petit)
-    paliers = [
-        (10**39, "D"), (10**36, "N"), (10**33, "X"), (10**30, "S"),
-        (10**27, "U"), (10**24, "Q"), (10**21, "R"), (10**18, "Y"),
-        (10**15, "Z"), (10**12, "E"), (10**9, "P"), (10**6, "T"),
-        (10**3, "G")
-    ]
-    
-    for valeur, suffixe in paliers:
-        if abs_n >= valeur:
-            reste = abs_n / valeur
-            signe = "-" if n < 0 else ""
-            return f"{signe}{reste:,.2f} {suffixe}".replace(",", " ")
-            
-    return f"{n:,}".replace(",", " ")
-
-# Vérification si les données ont bien été synchronisées depuis l'accueil
 if not st.session_state.get("donnees_chargees", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
@@ -49,10 +23,10 @@ else:
             if len(cols) < 5: continue
             nom = cols[0]
             data_fin[nom] = {
-                "tresorerie": int(cols[1].replace(" ", "").replace("€", "")),
-                "exploitation": int(cols[2].replace(" ", "").replace("€", "")),
-                "net": int(cols[3].replace(" ", "").replace("€", "")),
-                "benefices": int(cols[4].replace(" ", "").replace("€", ""))
+                "tresorerie": convertir_saisie_en_nombre(cols[1]),
+                "exploitation": convertir_saisie_en_nombre(cols[2]),
+                "net": convertir_saisie_en_nombre(cols[3]),
+                "benefices": convertir_saisie_en_nombre(cols[4])
             }
 
         # 2. Traitement du tableau Capital
@@ -65,10 +39,10 @@ else:
             if len(cols) < 5: continue
             nom = cols[0]
             data_cap[nom] = {
-                "apport": int(cols[1].replace(" ", "").replace("€", "")),
-                "propres": int(cols[2].replace(" ", "").replace("€", "")),
-                "latence": int(cols[3].replace(" ", "").replace("€", "")),
-                "plus_value": int(cols[4].replace(" ", "").replace("€", ""))
+                "apport": convertir_saisie_en_nombre(cols[1]),
+                "propres": convertir_saisie_en_nombre(cols[2]),
+                "latence": convertir_saisie_en_nombre(cols[3]),
+                "plus_value": convertir_saisie_en_nombre(cols[4])
             }
 
         # 3. Traitement du tableau Frais
@@ -80,9 +54,9 @@ else:
                 if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 2: continue
-                data_frais[cols[0]] = int(cols[-1].replace(" ", "").replace("€", ""))
+                data_frais[cols[0]] = convertir_saisie_en_nombre(cols[-1])
 
-        # 4. Fusion et calculs statistiques (Stockage en chaînes de caractères pour contourner la limite Pandas)
+        # 4. Fusion et calculs statistiques
         analyse_rows = []
         total_treso = 0
         total_exploitation = 0
@@ -112,34 +86,24 @@ else:
                 "Bénéfices/Pertes": formater_monnaie_empire(fin["benefices"]),
                 "Capitaux Propres": formater_monnaie_empire(cap["propres"]),
                 "Latence": formater_monnaie_empire(cap["latence"]),
-                "Rendement (%)": rendement_apport, # Gardé en nombre pour le tri interne
+                "Rendement (%)": rendement_apport,
                 "Poids Frais (%)": round(poids_frais, 2) if frais > 0 else 0
             })
 
         df = pd.DataFrame(analyse_rows)
 
-        # --- AFFICHAGE DU TABLEAU DE BORD GLOBAL ---
         st.success("🎉 Statistiques globales générées !")
-
         st.subheader("🏢 Vue d'ensemble de l'Empire")
         m1, m2, m3 = st.columns(3)
-        with m1:
-            st.metric("Trésorerie Totale", formater_monnaie_empire(total_treso))
-        with m2:
-            st.metric("Résultat Exploitation Total", formater_monnaie_empire(total_exploitation))
-        with m3:
-            st.metric("Résultat NET Total", formater_monnaie_empire(total_net))
+        with m1: st.metric("Trésorerie Totale", formater_monnaie_empire(total_treso))
+        with m2: st.metric("Résultat Exploitation Total", formater_monnaie_empire(total_exploitation))
+        with m3: st.metric("Résultat NET Total", formater_monnaie_empire(total_net))
 
         m4, m5 = st.columns(2)
-        with m4:
-            st.metric("Capital Total Apporté", formater_monnaie_empire(total_apport))
-        with m5:
-            st.metric("Latence Totale Dormante", formater_monnaie_empire(total_latence))
+        with m4: st.metric("Capital Total Apporté", formater_monnaie_empire(total_apport))
+        with m5: st.metric("Latence Totale Dormante", formater_monnaie_empire(total_latence))
 
         st.subheader("📈 Liste Statistique Détaillée de Toutes les Filiales")
-        st.markdown("Le tableau affiche désormais le format abrégé officiel de la monnaie pour éviter la coupure visuelle.")
-        
-        # Formatage des colonnes de pourcentages restantes
         df_tri = df.sort_values(by="Rendement (%)", ascending=False)
         df_affichage = df_tri.rename(columns={"Rendement (%)": "Rendement/Apport (%)"})
         
