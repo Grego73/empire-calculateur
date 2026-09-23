@@ -8,12 +8,23 @@ st.markdown("Identifiez les constructions les plus rentables de l'Empire en extr
 
 def calculer_pourcentage_grands_nombres(numerateur_brut, denominateur_brut):
     """
-    Fonction de sécurité pour diviser des nombres gigantesques de l'Empire
-    sans faire saturer ou arrondir le type float de Python.
+    Sécurité anti-bug : Réduit l'échelle des nombres géants de l'Empire
+    avant la division pour éviter les pourcentages aberrants en milliards.
     """
     if denominateur_brut <= 0:
         return 0.0
     try:
+        # On convertit en chaînes pour analyser la longueur et réduire l'échelle proportionnellement
+        str_num = str(abs(int(numerateur_brut)))
+        str_den = str(abs(int(denominateur_brut)))
+        max_len = max(len(str_num), len(str_den))
+        
+        if max_len > 10:
+            facteur = 10 ** (max_len - 7)
+            num_reduit = float(int(numerateur_brut) // facteur)
+            den_reduit = float(int(denominateur_brut) // facteur)
+            return (num_reduit / den_reduit * 100) if den_reduit > 0 else 0.0
+        
         return float(numerateur_brut) / float(denominateur_brut) * 100
     except:
         return 0.0
@@ -115,12 +126,23 @@ else:
                 duree_chantier = c_info["duree_mois"]
                 frais_terrain_pendant_chantier = (t_frais["charges"] + t_frais["impots"]) * duree_chantier
                 
+                # COÛT REEL GLOBAL DE L'OPÉRATION CONSTRUCTION (Chantier + Terrain + Taxes)
                 cout_total_construction = c_info["cout_chantier"] + t_frais["prix"] + frais_terrain_pendant_chantier
                 prix_marche = loc_info["prix_marche"]
+                
+                # Détermination du plan le moins cher (Nouvelle Colonne demandée)
+                if prix_marche > 0:
+                    if cout_total_construction < prix_marche:
+                        verdict_plan = "🏗️ Construire (Moins cher)"
+                    else:
+                        verdict_plan = "🛒 Acheter (Moins cher)"
+                else:
+                    verdict_plan = "🏗️ Construction Seule"
                 
                 rev_net_mensuel = loc_info["loyer"] - loc_info["charges"] - loc_info["impots"]
                 rev_net_annuel = rev_net_mensuel * 12
                 
+                # Calculs protégés avec notre nouvelle fonction de sécurité
                 renta_construction_reelle = calculer_pourcentage_grands_nombres(rev_net_annuel, cout_total_construction)
                 
                 economie_construction = prix_marche - cout_total_construction if prix_marche > 0 else 0
@@ -133,8 +155,9 @@ else:
                     "Coût Réel Const RAW": cout_total_construction,
                     "Renta_Const_RAW": renta_construction_reelle,
                     "Renta_Patrimoniale_RAW": renta_patrimoniale_vs_valeur,
-                    "Prix Clé en Main (Achat)": formater_monnaie_empire(prix_marche) if prix_marche > 0 else "N/A",
+                    "Clé en Main (Achat)": formater_monnaie_empire(prix_marche) if prix_marche > 0 else "N/A",
                     "Coût Global Construction": formater_monnaie_empire(cout_total_construction),
+                    "Plan le moins cher": verdict_plan, # Nouvelle colonne ajoutée
                     "Économie vs Achat": formater_monnaie_empire(economie_construction) if prix_marche > 0 else "N/A",
                     "Rentabilité Locative (%)": renta_construction_reelle,
                     "Rentabilité/Valeur (%)": renta_patrimoniale_vs_valeur,
@@ -156,7 +179,7 @@ else:
                     st.metric("Coût Global Réel (Frais inclus)", top_row["Coût Global Construction"])
                     st.metric("Rentabilité Locative Net", f"{top_row['Renta_Const_RAW']:.2f}%")
                 with c2:
-                    st.metric("Prix Clé en main Marché", top_row["Prix Clé en Main (Achat)"])
+                    st.metric("Prix Clé en main Marché", top_row["Clé en Main (Achat)"])
                     st.metric("Plus-Value à la construction", f"{top_row['Renta_Patrimoniale_RAW']:.2f}%")
             else:
                 st.info("💡 Les calculs s'afficheront dès que vos grilles de loyers seront synchronisées.")
@@ -184,7 +207,7 @@ else:
                     st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
                     
                     st.markdown("---")
-                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Prix Clé en Main (Achat)']}`")
+                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Clé en Main (Achat)']}`")
                     
                     prix_marche_raw = row_focus['Prix Marché RAW']
                     if prix_marche_raw > 0:
@@ -210,6 +233,7 @@ else:
             df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
             
+            # Nettoyage des colonnes RAW techniques internes
             df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
             
             st.dataframe(df_affichage, use_container_width=True)
