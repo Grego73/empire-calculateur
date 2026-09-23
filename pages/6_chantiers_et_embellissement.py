@@ -14,7 +14,6 @@ def calculer_pourcentage_grands_nombres(numerateur_brut, denominateur_brut):
     if denominateur_brut <= 0:
         return 0.0
     try:
-        # On convertit en chaînes pour analyser la longueur et réduire l'échelle proportionnellement
         str_num = str(abs(int(numerateur_brut)))
         str_den = str(abs(int(denominateur_brut)))
         max_len = max(len(str_num), len(str_den))
@@ -40,11 +39,11 @@ else:
         st.info("💡 Veuillez remplir au moins le Cadre 5 (Achat/Location) et le Cadre 6 (Construction) sur l'accueil pour activer le comparateur.")
     else:
         try:
-            # 1. Extraction des données du Cadre 5 (Achat du bien et Location)
+            # 1. Extraction des données du Cadre 5
             lignes_l = brut_achat_loc.strip().split('\n')
             idx_l = 0
             if lignes_l and len(lignes_l) > 0:
-                if "description" in lignes_l[0].lower() or "prix" in lignes_l[0].lower():
+                if "description" in lignes_l.lower() or "prix" in lignes_l.lower():
                     idx_l = 1
             
             data_locatif = {}
@@ -55,11 +54,11 @@ else:
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 5: continue
                 
-                nom_item = cols[0]
-                prix_brut = convertir_saisie_en_nombre(cols[1])
-                loyer_brut = convertir_saisie_en_nombre(cols[2])
-                charges_brutes = convertir_saisie_en_nombre(cols[3])
-                impots_bruts = convertir_saisie_en_nombre(cols[4])
+                nom_item = cols
+                prix_brut = convertir_saisie_en_nombre(cols)
+                loyer_brut = convertir_saisie_en_nombre(cols)
+                charges_brutes = convertir_saisie_en_nombre(cols)
+                impots_bruts = convertir_saisie_en_nombre(cols)
                 
                 data_locatif[nom_item] = {
                     "prix_marche": prix_brut,
@@ -76,11 +75,11 @@ else:
                         "impots": impots_bruts
                     }
 
-            # 2. Extraction des données du Cadre 6 (Construction)
+            # 2. Extraction des données du Cadre 6
             lignes_c = brut_construction.strip().split('\n')
             idx_c = 0
             if lignes_c and len(lignes_c) > 0:
-                if "bâtiment" in lignes_c[0].lower() or "terrain" in lignes_c[0].lower():
+                if "bâtiment" in lignes_c.lower() or "terrain" in lignes_c.lower():
                     idx_c = 1
                     
             data_construction = {}
@@ -88,33 +87,33 @@ else:
                 if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 4: continue
-                nom = cols[0]
+                nom = cols
                 data_construction[nom] = {
-                    "terrain": cols[1],
-                    "cout_chantier": convertir_saisie_en_nombre(cols[2]),
-                    "duree_mois": convertir_saisie_en_nombre(cols[3])
+                    "terrain": cols,
+                    "cout_chantier": convertir_saisie_en_nombre(cols),
+                    "duree_mois": convertir_saisie_en_nombre(cols)
                 }
 
-            # 3. Extraction des données du Cadre 7 (Embellissement)
+            # 3. Extraction des données du Cadre 7
             data_embellissement = {}
             if brut_embellissement.strip():
                 lignes_e = brut_embellissement.strip().split('\n')
                 idx_e = 0
                 if lignes_e and len(lignes_e) > 0:
-                    if "bâtiment" in lignes_e[0].lower() or "coût" in lignes_e[0].lower():
+                    if "bâtiment" in lignes_e.lower() or "coût" in lignes_e.lower():
                         idx_e = 1
                         
                 for l in lignes_e[idx_e:]:
                     if not l.strip(): continue
                     cols = [c.strip() for c in l.split('\t') if c.strip()]
                     if len(cols) < 3: continue
-                    nom = cols[0]
+                    nom = cols
                     data_embellissement[nom] = {
-                        "cout_e": convertir_saisie_en_nombre(cols[1]),
-                        "duree_e": cols[2]
+                        "cout_e": convertir_saisie_en_nombre(cols),
+                        "duree_e": cols
                     }
 
-            # 4. Croisement et calculs financiers réels de la boucle
+            # 4. Croisement et calculs financiers réels
             rows_comparatives = []
             for bat, c_info in data_construction.items():
                 loc_info = data_locatif.get(bat, {"prix_marche": 0, "loyer": 0, "charges": 0, "impots": 0})
@@ -126,11 +125,9 @@ else:
                 duree_chantier = c_info["duree_mois"]
                 frais_terrain_pendant_chantier = (t_frais["charges"] + t_frais["impots"]) * duree_chantier
                 
-                # COÛT REEL GLOBAL DE L'OPÉRATION CONSTRUCTION (Chantier + Terrain + Taxes)
                 cout_total_construction = c_info["cout_chantier"] + t_frais["prix"] + frais_terrain_pendant_chantier
                 prix_marche = loc_info["prix_marche"]
                 
-                # Détermination du plan le moins cher (Nouvelle Colonne demandée)
                 if prix_marche > 0:
                     if cout_total_construction < prix_marche:
                         verdict_plan = "🏗️ Construire (Moins cher)"
@@ -142,44 +139,45 @@ else:
                 rev_net_mensuel = loc_info["loyer"] - loc_info["charges"] - loc_info["impots"]
                 rev_net_annuel = rev_net_mensuel * 12
                 
-                # Calculs protégés avec notre nouvelle fonction de sécurité
                 renta_construction_reelle = calculer_pourcentage_grands_nombres(rev_net_annuel, cout_total_construction)
-                
                 economie_construction = prix_marche - cout_total_construction if prix_marche > 0 else 0
                 renta_patrimoniale_vs_valeur = calculer_pourcentage_grands_nombres(economie_construction, cout_total_construction)
 
                 rows_comparatives.append({
                     "Bâtiment": bat,
                     "Terrain Requis": type_terrain,
-                    "Prix Marché RAW": prix_marche,
-                    "Coût Réel Const RAW": cout_total_construction,
                     "Renta_Const_RAW": renta_construction_reelle,
                     "Renta_Patrimoniale_RAW": renta_patrimoniale_vs_valeur,
-                    "Clé en Main (Achat)": formater_monnaie_empire(prix_marche) if prix_marche > 0 else "N/A",
-                    "Coût Global Construction": formater_monnaie_empire(cout_total_construction),
-                    "Plan le moins cher": verdict_plan, # Nouvelle colonne ajoutée
-                    "Économie vs Achat": formater_monnaie_empire(economie_construction) if prix_marche > 0 else "N/A",
+                    
+                    # CORRECTION MAJEURE : On envoie les valeurs en VRAIS nombres (float) pour que le tri soit 100% numérique
+                    "Clé en Main (Achat)": float(prix_marche),
+                    "Coût Global Construction": float(cout_total_construction),
+                    "Plan le moins cher": verdict_plan,
+                    "Économie vs Achat": float(economie_construction),
+                    
                     "Rentabilité Locative (%)": renta_construction_reelle,
                     "Rentabilité/Valeur (%)": renta_patrimoniale_vs_valeur,
-                    "Coût Embellissement": formater_monnaie_empire(emb_info["cout_e"]) if emb_info["cout_e"] > 0 else "Maximum",
+                    "Coût Embellissement": float(emb_info["cout_e"]),
                     "Durée Chantiers (mois)": duree_chantier
                 })
 
             df_global = pd.DataFrame(rows_comparatives)
-            df_tri_renta = df_global.sort_values(by="Renta_Const_RAW", ascending=False)
+            
+            # Tri initial par économie décroissante
+            df_tri_renta = df_global.sort_values(by="Économie vs Achat", ascending=False)
 
             # --- VERDICT DE LA HOLDING ---
             st.subheader("🏆 Verdict de la Holding")
-            if not df_tri_renta.empty and df_tri_renta.iloc[0]["Renta_Const_RAW"] > 0:
-                top_row = df_tri_renta.iloc[0]
+            if not df_tri_renta.empty and df_tri_renta.iloc["Renta_Const_RAW"] > 0:
+                top_row = df_tri_renta.iloc
                 st.success(f"🚀 **Le bien le plus rentable à construire est : {top_row['Bâtiment']}**")
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.metric("Coût Global Réel (Frais inclus)", top_row["Coût Global Construction"])
+                    st.metric("Coût Global Réel (Frais inclus)", formater_monnaie_empire(top_row["Coût Global Construction"]))
                     st.metric("Rentabilité Locative Net", f"{top_row['Renta_Const_RAW']:.2f}%")
                 with c2:
-                    st.metric("Prix Clé en main Marché", top_row["Clé en Main (Achat)"])
+                    st.metric("Prix Clé en main Marché", formater_monnaie_empire(top_row["Clé en Main (Achat)"]))
                     st.metric("Plus-Value à la construction", f"{top_row['Renta_Patrimoniale_RAW']:.2f}%")
             else:
                 st.info("💡 Les calculs s'afficheront dès que vos grilles de loyers seront synchronisées.")
@@ -190,13 +188,12 @@ else:
             choix_bat = st.selectbox("Sélectionnez un bâtiment pour simuler son opération :", options=sorted(list(data_construction.keys())))
             
             if choix_bat:
-                row_focus = df_global[df_global["Bâtiment"] == choix_bat].iloc[0]
+                row_focus = df_global[df_global["Bâtiment"] == choix_bat].iloc
                 bat_c_info = data_construction[choix_bat]
                 l_focus = data_locatif.get(choix_bat, {"prix_marche": 0, "loyer": 0, "charges": 0, "impots": 0})
                 
                 focus_net_mensuel = l_focus["loyer"] - l_focus["charges"] - l_focus["impots"]
                 focus_net_annuel = focus_net_mensuel * 12
-                
                 t_focus = dictionnaire_terrains_dynamique.get(bat_c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
                 frais_dormants = (t_focus["charges"] + t_focus["impots"]) * bat_c_info["duree_mois"]
                 
@@ -204,12 +201,12 @@ else:
                     st.write(f"• 🏗️ Devis Chantier de base : `{formater_monnaie_empire(bat_c_info['cout_chantier'])}`")
                     st.write(f"• 🗺️ Achat du terrain ({bat_c_info['terrain']}) [extrait du Cadre 5] : `{formater_monnaie_empire(t_focus['prix'])}`")
                     st.write(f"• ⏳ Charges ({t_focus['charges']}€) & Impôts ({t_focus['impots']}€) du terrain cumulés durant les {bat_c_info['duree_mois']} mois de travaux : `{formater_monnaie_empire(frais_dormants)}`")
-                    st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
+                    st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{formater_monnaie_empire(row_focus['Coût Global Construction'])}`")
                     
                     st.markdown("---")
-                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Clé en Main (Achat)']}`")
+                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{formater_monnaie_empire(row_focus['Clé en Main (Achat)'])}`")
                     
-                    prix_marche_raw = row_focus['Prix Marché RAW']
+                    prix_marche_raw = row_focus['Clé en Main (Achat)']
                     if prix_marche_raw > 0:
                         renta_achat = calculer_pourcentage_grands_nombres(focus_net_annuel, prix_marche_raw)
                         st.write(f"   * *Rendement Locatif si acheté sur le marché : {renta_achat:.2f}%*")
@@ -230,13 +227,23 @@ else:
             df_filtre = df_tri_renta[df_tri_renta["Bâtiment"].str.contains(recherche, case=False)]
             
             df_affichage = df_filtre.copy()
+            
+            # Application des pourcentages
             df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
             
-            # Nettoyage des colonnes RAW techniques internes
-            df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
+            # Reformatage textuel final des montants géants pour l'affichage visuel
+            df_affichage["Clé en Main (Achat)"] = df_affichage["Clé en Main (Achat)"].apply(lambda x: formater_monnaie_empire(x) if x > 0 else "N/A")
+            df_affichage["Coût Global Construction"] = df_affichage["Coût Global Construction"].apply(formater_monnaie_empire)
+            df_affichage["Économie vs Achat"] = df_affichage["Économie vs Achat"].apply(formater_monnaie_empire)
+            df_affichage["Coût Embellissement"] = df_affichage["Coût Embellissement"].apply(lambda x: formater_monnaie_empire(x) if x > 0 else "Maximum")
             
+            # Nettoyage des colonnes techniques internes
+            df_affichage = df_affichage.drop(columns=["Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
+            
+            # Rendu final stable qui maintient l'ordre numérique calculé en amont
             st.dataframe(df_affichage, use_container_width=True)
 
         except Exception as e:
             st.error(f"⚠️ Erreur lors du croisement des fiches : {str(e)}")
+
