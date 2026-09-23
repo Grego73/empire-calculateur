@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("🏗️ Analyse des Chantiers & Embellissements")
@@ -39,12 +38,13 @@ else:
         st.info("💡 Veuillez remplir au moins le Cadre 5 (Achat/Location) et le Cadre 6 (Construction) sur l'accueil pour activer le comparateur.")
     else:
         try:
-            # 1. Extraction des données du Cadre 5
+            # 1. Extraction des données du Cadre 5 (Achat du bien et Location)
             lignes_l = brut_achat_loc.strip().split('\n')
+            
+            # RECTIFICATION ICI : On analyse la chaîne brute globale au lieu de la liste
             idx_l = 0
-            if lignes_l and len(lignes_l) > 0:
-                if "description" in lignes_l.lower() or "prix" in lignes_l.lower():
-                    idx_l = 1
+            if "description" in brut_achat_loc.lower() or "prix" in brut_achat_loc.lower():
+                idx_l = 1
             
             data_locatif = {}
             dictionnaire_terrains_dynamique = {}
@@ -75,12 +75,13 @@ else:
                         "impots": impots_bruts
                     }
 
-            # 2. Extraction des données du Cadre 6
+            # 2. Extraction des données du Cadre 6 (Construction)
             lignes_c = brut_construction.strip().split('\n')
+            
+            # RECTIFICATION ICI : On analyse la chaîne brute globale au lieu de la liste
             idx_c = 0
-            if lignes_c and len(lignes_c) > 0:
-                if "bâtiment" in lignes_c.lower() or "terrain" in lignes_c.lower():
-                    idx_c = 1
+            if "bâtiment" in brut_construction.lower() or "terrain" in brut_construction.lower():
+                idx_c = 1
                     
             data_construction = {}
             for l in lignes_c[idx_c:]:
@@ -94,14 +95,15 @@ else:
                     "duree_mois": convertir_saisie_en_nombre(cols)
                 }
 
-            # 3. Extraction des données du Cadre 7
+            # 3. Extraction des données du Cadre 7 (Embellissement)
             data_embellissement = {}
             if brut_embellissement.strip():
                 lignes_e = brut_embellissement.strip().split('\n')
+                
+                # RECTIFICATION ICI : On analyse la chaîne brute globale au lieu de la liste
                 idx_e = 0
-                if lignes_e and len(lignes_e) > 0:
-                    if "bâtiment" in lignes_e.lower() or "coût" in lignes_e.lower():
-                        idx_e = 1
+                if "bâtiment" in brut_embellissement.lower() or "coût" in brut_embellissement.lower():
+                    idx_e = 1
                         
                 for l in lignes_e[idx_e:]:
                     if not l.strip(): continue
@@ -146,25 +148,28 @@ else:
                 rows_comparatives.append({
                     "Bâtiment": bat,
                     "Terrain Requis": type_terrain,
+                    
+                    # Valeurs numériques pures pour forcer le tri Pandas interne
+                    "Économie_Tri": economie_construction,
+                    "Prix Marché RAW": prix_marche,
                     "Renta_Const_RAW": renta_construction_reelle,
                     "Renta_Patrimoniale_RAW": renta_patrimoniale_vs_valeur,
                     
-                    # CORRECTION MAJEURE : On envoie les valeurs en VRAIS nombres (float) pour que le tri soit 100% numérique
-                    "Clé en Main (Achat)": float(prix_marche),
-                    "Coût Global Construction": float(cout_total_construction),
+                    # Valeurs de base exploitées par l'affichage
+                    "Clé en Main (Achat)": prix_marche,
+                    "Coût Global Construction": cout_total_construction,
                     "Plan le moins cher": verdict_plan,
-                    "Économie vs Achat": float(economie_construction),
-                    
+                    "Économie vs Achat": economie_construction,
                     "Rentabilité Locative (%)": renta_construction_reelle,
                     "Rentabilité/Valeur (%)": renta_patrimoniale_vs_valeur,
-                    "Coût Embellissement": float(emb_info["cout_e"]),
+                    "Coût Embellissement": emb_info["cout_e"],
                     "Durée Chantiers (mois)": duree_chantier
                 })
 
             df_global = pd.DataFrame(rows_comparatives)
             
-            # Tri initial par économie décroissante
-            df_tri_renta = df_global.sort_values(by="Économie vs Achat", ascending=False)
+            # Tri par la colonne masquée de l'économie réelle numérique
+            df_tri_renta = df_global.sort_values(by="Économie_Tri", ascending=False)
 
             # --- VERDICT DE LA HOLDING ---
             st.subheader("🏆 Verdict de la Holding")
@@ -194,6 +199,7 @@ else:
                 
                 focus_net_mensuel = l_focus["loyer"] - l_focus["charges"] - l_focus["impots"]
                 focus_net_annuel = focus_net_mensuel * 12
+                
                 t_focus = dictionnaire_terrains_dynamique.get(bat_c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
                 frais_dormants = (t_focus["charges"] + t_focus["impots"]) * bat_c_info["duree_mois"]
                 
@@ -206,7 +212,7 @@ else:
                     st.markdown("---")
                     st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{formater_monnaie_empire(row_focus['Clé en Main (Achat)'])}`")
                     
-                    prix_marche_raw = row_focus['Clé en Main (Achat)']
+                    prix_marche_raw = row_focus['Prix Marché RAW']
                     if prix_marche_raw > 0:
                         renta_achat = calculer_pourcentage_grands_nombres(focus_net_annuel, prix_marche_raw)
                         st.write(f"   * *Rendement Locatif si acheté sur le marché : {renta_achat:.2f}%*")
@@ -228,22 +234,20 @@ else:
             
             df_affichage = df_filtre.copy()
             
-            # Application des pourcentages
+            # Formatage des taux de rendement
             df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
             
-            # Reformatage textuel final des montants géants pour l'affichage visuel
+            # Conversion textuelle finale des valeurs monétaires géantes pour l'Empire
             df_affichage["Clé en Main (Achat)"] = df_affichage["Clé en Main (Achat)"].apply(lambda x: formater_monnaie_empire(x) if x > 0 else "N/A")
             df_affichage["Coût Global Construction"] = df_affichage["Coût Global Construction"].apply(formater_monnaie_empire)
             df_affichage["Économie vs Achat"] = df_affichage["Économie vs Achat"].apply(formater_monnaie_empire)
             df_affichage["Coût Embellissement"] = df_affichage["Coût Embellissement"].apply(lambda x: formater_monnaie_empire(x) if x > 0 else "Maximum")
             
-            # Nettoyage des colonnes techniques internes
-            df_affichage = df_affichage.drop(columns=["Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
+            # Retrait des index techniques bruts devenus inutiles
+            df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Économie_Tri", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
             
-            # Rendu final stable qui maintient l'ordre numérique calculé en amont
             st.dataframe(df_affichage, use_container_width=True)
 
         except Exception as e:
             st.error(f"⚠️ Erreur lors du croisement des fiches : {str(e)}")
-
