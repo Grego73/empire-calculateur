@@ -10,8 +10,7 @@ if not st.session_state.get("projets_charges", False):
 else:
     # Récupération des deux blocs saisis sur l'accueil
     brut_construction = st.session_state.get("tab_projets_construction", "")
-    brut_embellissement = st.session_state.get("tab_projets_renovation", "")
-
+    brut_embellissement = st.session_state.get("tab_projets_embellissement", "")
     if not brut_construction.strip() or not brut_embellissement.strip():
         st.info("💡 Pour utiliser ce comparateur, veillez à remplir à la fois le bloc 5 (Construction) et le bloc 6 (Embellissement) sur la page d'accueil.")
     else:
