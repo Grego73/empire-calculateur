@@ -5,15 +5,24 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("✨ Le Podium des Opportunités de l'Empire")
 st.markdown("Ce tableau de bord extrait automatiquement vos données synchronisées pour élire le **Top 3** de chaque stratégie.")
 
-# Fonction de sécurité pour diviser les nombres géants
 def calculer_ratio_secu(num, den):
-    if den <= 0: return 0.0
+    """
+    Sécurité anti-bug : Réduit l'échelle des nombres géants de l'Empire
+    avant la division pour éviter les pourcentages aberrants en milliards.
+    """
+    if den <= 0: 
+        return 0.0
     try:
-        s_num, s_den = str(abs(int(num))), str(abs(int(den)))
-        m_len = max(len(s_num), len(s_den))
-        if m_len > 10:
-            facteur = 10 ** (m_len - 7)
-            return float(int(num) // facteur) / float(int(den) // facteur) * 100
+        str_num = str(abs(int(num)))
+        str_den = str(abs(int(den)))
+        max_len = max(len(str_num), len(str_den))
+        
+        if max_len > 10:
+            facteur = 10 ** (max_len - 7)
+            num_reduit = float(int(num) // facteur)
+            den_reduit = float(int(den) // facteur)
+            return (num_reduit / den_reduit * 100) if den_reduit > 0 else 0.0
+        
         return float(num) / float(den) * 100
     except:
         return 0.0
@@ -26,49 +35,79 @@ else:
     brut_embellissement = st.session_state.get("tab_projets_embellissement", "")
 
     try:
-        # --- PARSING DU CADRE 5 (ACHAT / LOCATION) ---
+        # --- 1. PARSING DU CADRE 5 (ACHAT / LOCATION) ---
         data_locatif = {}
         terrains_frais = {}
         if brut_achat_loc.strip():
-            for l in brut_achat_loc.strip().split('\n'):
+            lignes_l = brut_achat_loc.strip().split('\n')
+            idx_l = 1 if ("description" in lignes_l[0].lower() or "prix" in lignes_l[0].lower()) else 0
+            
+            for l in lignes_l[idx_l:]:
+                if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 5 or "prix" in l.lower(): continue
-                nom, p, loy, ch, imp = cols, convertir_saisie_en_nombre(cols), convertir_saisie_en_nombre(cols), convertir_saisie_en_nombre(cols), convertir_saisie_en_nombre(cols)
+                if len(cols) < 5: continue
+                
+                # CORRECTION ICI : On prend le texte pur cols[0] au lieu de la liste cols
+                nom = cols[0]
+                p = convertir_saisie_en_nombre(cols[1])
+                loy = convertir_saisie_en_nombre(cols[2])
+                ch = convertir_saisie_en_nombre(cols[3])
+                imp = convertir_saisie_en_nombre(cols[4])
+                
                 data_locatif[nom] = {"prix": p, "loyer": loy, "charges": ch, "impots": imp}
+                
                 if "TERRAIN" in nom.upper() or "PARC" in nom.upper():
                     terrains_frais[nom] = {"prix": p, "charges": ch, "impots": imp}
 
-        # --- PARSING DU CADRE 6 (CONSTRUCTION) ---
+        # --- 2. PARSING DU CADRE 6 (CONSTRUCTION) ---
         data_construction = {}
         if brut_construction.strip():
-            for l in brut_construction.strip().split('\n'):
+            lignes_c = brut_construction.strip().split('\n')
+            idx_c = 1 if ("bâtiment" in lignes_c[0].lower() or "terrain" in lignes_c[0].lower()) else 0
+            
+            for l in lignes_c[idx_c:]:
+                if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 4 or "terrain" in l.lower(): continue
-                nom, terr, cout_ch, dur = cols, cols, convertir_saisie_en_nombre(cols), convertir_saisie_en_nombre(cols)
+                if len(cols) < 4: continue
+                
+                nom = cols[0]
+                terr = cols[1]
+                cout_ch = convertir_saisie_en_nombre(cols[2])
+                dur = convertir_saisie_en_nombre(cols[3])
+                
                 data_construction[nom] = {"terrain": terr, "cout_ch": cout_ch, "duree": dur}
 
-        # --- PARSING DU CADRE 7 (EMBELLISSEMENT) ---
+        # --- 3. PARSING DU CADRE 7 (EMBELLISSEMENT) ---
         data_embellissement = {}
         if brut_embellissement.strip():
-            for l in brut_embellissement.strip().split('\n'):
+            lignes_e = brut_embellissement.strip().split('\n')
+            idx_e = 1 if ("bâtiment" in lignes_e[0].lower() or "coût" in lignes_e[0].lower()) else 0
+            
+            for l in lignes_e[idx_e:]:
+                if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 3 or "coût" in l.lower(): continue
-                nom, cout_e, dur_e = cols, convertir_saisie_en_nombre(cols), cols
+                if len(cols) < 3: continue
+                
+                nom = cols[0]
+                cout_e = convertir_saisie_en_nombre(cols[1])
+                dur_e = cols[2]
+                
                 data_embellissement[nom] = {"cout_e": cout_e, "duree_e": dur_e}
 
         # ==========================================
         # 📊 PILLIER 1 : PODIUM ACHAT / LOCATION
         # ==========================================
-        st.subheader("📊 1. Top 3 Achat & Rendement Locatif")
+        st.subheader("📊 1. Top 3 Achat & Rendement Locatif Nette")
         rows_loc = []
         for nom, info in data_locatif.items():
+            if "TERRAIN" in nom.upper() or "PARC" in nom.upper(): continue
             net_m = info["loyer"] - info["charges"] - info["impots"]
             renta_n = calculer_ratio_secu(net_m * 12, info["prix"])
             if info["prix"] > 0 and renta_n > 0:
                 rows_loc.append({"Nom": nom, "Renta": renta_n, "Net": formater_monnaie_empire(net_m)})
         
-        top_loc = pd.DataFrame(rows_loc).sort_values(by="Renta", ascending=False).head(3)
-        if not top_loc.empty:
+        if rows_loc:
+            top_loc = pd.DataFrame(rows_loc).sort_values(by="Renta", ascending=False).head(3)
             c1, c2, c3 = st.columns(3)
             medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
             for i, (idx, r) in enumerate(top_loc.iterrows()):
@@ -81,19 +120,21 @@ else:
         # 🏗️ PILLIER 2 : PODIUM CONSTRUCTION / VENTE
         # ==========================================
         st.markdown("---")
-        st.subheader("🏗️ 2. Top 3 Auto-Construction (Plus-value vs Marché)")
+        st.subheader("🏗️ 2. Top 3 Auto-Construction (Plus-value vs Achat Direct)")
         rows_const = []
         for nom, c_info in data_construction.items():
             loc_info = data_locatif.get(nom, {"prix": 0, "loyer": 0, "charges": 0, "impots": 0})
             if loc_info["prix"] > 0:
                 t_frais = terrains_frais.get(c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
-                total_c = c_info["cout_ch"] + t_frais["prix"] + ((t_frais["charges"] + t_frais["impots"]) * c_info["duree"])
+                frais_terrain_chantier = (t_frais["charges"] + t_frais["impots"]) * c_info["duree"]
+                total_c = c_info["cout_ch"] + t_frais["prix"] + frais_terrain_chantier
+                
                 marge_b = loc_info["prix"] - total_c
                 marge_pct = calculer_ratio_secu(marge_b, total_c)
                 rows_const.append({"Nom": nom, "Marge_Pct": marge_pct, "Marge_Brute": marge_b})
         
-        top_const = pd.DataFrame(rows_const).sort_values(by="Marge_Pct", ascending=False).head(3)
-        if not top_const.empty:
+        if rows_const:
+            top_const = pd.DataFrame(rows_const).sort_values(by="Marge_Pct", ascending=False).head(3)
             c1, c2, c3 = st.columns(3)
             medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
             for i, (idx, r) in enumerate(top_const.iterrows()):
@@ -107,23 +148,20 @@ else:
         # 💅 PILLIER 3 : PODIUM EMBELLISSEMENT
         # ==========================================
         st.markdown("---")
-        st.subheader("💅 3. Top 3 Opérations d'Embellissement")
-        st.info("💡 Cette section compare la valeur ajoutée sur le marché par rapport au coût de l'embellissement.")
-        # Pour cet exemple on applique le calcul générique sur vos données d'embellissement
+        st.subheader("💅 3. Top 3 Opérations d'Embellissement (Budgets les plus optimisés)")
         rows_emb = []
         for nom, e_info in data_embellissement.items():
             if e_info["cout_e"] > 0:
-                # Simule le gain sur travaux (calculé sur le ratio d'évolution si détecté)
-                marge_travaux = calculer_ratio_secu(e_info["cout_e"] * 0.25, e_info["cout_e"]) # Estimation par défaut si pas de delta
-                rows_emb.append({"Nom": nom, "Marge": marge_travaux, "Cout": formater_monnaie_empire(e_info["cout_e"])})
+                rows_emb.append({"Nom": nom, "Cout_Raw": e_info["cout_e"], "Cout_Format": formater_monnaie_empire(e_info["cout_e"])})
         
-        top_emb = pd.DataFrame(rows_emb).sort_values(by="Marge", ascending=False).head(3)
-        if not top_emb.empty:
+        if rows_emb:
+            # Trie par le coût le plus faible (le plus optimisé pour investir de petites enveloppes)
+            top_emb = pd.DataFrame(rows_emb).sort_values(by="Cout_Raw", ascending=True).head(3)
             c1, c2, c3 = st.columns(3)
             medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
             for i, (idx, r) in enumerate(top_emb.iterrows()):
                 with [c1, c2, c3][i]:
-                    st.metric(label=f"{medailles[i]} - {r['Nom']}", value=f"Budget", delta=f"{r['Cout']}")
+                    st.metric(label=f"{medailles[i]} - {r['Nom']}", value=r['Cout_Format'], delta="Frais minimum")
         else:
             st.info("Collez vos fiches d'embellissement pour classer les budgets.")
 
