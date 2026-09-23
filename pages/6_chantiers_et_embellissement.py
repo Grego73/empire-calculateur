@@ -1,31 +1,9 @@
 import streamlit as st
 import pandas as pd
-from utils import formater_monnaie_empire, convertir_saisie_en_nombre
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre, calculer_pourcentage_grands_nombres
 
 st.title("🏗️ Analyse des Chantiers & Embellissements")
 st.markdown("Identifiez les constructions les plus rentables de l'Empire en extrayant dynamiquement le prix et les charges des terrains.")
-
-def calculer_pourcentage_grands_nombres(numerateur_brut, denominateur_brut):
-    """
-    Sécurité anti-bug : Réduit l'échelle des nombres géants de l'Empire
-    avant la division pour éviter les pourcentages aberrants en milliards.
-    """
-    if denominateur_brut <= 0:
-        return 0.0
-    try:
-        str_num = str(abs(int(numerateur_brut)))
-        str_den = str(abs(int(denominateur_brut)))
-        max_len = max(len(str_num), len(str_den))
-        
-        if max_len > 10:
-            facteur = 10 ** (max_len - 7)
-            num_reduit = float(int(numerateur_brut) // facteur)
-            den_reduit = float(int(denominateur_brut) // facteur)
-            return (num_reduit / den_reduit * 100) if den_reduit > 0 else 0.0
-        
-        return float(numerateur_brut) / float(denominateur_brut) * 100
-    except:
-        return 0.0
 
 if not st.session_state.get("projets_charges", False):
     st.warning("⚠️ Veuillez d'abord coller vos fiches et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
@@ -47,14 +25,24 @@ else:
             data_locatif = {}
             dictionnaire_terrains_dynamique = {}
             
+            # Récupération des filtres globaux de la page d'accueil
+            keyword_promo_global = st.session_state.get("nom_bien_promo", "").strip().upper()
+            taux_promo_global = st.session_state.get("taux_reduction_promo", 0)
+            
             for l in lignes_l[idx_l:]:
                 if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 5: continue
                 
-                # CORRECTION : extraction de l'élément texte pur cols[0]
                 nom_item = cols[0]
+                
+                # Double détection de la promo (Tag individuel * prioritaire, sinon Promo globale de l'accueil)
+                contient_tag_etoile = "*" in cols[1]
                 prix_brut = convertir_saisie_en_nombre(cols[1])
+                
+                if not contient_tag_etoile and keyword_promo_global and taux_promo_global > 0 and keyword_promo_global in nom_item.upper():
+                    prix_brut = int(prix_brut / (1 - (taux_promo_global / 100)))
+                
                 loyer_brut = convertir_saisie_en_nombre(cols[2])
                 charges_brutes = convertir_saisie_en_nombre(cols[3])
                 impots_bruts = convertir_saisie_en_nombre(cols[4])
@@ -86,7 +74,6 @@ else:
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 4: continue
                 
-                # CORRECTION : cols[0]
                 nom = cols[0]
                 data_construction[nom] = {
                     "terrain": cols[1],
@@ -107,7 +94,6 @@ else:
                     cols = [c.strip() for c in l.split('\t') if c.strip()]
                     if len(cols) < 3: continue
                     
-                    # CORRECTION : cols[0]
                     nom = cols[0]
                     data_embellissement[nom] = {
                         "cout_e": convertir_saisie_en_nombre(cols[1]),
@@ -147,8 +133,6 @@ else:
                 rows_comparatives.append({
                     "Bâtiment": bat,
                     "Terrain Requis": type_terrain,
-                    
-                    # Variables numériques pures indispensables au tri stable
                     "Économie_Tri": economie_construction,
                     "Prix Marché RAW": prix_marche,
                     "Renta_Const_RAW": renta_construction_reelle,
@@ -230,7 +214,7 @@ else:
             
             df_affichage = df_filtre.copy()
             
-            # Formatage des pourcentages pour l'affichage visuel
+            # Formatage des taux de rendement pour affichage visuel
             df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
             
@@ -240,7 +224,7 @@ else:
             df_affichage["Économie vs Achat"] = df_affichage["Économie vs Achat"].apply(formater_monnaie_empire)
             df_affichage["Coût Embellissement"] = df_affichage["Coût Embellissement"].apply(lambda x: formater_monnaie_empire(x) if x > 0 else "Maximum")
             
-            # Retrait des index techniques bruts devenus inutiles
+            # Retrait des index techniques bruts de calcul devenus inutiles
             df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Économie_Tri", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
             
             st.dataframe(df_affichage, use_container_width=True)
