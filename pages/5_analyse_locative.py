@@ -6,7 +6,7 @@ st.title("📊 Analyse Locative & Rendements")
 st.markdown("Calculez les revenus nets réels et le temps d'amortissement (R.O.I) des infrastructures à partir de votre saisie unique.")
 
 # Vérification de la synchronisation de l'accueil
-if not st.session_state.get("donnees_chargees", False):
+if not st.session_state.get("projets_charges", False):
     st.warning("⚠️ Veuillez d'abord coller vos fiches et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     # Récupération de la zone de texte 5 de l'accueil
