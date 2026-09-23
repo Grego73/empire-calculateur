@@ -221,3 +221,41 @@ else:
                 with st.expander("🔍 Décomposition du coût de construction réel de ce bien", expanded=True):
                     st.write(f"• 🏗️ Devis Chantier de base : `{formater_monnaie_empire(bat_c_info['cout_chantier'])}`")
                     st.write(f"• 🗺️ Achat du terrain ({bat_c_info['terrain']}) [extrait du Cadre 5] : `{formater_monnaie_empire(t_focus['prix'])}`")
+                    st.write(f"• ⏳ Charges ({t_focus['charges']}€) & Impôts ({t_focus['impots']}€) du terrain cumulés durant les {bat_c_info['duree_mois']} mois de travaux : `{formater_monnaie_empire(frais_dormants)}`")
+                    st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
+                    
+                    st.markdown("---")
+                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Prix Clé en Main (Achat)']}`")
+                    
+                    prix_marche_raw = row_focus['Prix Marché RAW']
+                    if prix_marche_raw > 0:
+                        # Utilisation sécurisée de la fonction de ratio pour éviter les milliards de pourcents
+                        renta_achat = calculer_pourcentage_grands_nombres(focus_net_annuel, prix_marche_raw)
+                        st.write(f"   * *Rendement Locatif si acheté sur le marché : {renta_achat:.2f}%*")
+                        st.write(f"   * *Rendement Locatif si construit de A à Z : {row_focus['Rentabilité Locative (%)']:.2f}%*")
+                        
+                        gain_brut = prix_marche_raw - (bat_c_info['cout_chantier'] + t_focus['prix'] + frais_dormants)
+                        if gain_brut > 0:
+                            st.markdown(f"🟢 **Bilan : Auto-construire vous fait économiser `{formater_monnaie_empire(gain_brut)}` ({row_focus['Rentabilité/Valeur (%)']:.2f}% de plus-value) !**")
+                        else:
+                            st.markdown(f"🔴 **Bilan : L'achat direct est moins cher de `{formater_monnaie_empire(abs(gain_brut))}` !**")
+                    else:
+                        st.write("• ⚠️ Aucun prix d'achat trouvé sur le marché pour ce bien dans le Cadre 5.")
+
+            # --- TABLEAU DE BORD GLOBAL ---
+            st.markdown("---")
+            st.subheader("📋 Vue d'ensemble comparative")
+            recherche = st.text_input("Filtrer le tableau comparatif par mot-clé :", value="", key="recherche_comparatif")
+            df_filtre = df_tri_renta[df_tri_renta["Bâtiment"].str.contains(recherche, case=False)]
+            
+            df_affichage = df_filtre.copy()
+            df_affichage["Rentabilité Locative (%)"] = df_affichage["Rentabilité Locative (%)"].apply(lambda x: f"{x:.2f}%")
+            df_affichage["Rentabilité/Valeur (%)"] = df_affichage["Rentabilité/Valeur (%)"].apply(lambda x: f"{x:.2f}%")
+            
+            # Nettoyage final des valeurs brutes internes de tri
+            df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW", "Renta_Patrimoniale_RAW"])
+            
+            st.dataframe(df_affichage, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"⚠️ Erreur lors du croisement des fiches : {str(e)}")
