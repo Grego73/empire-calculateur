@@ -5,7 +5,7 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("⚖️ Équilibrage basé sur les Capitaux Propres")
 st.markdown("Calculez les injections nécessaires pour équilibrer uniquement les **Capitaux Propres** de vos filiales.")
 
-if not st.session_state.get("donnees_chargees", False):
+if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     tab_finance = st.session_state.get("tab_finance", "")
