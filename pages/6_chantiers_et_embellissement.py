@@ -5,7 +5,7 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("🏗️ Chantiers & Embellissements")
 st.markdown("Comparez dynamiquement les coûts et les durées de vos projets de construction et de rénovation.")
 
-if not st.session_state.get("donnees_chargees", False):
+if not st.session_state.get("projets_charges", False):
     st.warning("⚠️ Veuillez d'abord coller vos fiches et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     # Récupération des deux blocs saisis sur l'accueil
