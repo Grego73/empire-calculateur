@@ -167,7 +167,28 @@ else:
                     st.write(f"• 🏗️ Devis Chantier de base : `{formater_monnaie_empire(bat_c_info['cout_chantier'])}`")
                     st.write(f"• 🗺️ Achat du terrain ({bat_c_info['terrain']}) [extrait du Cadre 5] : `{formater_monnaie_empire(t_focus['prix'])}`")
                     st.write(f"• ⏳ Charges ({t_focus['charges']}€) & Impôts ({t_focus['impots']}€) du terrain cumulés durant les {bat_c_info['duree_mois']} mois de travaux : `{formater_monnaie_empire(frais_dormants)}`")
-                    st.write(f"➡️ **Coût Total Réel de l'Opération :** `{row_focus['Coût Global Construction']}`")
+                    st.write(f"➡️ **Coût Total Réel de l'Opération (Construction) :** `{row_focus['Coût Global Construction']}`")
+                    
+                    # --- NOUVELLES LIGNES DE COMPARAISON INTÉGRÉES ---
+                    st.markdown("---")
+                    st.write(f"• 🛒 **Prix clé en main (Achat direct sur le marché) :** `{row_focus['Prix Clé en Main (Achat)']}`")
+                    
+                    # Calcul de la rentabilité de l'option achat direct pour comparer
+                    prix_marche_raw = row_focus['Prix Marché RAW']
+                    if prix_marche_raw > 0:
+                        renta_achat = (rev_net_annuel / prix_marche_raw * 100)
+                        st.write(f"   * *Rendement si acheté directement : {renta_achat:.2f}%*")
+                        st.write(f"   * *Rendement si construit de A à Z : {row_focus['Rentabilité à la Const. (%)']:.2f}%*")
+                        
+                        # Calcul du gain réel
+                        gain_brut = prix_marche_raw - (bat_c_info['cout_chantier'] + t_focus['prix'] + frais_dormants)
+                        if gain_brut > 0:
+                            st.markdown(f"🟢 **Bilan : Auto-construire vous fait économiser `{formater_monnaie_empire(gain_brut)}` !**")
+                        else:
+                            st.markdown(f"🔴 **Bilan : L'achat direct est moins cher de `{formater_monnaie_empire(abs(gain_brut))}` !**")
+                    else:
+                        st.write("• ⚠️ Aucun prix d'achat trouvé sur le marché pour ce bien dans le Cadre 5.")
+
 
             # --- TABLEAU DE BORD GLOBAL ---
             st.markdown("---")
