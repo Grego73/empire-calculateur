@@ -16,9 +16,14 @@ else:
         st.info("💡 Veuillez remplir au moins le Cadre 5 (Achat/Location) et le Cadre 6 (Construction) sur l'accueil pour activer le comparateur.")
     else:
         try:
-            # 1. Extraction des données du Cadre 5 (Achat du bien et Location) + Construction dynamique du Dictionnaire Terrains
+            # 1. Extraction des données du Cadre 5 (Achat du bien et Location)
             lignes_l = brut_achat_loc.strip().split('\n')
-            idx_l = 1 if "description" in lignes_l.lower() or "prix" in lignes_l.lower() else 0
+            
+            # CORRECTION ICI : On teste uniquement la première ligne [0] et pas la liste complète
+            idx_l = 0
+            if lignes_l and len(lignes_l) > 0:
+                if "description" in lignes_l[0].lower() or "prix" in lignes_l[0].lower():
+                    idx_l = 1
             
             data_locatif = {}
             dictionnaire_terrains_dynamique = {}
@@ -34,7 +39,6 @@ else:
                 charges_brutes = convertir_saisie_en_nombre(cols[3])
                 impots_bruts = convertir_saisie_en_nombre(cols[4])
                 
-                # Stockage des biens immobiliers classiques
                 data_locatif[nom_item] = {
                     "prix_marche": prix_brut,
                     "loyer": loyer_brut,
@@ -42,7 +46,6 @@ else:
                     "impots": impots_bruts
                 }
                 
-                # Si l'item contient le mot "TERRAIN" ou "PARC", on l'ajoute automatiquement au dictionnaire des terrains
                 nom_item_upper = nom_item.upper()
                 if "TERRAIN" in nom_item_upper or "PARC" in nom_item_upper:
                     dictionnaire_terrains_dynamique[nom_item] = {
@@ -53,7 +56,13 @@ else:
 
             # 2. Extraction des données du Cadre 6 (Construction)
             lignes_c = brut_construction.strip().split('\n')
-            idx_c = 1 if "bâtiment" in lignes_c.lower() or "terrain" in lignes_c.lower() else 0
+            
+            # CORRECTION ICI : Test sur la première ligne [0]
+            idx_c = 0
+            if lignes_c and len(lignes_c) > 0:
+                if "bâtiment" in lignes_c[0].lower() or "terrain" in lignes_c[0].lower():
+                    idx_c = 1
+                    
             data_construction = {}
             for l in lignes_c[idx_c:]:
                 if not l.strip(): continue
@@ -70,7 +79,13 @@ else:
             data_embellissement = {}
             if brut_embellissement.strip():
                 lignes_e = brut_embellissement.strip().split('\n')
-                idx_e = 1 if "bâtiment" in lignes_e.lower() or "coût" in lignes_e.lower() else 0
+                
+                # CORRECTION ICI : Test sur la première ligne [0]
+                idx_e = 0
+                if lignes_e and len(lignes_e) > 0:
+                    if "bâtiment" in lignes_e[0].lower() or "coût" in lignes_e[0].lower():
+                        idx_e = 1
+                        
                 for l in lignes_e[idx_e:]:
                     if not l.strip(): continue
                     cols = [c.strip() for c in l.split('\t') if c.strip()]
@@ -87,22 +102,17 @@ else:
                 loc_info = data_locatif.get(bat, {"prix_marche": 0, "loyer": 0, "charges": 0, "impots": 0})
                 emb_info = data_embellissement.get(bat, {"cout_e": 0, "duree_e": "0"})
                 
-                # Recherche du terrain dans notre dictionnaire extrait dynamiquement
                 type_terrain = c_info["terrain"]
                 t_frais = dictionnaire_terrains_dynamique.get(type_terrain, {"prix": 0, "charges": 0, "impots": 0})
                 
-                # Calcul des charges et impôts du terrain accumulés pendant le chantier
                 duree_chantier = c_info["duree_mois"]
                 frais_terrain_pendant_chantier = (t_frais["charges"] + t_frais["impots"]) * duree_chantier
                 
-                # COÛT REEL GLOBAL DE LA CONSTRUCTION (Chantier + Terrain + Frais dormants)
                 cout_total_construction = c_info["cout_chantier"] + t_frais["prix"] + frais_terrain_pendant_chantier
                 
-                # Comparaison directe avec l'achat clé en main sur le marché
                 prix_marche = loc_info["prix_marche"]
                 economie_construction = prix_marche - cout_total_construction if prix_marche > 0 else 0
                 
-                # Rendement Net basé sur le coût de construction réel
                 rev_net_mensuel = loc_info["loyer"] - loc_info["charges"] - loc_info["impots"]
                 rev_net_annuel = rev_net_mensuel * 12
                 renta_construction_reelle = (rev_net_annuel / cout_total_construction * 100) if cout_total_construction > 0 else 0
@@ -150,7 +160,6 @@ else:
                 row_focus = df_global[df_global["Bâtiment"] == choix_bat].iloc[0]
                 bat_c_info = data_construction[choix_bat]
                 
-                # Récupération dynamique pour le focus détaillé
                 t_focus = dictionnaire_terrains_dynamique.get(bat_c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
                 frais_dormants = (t_focus["charges"] + t_focus["impots"]) * bat_c_info["duree_mois"]
                 
@@ -164,11 +173,8 @@ else:
             st.markdown("---")
             st.subheader("📋 Vue d'ensemble comparative")
             recherche = st.text_input("Filtrer le tableau comparatif par mot-clé :", value="")
-            
-            # [Votre ligne de départ]
             df_filtre = df_tri_renta[df_tri_renta["Bâtiment"].str.contains(recherche, case=False)]
             
-            # [La suite complète]
             df_affichage = df_filtre.copy()
             df_affichage["Rentabilité à la Const. (%)"] = df_affichage["Rentabilité à la Const. (%)"].apply(lambda x: f"{x:.2f}%")
             df_affichage = df_affichage.drop(columns=["Prix Marché RAW", "Coût Réel Const RAW", "Renta_Const_RAW"])
@@ -177,4 +183,3 @@ else:
 
         except Exception as e:
             st.error(f"⚠️ Erreur lors du croisement des fiches : {str(e)}")
-
