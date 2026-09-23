@@ -10,10 +10,14 @@ if "tab_capital" not in st.session_state: st.session_state["tab_capital"] = ""
 if "tab_primes" not in st.session_state: st.session_state["tab_primes"] = ""
 if "tab_frais" not in st.session_state: st.session_state["tab_frais"] = ""
 
-# Blocs de Fiches Projets / Rentabilité (3 Blocs distincts)
+# Blocs de Fiches Projets / Rentabilité
 if "tab_projets_achat_loc" not in st.session_state: st.session_state["tab_projets_achat_loc"] = ""
 if "tab_projets_construction" not in st.session_state: st.session_state["tab_projets_construction"] = ""
 if "tab_projets_embellissement" not in st.session_state: st.session_state["tab_projets_embellissement"] = ""
+
+# --- CONFIGURATION DYNAMIQUE DES BIENS EN PROMOTION ---
+if "nom_bien_promo" not in st.session_state: st.session_state["nom_bien_promo"] = ""
+if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduction_promo"] = 0
 
 # Statuts de chargement indépendants
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
@@ -54,7 +58,19 @@ def home_page():
     # --- SECTION 2 : DONNÉES DES PROJETS DE RENTABILITÉ ---
     st.subheader("🏗️ 2. Fiches Projets & Rentabilité")
     st.markdown("Collez ici vos rapports ou fiches de chantiers pour extraire les coûts et rendements.")
-    st.session_state["tab_projets_achat_loc"] = st.text_area("5. Fiches ACHAT DU BIEN ET LOCATION :", value=st.session_state["tab_projets_achat_loc"], height=120)
+    st.session_state["tab_projets_achat_loc"] = st.text_area("5. Fiches ACHAT DU BIEN ET LOCATION :", value=st.session_state["tab_projets_achat_loc"], height=150)
+    
+    # --- LOGIQUE INTEGRÉE POUR LES PROMOTIONS DU JOUR ---
+    st.markdown("##### 🏷️ Option Promotion temporaire du Marché")
+    st.caption("Si un ou plusieurs biens sont affichés en promotion dans votre saisie, configurez-les ici pour recalibrer automatiquement leur vraie valeur.")
+    
+    p_col1, p_col2 = st.columns(2)
+    with p_col1:
+        st.session_state["nom_bien_promo"] = st.text_input("Rechercher le mot-clé du bien en promo (ex: Mégapôle, Bureaux, Gratte-ciel) :", value=st.session_state["nom_bien_promo"])
+    with p_col2:
+        st.session_state["taux_reduction_promo"] = st.number_input("Pourcentage de réduction appliqué dans le jeu (%) :", min_value=0, max_value=99, value=st.session_state["taux_reduction_promo"], step=5)
+    
+    st.markdown(" ")
     st.session_state["tab_projets_construction"] = st.text_area("6. Fiches CONSTRUCTION :", value=st.session_state["tab_projets_construction"], height=120)
     st.session_state["tab_projets_embellissement"] = st.text_area("7. Fiches EMBELLISSEMENT :", value=st.session_state["tab_projets_embellissement"], height=120)
     
@@ -71,6 +87,8 @@ def home_page():
             st.session_state["tab_projets_achat_loc"] = ""
             st.session_state["tab_projets_construction"] = ""
             st.session_state["tab_projets_embellissement"] = ""
+            st.session_state["nom_bien_promo"] = ""
+            st.session_state["taux_reduction_promo"] = 0
             st.session_state["projets_charges"] = False
             st.rerun()
     
@@ -113,13 +131,14 @@ page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injecti
 # Catégorie 2 : Calculs de Rentabilité
 page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
 page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
-# --- NOUVELLE PAGE DE SYNTHÈSE ---
 page_synthese = st.Page("pages/7_synthese_opportunites.py", title="🏆 Top Opportunités", icon="✨")
 
-# 🗺️ CONFIGURATION DE LA NAVIGATION TOUT À LA FIN DU FICHIER
+# 🗺️ CONFIGURATION DE LA NAVIGATION ET DU MENU PAR CATÉGORIES
 pg = st.navigation({
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [page_frais, page_primes, page_perf, page_equilibre],
-    "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno, page_synthese] # Ajoutée ici
+    "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno, page_synthese]
 })
+
+# Lancement de l'application
 pg.run()
