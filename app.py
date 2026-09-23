@@ -10,11 +10,12 @@ if "tab_capital" not in st.session_state: st.session_state["tab_capital"] = ""
 if "tab_primes" not in st.session_state: st.session_state["tab_primes"] = ""
 if "tab_frais" not in st.session_state: st.session_state["tab_frais"] = ""
 
-# Blocs de Fiches Projets / Rentabilité
+# Blocs de Fiches Projets / Rentabilité (3 Blocs distincts)
+if "tab_projets_achat_loc" not in st.session_state: st.session_state["tab_projets_achat_loc"] = ""
 if "tab_projets_construction" not in st.session_state: st.session_state["tab_projets_construction"] = ""
-if "tab_projets_renovation" not in st.session_state: st.session_state["tab_projets_renovation"] = ""
+if "tab_projets_embellissement" not in st.session_state: st.session_state["tab_projets_embellissement"] = ""
 
-# Statuts de chargement indépendants pour éviter les blocages croisés
+# Statuts de chargement indépendants
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
@@ -67,21 +68,23 @@ def home_page():
     # --- SECTION 2 : DONNÉES DES PROJETS DE RENTABILITÉ ---
     st.subheader("🏗️ 2. Fiches Projets & Rentabilité")
     st.markdown("Collez ici vos rapports ou fiches de chantiers pour extraire les coûts et rendements.")
-    st.session_state["tab_projets_construction"] = st.text_area("5. Fiches CONSTRUCTION / NEUF / LOCATIF :", value=st.session_state["tab_projets_construction"], height=150)
-    st.session_state["tab_projets_renovation"] = st.text_area("6. Fiches RÉNOVATION / EMBELLISSEMENT :", value=st.session_state["tab_projets_renovation"], height=150)
+    st.session_state["tab_projets_achat_loc"] = st.text_area("5. Fiches ACHAT DU BIEN ET LOCATION :", value=st.session_state["tab_projets_achat_loc"], height=120)
+    st.session_state["tab_projets_construction"] = st.text_area("6. Fiches CONSTRUCTION :", value=st.session_state["tab_projets_construction"], height=120)
+    st.session_state["tab_projets_embellissement"] = st.text_area("7. Fiches EMBELLISSEMENT :", value=st.session_state["tab_projets_embellissement"], height=120)
     
     col3, col4 = st.columns(2)
     with col3:
         if st.button("🚀 Synchroniser uniquement les Projets", use_container_width=True):
-            if not st.session_state["tab_projets_construction"].strip():
-                st.error("❌ La fiche de construction brute (bloc 5) est requise.")
+            if not st.session_state["tab_projets_achat_loc"].strip() and not st.session_state["tab_projets_construction"].strip():
+                st.error("❌ Veuillez remplir au moins une fiche de projet pour synchroniser.")
             else:
                 st.session_state["projets_charges"] = True
                 st.success("🎉 Pôle Projets & Rentabilité synchronisé et prêt !")
     with col4:
         if st.button("🗑️ Vider les fiches Projets", use_container_width=True):
+            st.session_state["tab_projets_achat_loc"] = ""
             st.session_state["tab_projets_construction"] = ""
-            st.session_state["tab_projets_renovation"] = ""
+            st.session_state["tab_projets_embellissement"] = ""
             st.session_state["projets_charges"] = False
             st.rerun()
     
