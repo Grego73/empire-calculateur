@@ -20,20 +20,6 @@ if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
 
-# 📋 DÉCLARATION DES PAGES DE L'APPLICATION
-page_home = st.Page(lambda: home_page(), title="📥 Accueil & Saisie Unique", icon="🏠")
-
-# Catégorie 1 : Gestion Holding
-page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📉")
-page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
-page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", icon="📊")
-page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
-
-# Catégorie 2 : Calculs de Rentabilité
-page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
-page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
-
-
 # 🏠 DÉFINITION DE LA PAGE D'ACCUEIL CENTRALISÉE
 def home_page():
     st.title("🏠 Centre de Saisie Unique de l'Empire")
@@ -109,11 +95,24 @@ def home_page():
             else:
                 st.success("✅ CONCORDANCE PARFAITE : Les calculs de la filiale sont 100% valides et équilibrés !")
                 col1_aud, col2_aud = st.columns(2)
-                with col1_aud: 
+                with col1_aud:
                     st.write(f"• Résultat NET : `{formater_monnaie_empire(data.get('net', 0))}`")
-                with col2_aud: 
+                with col2_aud:
                     st.write(f"• Total Actif/Passif : `{formater_monnaie_empire(data.get('actif', 0))}`")
 
+
+# 📋 DÉCLARATION DES PAGES DE L'APPLICATION
+page_home = st.Page(lambda: home_page(), title="📥 Accueil & Saisie Unique", icon="🏠")
+
+# Catégorie 1 : Gestion Holding
+page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📉")
+page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
+page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", icon="📊")
+page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
+
+# Catégorie 2 : Calculs de Rentabilité
+page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
+page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
 
 # 🗺️ CONFIGURATION DE LA NAVIGATION ET DU MENU PAR CATÉGORIES
 pg = st.navigation({
