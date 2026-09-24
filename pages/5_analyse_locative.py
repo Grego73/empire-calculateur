@@ -17,9 +17,9 @@ else:
         st.info("💡 Le bloc 5 (Achat du bien et Location) est vide sur la page d'accueil. Collez-y vos données pour activer l'analyse.")
     else:
         try:
-            # --- 💵 AJOUT DE LA CASE FINANCIÈRE DYNAMIQUE ---
+            # --- 💵 ZONE FINANCIÈRE DYNAMIQUE ---
             st.subheader("💰 1. Capacité Financière de la Holding")
-            saisie_capital = st.text_input("Saisissez votre budget ou trésorerie disponible (ex: 500M, 10G, 5.5Z) :", value="10G")
+            saisie_capital = st.text_input("Saisissez votre budget ou trésorerie disponible (ex: 500M, 10G, 5.5Z) :", value="10G", key="capital_input_5")
             capital_disponible = convertir_saisie_en_nombre(saisie_capital)
             st.caption(f"ℹ️ Capital interprété par la Holding : **{formater_monnaie_empire(capital_disponible)}**")
             st.markdown("---")
@@ -35,32 +35,27 @@ else:
                 colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
                 if len(colonnes) < 5: continue
                 
-                desc = colonnes
-                prix = convertir_saisie_en_nombre(colonnes)
-                loyer = convertir_saisie_en_nombre(colonnes)
-                charges = convertir_saisie_en_nombre(colonnes)
-                impots = convertir_saisie_en_nombre(colonnes)
+                desc = colonnes[0] # Extraction du texte pur
+                prix = convertir_saisie_en_nombre(colonnes[1])
+                loyer = convertir_saisie_en_nombre(colonnes[2])
+                charges = convertir_saisie_en_nombre(colonnes[3])
+                impots = convertir_saisie_en_nombre(colonnes[4])
                 
-                # Exclusion des terrains et parcs qui faussent le locatif pur
+                # Exclusion des terrains et parcs qui n'ont pas de loyer
                 if "TERRAIN" in desc.upper() or "PARC" in desc.upper(): continue
                 
                 rev_net_mensuel = loyer - charges - impots
                 rev_net_annuel = rev_net_mensuel * 12
                 renta_nette = (rev_net_annuel / prix * 100) if prix > 0 else 0
                 
-                # --- CALCULS STRATÉGIQUES BASÉS SUR VOTRE CAPITAL ---
+                # Calculs basés sur votre budget
                 if prix > 0 and capital_disponible > 0:
-                    # Combien de biens je peux m'offrir avec mon argent ?
                     nb_biens_possibles = capital_disponible // prix
-                    
-                    # On applique la bride stricte des 500 000 000 d'unités max du jeu
                     if nb_biens_possibles > PLAFOND_MAX_BIENS:
                         nb_biens_possibles = PLAFOND_MAX_BIENS
                         statut_limite = "⚠️ Bridé par la place (500M)"
                     else:
                         statut_limite = "💵 Limité par votre budget"
-                        
-                    # Quel est le gain mensuel total généré par cette ligne ?
                     gain_mensuel_total = rev_net_mensuel * nb_biens_possibles
                 else:
                     nb_biens_possibles = 0
@@ -78,11 +73,9 @@ else:
                     "Prix d'Achat": prix,
                     "Rendement Net (%)": renta_nette,
                     "R.O.I": roi_texte,
-                    
-                    # Colonnes dynamiques par rapport au budget
                     "Quantité Max Achetée": nb_biens_possibles,
                     "Facteur Limitant": statut_limite,
-                    "Gain Mensuel Cumulé RAW": gain_mensuel_total, # Pour le tri
+                    "Gain Mensuel Cumulé RAW": gain_mensuel_total,
                     "Gain Mensuel Cumulé": formater_monnaie_empire(gain_mensuel_total),
                     "Revenu Net Unique": formater_monnaie_empire(rev_net_mensuel)
                 })
@@ -90,28 +83,23 @@ else:
             df = pd.DataFrame(rows)
 
             st.subheader("🔍 Analyse des meilleures opportunités budgétaires")
-            recherche = st.text_input("Filtrer par mot-clé (ex: Bureaux, Usine) :", value="", key="filtre_locatif")
+            recherche = st.text_input("Filtrer par mot-clé :", value="", key="filtre_locatif")
             df_filtre = df[df["Description"].str.contains(recherche, case=False)].copy()
 
-            # Tri automatique par le plus gros gain d'argent généré globalement
             df_affichage = df_filtre.sort_values(by="Gain Mensuel Cumulé RAW", ascending=False)
 
-            # Formatage cosmétique pour l'affichage final
             df_visuel = df_affichage.copy()
             df_visuel["Prix d'Achat"] = df_visuel["Prix d'Achat"].apply(formater_monnaie_empire)
             df_visuel["Rendement Net (%)"] = df_visuel["Rendement Net (%)"].apply(lambda x: f"{x:.2f}%")
             df_visuel["Quantité Max Achetée"] = df_visuel["Quantité Max Achetée"].apply(lambda x: f"{x:,}".replace(",", " "))
-            
-            # Retrait des index techniques
             df_visuel = df_visuel.drop(columns=["Gain Mensuel Cumulé RAW"])
 
             st.dataframe(df_visuel, use_container_width=True)
 
-            # --- VERDICT STRATÉGIQUE DE L'EXPERT ---
-            if not df_affichage.empty and df_affichage.iloc["Gain Mensuel Cumulé RAW"] > 0:
-                top_achat = df_affichage.iloc
+            if not df_affichage.empty and df_affichage.iloc[0]["Gain Mensuel Cumulé RAW"] > 0:
+                top_achat = df_affichage.iloc[0]
                 st.success(f"👑 **Stratégie d'achat validée pour votre budget :**")
-                st.write(f"En investissant votre capital dans l'achat de **{df_visuel.iloc['Quantité Max Achetée']}** unités de **{top_achat['Description']}**, vous générez le plus gros flux de trésorerie possible avec un gain net global de **{top_achat['Gain Mensuel Cumulé']} /mois**.")
+                st.write(f"En investissant votre capital dans l'achat de **{df_visuel.iloc[0]['Quantité Max Achetée']}** unités de **{top_achat['Description']}**, vous générez le plus gros flux de trésorerie possible avec un gain net global de **{top_achat['Gain Mensuel Cumulé']} /mois**.")
 
         except Exception as e:
             st.error(f"⚠️ Erreur lors de l'analyse locative : {str(e)}")
