@@ -1,95 +1,79 @@
-import streamlit as st
+import os
+import sys
 import requests
-from utils import formater_monnaie_empire, convertir_saisie_en_nombre
+from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-st.title("📉 Extraction des Frais de Gestion")
-st.markdown("Cette page utilise automatiquement le tableau **Finance** collé sur l'accueil pour isoler la colonne d'exploitation.")
+# Alignement du chemin d'importation
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from utils import API_KEY, BASE_URL
 
-if not st.session_state.get("holding_chargee", False):
-    st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
-else:
-    # Récupération automatique du tableau Finance depuis la mémoire centrale
-    donnees_brutes = st.session_state.get("tab_finance", "")
+DOSSIER_CRON = os.path.dirname(os.path.abspath(__file__))
+RACINE_PROJET = os.path.dirname(DOSSIER_CRON)
+CHEMIN_CLE = os.path.join(RACINE_PROJET, "data_cache", "firebase_credentials.json")
 
-    # --- OPTION DE MISE À ZÉRO GLOBALE POUR LES FRAIS ---
-    st.markdown("---")
-    forcer_zero_frais = st.checkbox("🛑 Forcer TOUTES les filiales à zéro pour cet import (Mise à zéro générale)", value=False)
-    st.markdown("---")
+if not firebase_admin._apps:
+    cred = credentials.Certificate(CHEMIN_CLE)
+    firebase_admin.initialize_app(cred)
 
-    with st.expander("🔍 Voir le tableau Finance récupéré depuis l'accueil"):
-        st.text(donnees_brutes)
+db = firestore.client()
 
-    if st.button("🚀 Extraire et Envoyer les Frais sur Discord", use_container_width=True):
-        try:
-            url_webhook = st.secrets["webhooks"]["frais_gestion"]
-            lignes = donnees_brutes.strip().split('\n')
-            lignes_finales = ["Filiale\tFrais de gestion"]
-            
-            # Détection et exclusion automatique de l'en-tête du tableau Finance
-            debut_index = 0
-            if lignes and len(lignes) > 0:
-                premiere_ligne = lignes[0].lower()
-                if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne:
-                    debut_index = 1
+def executer_mise_a_jour_cron():
+    print("⏰ [CRON CLOUD] Démarrage de la récupération...")
+    date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            # Extraction ou mise à zéro pour toutes les filiales
-            for ligne in lignes[debut_index:]:
-                if not ligne.strip(): continue
-                colonnes = ligne.split('\t')
-                if len(colonnes) < 3: continue
-                
-                nom_filiale = colonnes[0].strip()
-                
-                if forcer_zero_frais:
-                    # On force le montant à 0 pour absolument toutes les filiales du tableau
-                    frais_numerique = 0
-                else:
-                    raw_frais = colonnes[2].strip()
-                    # Traduction et sécurisation via l'outil central
-                    frais_numerique = convertir_saisie_en_nombre(raw_frais)
-                    if frais_numerique < 0:
-                        frais_numerique = 0
-                
-                lignes_finales.append(f"{nom_filiale}\t{frais_numerique}")
+    # --- 1. MATÉRIAUX ---
+    try:
+        req = requests.get(f"{BASE_URL}/materials.json?key={API_KEY}", timeout=15)
+        if req.status_code == 200:
+            for m in req.json().get("materials", []):
+                doc_id = f"{m.get('name').replace('/', '_')}_{timestamp_id}"
+                db.collection("materiaux").document(doc_id).set({
+                    "nom": m.get("name"), "prix": int(m.get("price", 0)), "unite": m.get("unit"), "date_extraction": date_now
+                })
+            print("✅ Collection 'materiaux' synchronisée.")
+    except Exception as e: print(f"⚠️ Erreur matériaux : {e}")
 
-            # Contenu d'importation au format CRLF (\r\n) pour Empire Immo
-            contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
-            
-            # --- STRUCTURE DU MESSAGE DISCORD ADAPTATIF ---
-            if forcer_zero_frais:
-                texte_discord = "🛑 **RAPPORT GÉNÉRAL : TOUS LES FRAIS DE GESTION ONT ÉTÉ FORCÉS À 0 !**\n"
-                st.info("ℹ️ Remise à niveau globale : L'intégralité des filiales a été injectée à 0 dans le fichier d'import.")
-            else:
-                texte_discord = "✅ **Nouveau fichier d'importation des FRAIS DE GESTION !**\n"
-            
-            texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
-            
-            if len(texte_discord) + len(contenu_crlf_pur) < 1900:
-                texte_discord += f"```text\n{contenu_crlf_pur}```"
-            else:
-                texte_discord += "⚠️ *Le tableau est trop long pour être affiché en texte sur Discord. Utilisez le fichier joint.*"
+    # --- 2. BÂTIMENTS ---
+    try:
+        req = requests.get(f"{BASE_URL}/buildings.json?key={API_KEY}", timeout=15)
+        if req.status_code == 200:
+            for b in req.json().get("buildings_entreprise", []):
+                doc_id = f"{b.get('id')}_{timestamp_id}"
+                db.collection("batiments").document(doc_id).set({
+                    "id_jeu": b.get("id"), "nom": b.get("name"), "type": b.get("type"), "valeur": int(b.get("value", 0)),
+                    "loyer": int(b.get("rent", 0)), "charge": int(b.get("charge", 0)), "impot": int(b.get("tax", 0)), "date_extraction": date_now
+                })
+            print("✅ Collection 'batiments' synchronisée.")
+    except Exception as e: print(f"⚠️ Erreur bâtiments : {e}")
 
-            # Envoi des données et du fichier vers le webhook Discord
-            fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
-            reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
-            
-            if reponse.status_code == 200 or reponse.status_code == 204:
-                st.success("🎉 Traitement réussi et envoyé sur Discord ! ")
-                
-                # --- AFFICHAGE DU BLOC NOIR AVEC BOUTON COPIER DIRECT SUR LE SITE ---
-                st.subheader("📋 Résultat prêt à être copié :")
-                st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier le texte :")
-                st.code(contenu_crlf_pur, language="text")
-                
-                # Bouton de téléchargement direct du fichier .txt pur
-                st.download_button(
-                    label="📥 Télécharger le fichier d'import pur", 
-                    data=contenu_crlf_pur, 
-                    file_name="frais_gestion_import_officiel.txt", 
-                    mime="text/plain"
-                )
-            else:
-                st.error(f"🤖 Erreur Discord : {reponse.status_code}")
-                
-        except Exception as e:
-            st.error(f"⚠️ Erreur lors du traitement : {str(e)}")
+    # --- 3. TRAVAUX ---
+    try:
+        req = requests.get(f"{BASE_URL}/works.json?key={API_KEY}", timeout=15)
+        if req.status_code == 200:
+            for w in req.json().get("works_entreprise", []):
+                doc_id = f"{w.get('building_name').replace('/', '_')}_{w.get('type')}_{timestamp_id}"
+                db.collection("travaux").document(doc_id).set({
+                    "type_travaux": w.get("type"), "building_name": w.get("building_name"), "terrain_requis": w.get("terrain_required"),
+                    "cout_estime": int(w.get("estimated_cost", 0)), "duree_mois": int(w.get("duration", 0)), "date_extraction": date_now
+                })
+            print("✅ Collection 'travaux' synchronisée.")
+    except Exception as e: print(f"⚠️ Erreur travaux : {e}")
+
+    # --- 4. PLAYERS ---
+    try:
+        req = requests.get(f"{BASE_URL}/players.json?key={API_KEY}", timeout=15)
+        if req.status_code == 200:
+            for p in req.json().get("players", []):
+                doc_id = f"{p.get('pseudo')}_{timestamp_id}"
+                db.collection("players").document(doc_id).set({
+                    "pseudo": p.get("pseudo"), "points": int(p.get("points", 0)), "classement": int(p.get("ranking", 0)),
+                    "niveau": int(p.get("level", 0)), "date_extraction": date_now
+                })
+            print("✅ Collection 'players' synchronisée.")
+    except Exception as e: print(f"⚠️ Erreur players : {e}")
+
+if __name__ == "__main__":
+    executer_mise_a_jour_cron()
