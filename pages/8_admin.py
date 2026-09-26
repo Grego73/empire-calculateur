@@ -8,7 +8,7 @@ import pandas as pd
 # S'assure que le dossier racine est accessible pour l'import
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
-    from cron_update_api import executer_mise_a_jour_cron
+    from crons.cron_update_api import executer_mise_a_jour_cron
     CRON_DISPONIBLE = True
 except ImportError:
     CRON_DISPONIBLE = False
