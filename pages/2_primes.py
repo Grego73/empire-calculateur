@@ -135,7 +135,7 @@ else:
             fichiers = {'file': ('primes_import_officiel.txt', crlf_primes_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
-            if reponse.status_code in:
+            if reponse.status_code in [200,204]:
                 st.success("🎉 Calculs comptabilisés et rapport envoyé avec succès sur le canal Discord !")
                 
                 # Rendu du tableau récapitulatif
