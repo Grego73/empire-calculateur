@@ -118,7 +118,7 @@ if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_wi
                 stats_tables.append({
                     "Table SQL": table,
                     "Total Enregistrements": f"{total_lignes:,}".replace(",", " "),
-                    "Dernière Synchro": "Aucune" if notCompliance or derniere_synchro is None else str(derniere_synchro)
+                    "Dernière Synchro": "Aucune" if (derniere_synchro is None or derniere_synchro[0] is None) else str(derniere_synchro[0])
                 })
                 
             conn.close()
