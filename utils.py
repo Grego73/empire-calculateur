@@ -85,9 +85,11 @@ def verifier_concordance_rapport(rapport_texte):
     for ligne in lignes:
         ligne_up = ligne.upper()
         if "RÉSULTAT NET" in ligne_up or "RESULTAT NET" in ligne_up:
-            chiffres = "".join(re.findall(r'\d+', ligne))
-            if chiffres: data["net"] = convertir_saisie_en_nombre(chiffres)
+            # Capture les chiffres, les points, les virgules et la lettre de palier à la fin
+            match = re.search(r'([\d.,]+\s*[A-Z]?)', ligne_up)
+            if match: data["net"] = convertir_saisie_en_nombre(match.group(1))
         if "TOTAL ACTIF" in ligne_up or "TOTAL PASSIF" in ligne_up:
-            chiffres = "".join(re.findall(r'\d+', ligne))
-            if chiffres: data["actif"] = convertir_saisie_en_nombre(chiffres)
+            match = re.search(r'([\d.,]+\s*[A-Z]?)', ligne_up)
+            if match: data["actif"] = convertir_saisie_en_nombre(match.group(1))
     return erreurs, data
+
