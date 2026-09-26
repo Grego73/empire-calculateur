@@ -1,107 +1,73 @@
 import streamlit as st
 import pandas as pd
-import requests
-import time
-from utils import formater_monnaie_empire, convertir_saisie_en_nombre
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre, recuperer_derniere_donnee_table
 
-st.title("📊 Analyse Locative & Rendements via API")
-st.markdown("Optimisez vos investissements en temps réel grâce aux données directes du marché de l'Empire.")
+st.title("📊 Analyse Locative & Rendements (Données SQL)")
+st.markdown("Cette analyse se base sur les derniers prix réels de l'Empire récupérés en base de données.")
 
 PLAFOND_MAX_BIENS = 500000000
-API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-URL_BUILDINGS = f"https://empireimmo.com{API_KEY}"
 
-# --- FONCTION DE CACHE LOCAL SÉCURISÉ ---
-def charger_buildings_api():
-    instant_present = time.time()
-    if "last_fetch_buildings" in st.session_state and (instant_present - st.session_state["last_fetch_buildings"] < 14400):
-        return st.session_state["cached_buildings"], "💾 Données chargées depuis le cache local (Mise à jour toutes les 4h)."
-    
-    try:
-        req = requests.get(URL_BUILDINGS, timeout=10)
-        if req.status_code == 200:
-            st.session_state["cached_buildings"] = req.json()
-            st.session_state["last_fetch_buildings"] = instant_present
-            return st.session_state["cached_buildings"], "🌐 Données synchronisées en direct depuis l'API."
-        elif req.status_code == 429:
-            return None, "🚨 Limite d'appels API atteinte (Rate Limit). Usage du dernier cache disponible."
-        return None, f"❌ Erreur de connexion API (Code {req.status_code})."
-    except Exception as e:
-        return None, f"⚠️ Serveur de l'Empire injoignable : {str(e)}"
+# 📥 Lecture directe de la table SQL via notre utilitaire centralisé
+df_batiments = recuperer_derniere_donnee_table("batiments")
 
-json_buildings, statut_msg = charger_buildings_api()
-
-if json_buildings is None:
-    st.error(statut_msg)
+if df_batiments is None or df_batiments.empty:
+    st.error("🚨 Aucune donnée disponible en base de données. Veuillez attendre l'exécution du Cron.")
 else:
-    st.caption(statut_msg)
-    
-    # --- 💵 ZONE FINANCIÈRE DYNAMIQUE ---
+    st.caption(f"💾 Source : Base de données SQL locale | Dernière synchronisation : `{df_batiments['date_extraction'].iloc[0]}`")
+
+    # --- 💵 COMPOSANT DE BUDGET HOLDING ---
     st.subheader("💰 1. Capacité Financière de la Holding")
-    saisie_capital = st.text_input("Saisissez votre budget ou trésorerie disponible (ex: 500M, 10G, 5.5Z) :", value="10G", key="capital_input_5")
+    saisie_capital = st.text_input("Saisissez votre budget disponible (ex: 500M, 10G, 5.5Z) :", value="10G", key="capital_input_sql_5")
     capital_disponible = convertir_saisie_en_nombre(saisie_capital)
     st.caption(f"ℹ️ Capital interprété par la Holding : **{formater_monnaie_empire(capital_disponible)}**")
     st.markdown("---")
 
     try:
-        # L'API sépare les bâtiments selon 3 listes : "buildings_perso", "buildings_entreprise", "buildings_terrain"
-        liste_biens = json_buildings.get("buildings_entreprise", [])
-        rows = []
+        # Nettoyage et filtrage des lignes (on exclut les terrains et les parcs)
+        df_biens = df_batiments[~df_batiments["nom"].str.contains("TERRAIN|PARC", case=False, na=False)].copy()
+
+        # --- CALCULS VECTORIELS ULTRA-RAPIDES AVEC PANDAS (Zéro boucle for !) ---
+        df_biens["rev_net_mensuel"] = df_biens["loyer"] - df_biens["charge"] - df_biens["impot"]
+        df_biens["rev_net_annuel"] = df_biens["rev_net_mensuel"] * 12
         
-        for bien in liste_biens:
-            desc = bien.get("name", "").strip()
-            if "TERRAIN" in desc.upper() or "PARC" in desc.upper(): 
-                continue
-                
-            prix = int(bien.get("value", 0))
-            loyer = int(bien.get("rent", 0))
-            charges = int(bien.get("charge", 0))
-            impots = int(bien.get("tax", 0))
-            
-            rev_net_mensuel = loyer - charges - impots
-            rev_net_annuel = rev_net_mensuel * 12
-            renta_nette = (rev_net_annuel / prix * 100) if prix > 0 else 0
-            
-            if prix > 0 and capital_disponible > 0:
-                nb_biens_possibles = capital_disponible // prix
-                if nb_biens_possibles > PLAFOND_MAX_BIENS:
-                    nb_biens_possibles = PLAFOND_MAX_BIENS
-                    statut_limite = "⚠️ Bridé par la place (500M)"
-                else:
-                    statut_limite = "💵 Limité par votre budget"
-                gain_mensuel_total = rev_net_mensuel * nb_biens_possibles
-            else:
-                nb_biens_possibles = 0
-                gain_mensuel_total = 0
-                statut_limite = "Budget insuffisant"
+        # Rendement net et ROI
+        df_biens["Rendement Net (%)"] = (df_biens["rev_net_annuel"] / df_biens["valeur"] * 100).fillna(0)
+        df_biens["R.O.I"] = df_biens["rev_net_annuel"].apply(lambda x: f"{int(df_biens['valeur'].iloc[0] / x)} ans" if x > 0 else "Aucun")
 
-            roi_texte = f"{int(prix / rev_net_annuel)} ans" if rev_net_annuel > 0 else "Aucun"
+        # Quantité achetable selon votre trésorerie holding
+        df_biens["Quantité Max Achetée"] = capital_disponible // df_biens["valeur"]
+        df_biens["Quantité Max Achetée"] = df_biens["Quantité Max Achetée"].clip(upper=PLAFOND_MAX_BIENS)
+        
+        # Facteurs limitants et gains globaux
+        df_biens["Facteur Limitant"] = df_biens["Quantité Max Achetée"].apply(lambda x: "⚠️ Bridé par la place (500M)" if x >= PLAFOND_MAX_BIENS else "💵 Limité par votre budget")
+        df_biens["Gain Mensuel Cumulé RAW"] = df_biens["rev_net_mensuel"] * df_biens["Quantité Max Achetée"]
 
-            rows.append({
-                "Description": desc,
-                "Prix d'Achat": prix,
-                "Rendement Net (%)": renta_nette,
-                "R.O.I": roi_texte,
-                "Quantité Max Achetée": nb_biens_possibles,
-                "Facteur Limitant": statut_limite,
-                "Gain Mensuel Cumulé RAW": gain_mensuel_total,
-                "Gain Mensuel Cumulé": formater_monnaie_empire(gain_mensuel_total),
-                "Revenu Net Unique": formater_monnaie_empire(rev_net_mensuel)
-            })
+        # Tri par le plus gros générateur de cash-flow
+        df_tri = df_biens.sort_values(by="Gain Mensuel Cumulé RAW", ascending=False)
 
-        df = pd.DataFrame(rows)
-        st.subheader("🔍 Analyse des meilleures opportunités budgétaires")
-        df_affichage = df.sort_values(by="Gain Mensuel Cumulé RAW", ascending=False)
+        # Préparation d'une vue d'affichage propre pour l'utilisateur
+        df_visuel = pd.DataFrame()
+        df_visuel["Description"] = df_tri["nom"]
+        df_visuel["Prix d'Achat"] = df_tri["valeur"].apply(formater_monnaie_empire)
+        df_visuel["Rendement Net (%)"] = df_tri["Rendement Net (%)"].apply(lambda x: f"{x:.2f}%")
+        df_visuel["R.O.I"] = df_tri["R.O.I"]
+        df_visuel["Quantité Max Achetée"] = df_tri["Quantité Max Achetée"].apply(lambda x: f"{x:,}".replace(",", " "))
+        df_visuel["Facteur Limitant"] = df_tri["Facteur Limitant"]
+        df_visuel["Gain Mensuel Cumulé"] = df_tri["Gain Mensuel Cumulé RAW"].apply(formater_monnaie_empire)
 
-        df_visuel = df_affichage.copy()
-        df_visuel["Prix d'Achat"] = df_visuel["Prix d'Achat"].apply(formater_monnaie_empire)
-        df_visuel["Rendement Net (%)"] = df_visuel["Rendement Net (%)"].apply(lambda x: f"{x:.2f}%")
-        df_visuel = df_visuel.drop(columns=["Gain Mensuel Cumulé RAW"])
+        # --- RECHERCHE INTERACTIVE ---
+        st.subheader("🔍 Filtrer et analyser les infrastructures")
+        recherche = st.text_input("Filtrer par mot-clé (ex: Immeuble, Gratte-ciel) :", value="")
+        if recherche:
+            df_visuel = df_visuel[df_visuel["Description"].str.contains(recherche, case=False, na=False)]
 
-        st.dataframe(df_visuel, use_container_width=True)
+        st.dataframe(df_visuel, use_container_width=True, hide_index=True)
 
-        if not df_affichage.empty and df_affichage.iloc[0]["Gain Mensuel Cumulé RAW"] > 0:
-            st.success(f"👑 **Stratégie d'achat recommandée :** Investissez dans **{df_visuel.iloc[0]['Description']}** pour dégager jusqu'à **{df_visuel.iloc[0]['Gain Mensuel Cumulé']} /mois**.")
+        # Affichage dynamique du gagnant
+        if not df_tri.empty and df_tri.iloc[0]["Gain Mensuel Cumulé RAW"] > 0:
+            top_nom = df_tri.iloc[0]["nom"]
+            top_gain = formater_monnaie_empire(df_tri.iloc[0]["Gain Mensuel Cumulé RAW"])
+            st.success(f"👑 **Stratégie Holding Validée :** Le meilleur placement pour votre capital est l'achat massif de **{top_nom}**. Cela générera un flux de trésorerie net de **{top_gain} /mois** pour votre Empire !")
 
     except Exception as e:
-        st.error(f"⚠️ Erreur lors du calcul de l'analyse locative : {str(e)}")
+        st.error(f"⚠️ Erreur lors de la compilation des données locatives : {str(e)}")
