@@ -1,36 +1,68 @@
 import streamlit as st
+import pandas as pd
+import datetime
+from utils import (
+    formater_monnaie_empire, 
+    convertir_saisie_en_nombre, 
+    recuperer_derniere_donnee_table, 
+    recuperer_historique_joueur
+)
 
-# Configuration globale de l'application
-st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="centered")
-
-# 📥 INITIALISATION DES VARIABLES DE SESSION (Mémoire centrale de l'Empire)
-# Blocs de Gestion Holding
-if "tab_finance" not in st.session_state: st.session_state["tab_finance"] = ""
-if "tab_capital" not in st.session_state: st.session_state["tab_capital"] = ""
-if "tab_primes" not in st.session_state: st.session_state["tab_primes"] = ""
-if "tab_frais" not in st.session_state: st.session_state["tab_frais"] = ""
-
-# Blocs de Fiches Projets / Rentabilité
-if "tab_projets_achat_loc" not in st.session_state: st.session_state["tab_projets_achat_loc"] = ""
-if "tab_projets_construction" not in st.session_state: st.session_state["tab_projets_construction"] = ""
-if "tab_projets_embellissement" not in st.session_state: st.session_state["tab_projets_embellissement"] = ""
-
-# --- CONFIGURATION DYNAMIQUE DES BIENS EN PROMOTION ---
-if "nom_bien_promo" not in st.session_state: st.session_state["nom_bien_promo"] = ""
-if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduction_promo"] = 0
-
-# Statuts de chargement indépendants
-if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
-if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
-
-
-# 🏠 DÉFINITION DE LA PAGE D'ACCUEIL CENTRALISÉE
 def home_page():
-    st.title("🏠 Centre de Saisie Unique de l'Empire")
-    st.markdown("Collez vos données dans la section de votre choix. Chaque pôle possède son propre bouton de synchronisation indépendant.")
+    st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
+    
+    # =========================================================
+    # 📈 MODULE ANALYTIQUE : SUIVI DES JOUEURS & CLASSEMENT
+    # =========================================================
+    st.subheader("📊 Tableau de Bord de votre Personnage")
+    
+    PSEUDO_JOUEUR = "Grego73" # Configuré d'après les logs de votre compte
+    df_players_actuel = recuperer_derniere_donnee_table("players")
+    df_historique = recuperer_historique_joueur(PSEUDO_JOUEUR)
+    
+    if df_players_actuel is not None and not df_players_actuel.empty:
+        # Extraction des données actuelles du joueur
+        infos_joueur = df_players_actuel[df_players_actuel["pseudo"].str.upper() == PSEUDO_JOUEUR.upper()]
+        
+        if not infos_joueur.empty:
+            row_j = infos_joueur.iloc[0]
+            
+            # Affichage des indicateurs clés (Metrics)
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.metric(label="🏆 Classement Général", value=f"{row_j['classement']}e place")
+            with m2:
+                st.metric(label="⭐ Niveau Actuel", value=f"Niveau {row_j['niveau']}")
+            with m3:
+                # Formatage du score avec l'échelle de l'Empire
+                score_formate = formater_monnaie_empire(row_j['points'])
+                st.metric(label="🎯 Score (Points)", value=score_formate)
+                
+            st.caption(f"📅 *Dernière synchronisation automatique de l'API : {row_j['date_extraction']}*")
+        else:
+            st.info(f"👋 Bienvenue ! Le joueur **{PSEUDO_JOUEUR}** n'apparaît pas encore dans la dernière extraction. Attendez le prochain passage du Cron.")
+            
+        # --- GRAPHIQUE D'ÉVOLUTION DE L'EMPIRE ---
+        if df_historique is not None and len(df_historique) > 1:
+            with st.expander("📈 Visualiser la courbe de progression de vos points", expanded=False):
+                # Nettoyage de la date pour l'affichage du graphique
+                df_historique["Date"] = pd.to_datetime(df_historique["date_extraction"]).dt.strftime("%d/%m %H:%M")
+                
+                # Rendu du graphique natif Streamlit (Points en fonction du temps)
+                st.line_chart(data=df_historique, x="Date", y="points", use_container_width=True)
+    else:
+        st.warning("📥 Aucune donnée analytique en base de données. Assurez-vous que votre script `cron_update_api.py` a été exécuté au moins une fois.")
+
+    st.markdown("---")
+
+    # =========================================================
+    # 🏛️ EXTRANT : VOTRE CODE EXISTANT DE SAISIE MANUELLE
+    # =========================================================
+    st.subheader("✍️ Saisie manuelle Holding & Rapports comptables")
+    st.markdown("Collez vos données spécifiques dans les sections ci-dessous pour alimenter vos pages de gestion.")
     
     # --- SECTION 1 : DONNÉES DE LA HOLDING ---
-    st.subheader("🏛️ 1. Données de Gestion Holding")
+    st.markdown("##### 🏢 Données de Gestion Holding")
     st.session_state["tab_finance"] = st.text_area("Tableau FINANCE :", value=st.session_state["tab_finance"], height=120)
     st.session_state["tab_capital"] = st.text_area("Tableau CAPITAL :", value=st.session_state["tab_capital"], height=120)
     st.session_state["tab_primes"] = st.text_area("Tableau DIRECTEURS / PLAFONDS PRIMES :", value=st.session_state["tab_primes"], height=120)
@@ -55,21 +87,14 @@ def home_page():
     
     st.markdown("---")
     
-    # --- SECTION 2 : DONNÉES DES PROJETS DE RENTABILITÉ ---
-    st.subheader("🏗️ 2. Fiches Projets & Rentabilité")
-    st.markdown("Collez ici vos rapports ou fiches de chantiers pour extraire les coûts et rendements.")
-    st.session_state["tab_projets_achat_loc"] = st.text_area("5. Fiches ACHAT DU BIEN ET LOCATION :", value=st.session_state["tab_projets_achat_loc"], height=150)
-    
-    # --- LOGIQUE INTEGRÉE POUR LES PROMOTIONS DU JOUR ---
+    # --- SECTION 2 : PROMOTIONS DU JOUR MANUELLES (Si nécessaire) ---
     st.markdown("##### 🏷️ Option Promotion temporaire du Marché")
-    st.caption("Si un ou plusieurs biens sont affichés en promotion dans votre saisie, configurez-les ici pour recalibrer automatiquement leur vraie valeur.")
-    
     p_col1, p_col2 = st.columns(2)
     with p_col1:
-        st.session_state["nom_bien_promo"] = st.text_input("Rechercher le mot-clé du bien en promo (ex: Mégapôle, Bureaux, Gratte-ciel) :", value=st.session_state["nom_bien_promo"])
+        st.session_state["nom_bien_promo"] = st.text_input("Rechercher le mot-clé du bien en promo (ex: Mégapôle, Bureaux) :", value=st.session_state["nom_bien_promo"])
     with p_col2:
         st.session_state["taux_reduction_promo"] = st.number_input("Pourcentage de réduction appliqué dans le jeu (%) :", min_value=0, max_value=99, value=st.session_state["taux_reduction_promo"], step=5)
-    
+
     st.markdown(" ")
     st.session_state["tab_projets_construction"] = st.text_area("6. Fiches CONSTRUCTION :", value=st.session_state["tab_projets_construction"], height=120)
     st.session_state["tab_projets_embellissement"] = st.text_area("7. Fiches EMBELLISSEMENT :", value=st.session_state["tab_projets_embellissement"], height=120)
