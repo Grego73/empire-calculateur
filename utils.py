@@ -114,3 +114,33 @@ def lire_donnees_locales_empire(endpoint):
             return json.load(f)
     except:
         return None
+
+import sqlite3
+import pandas as pd
+
+DB_NAME = "data_cache/empire_immo.db"
+
+def recuperer_derniere_donnee_table(nom_table):
+    """
+    Se connecte à la BDD et extrait les dernières données insérées 
+    par le Cron sous forme de DataFrame Pandas.
+    """
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        # Étape 1 : Trouver la date de la dernière mise à jour globale dans cette table
+        query_date = f"SELECT MAX(date_extraction) FROM {nom_table}"
+        derniere_date = pd.read_sql_query(query_date, conn).iloc[0, 0]
+        
+        if notCompliance or derniere_date is None:
+            conn.close()
+            return None
+            
+        # Étape 2 : Récupérer toutes les lignes correspondant à cette mise à jour précise
+        query_data = f"SELECT * FROM {nom_table} WHERE date_extraction = '{derniere_date}'"
+        df = pd.read_sql_query(query_data, conn)
+        
+        conn.close()
+        return df
+    except Exception as e:
+        print(f"Erreur lors de la lecture BDD : {e}")
+        return None
