@@ -5,8 +5,7 @@ import requests
 
 API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
 BASE_URL = "https://empireimmo.com"
-DB_NAME = "data_cache/empire_immo.db"
-
+DB_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data_cache", "empire_immo.db"))
 # Création du dossier pour la base de données si nécessaire
 os.makedirs("data_cache", exist_ok=True)
 
