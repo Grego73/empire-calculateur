@@ -1,4 +1,4 @@
-# Vérification des préimport streamlit as st
+import streamlit as st
 import pandas as pd
 import requests
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre
@@ -71,4 +71,3 @@ else:
                 st.dataframe(pd.DataFrame(lignes_tab), use_container_width=True, hide_index=True)
                 st.code(crlf_pur, language="text")
         except Exception as e: st.error(f"⚠️ Erreur : {e}")
-requis de la holding (tableaux manuels de l'accueil)
