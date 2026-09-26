@@ -1,7 +1,10 @@
+import os
 import re
+import firebase_admin
+from firebase_admin import credentials, firestore
+import pandas as pd
 
-
-# ÉCHELLE UNIQUE ET SÉCURISÉE DE L'EMPIRE
+# 🏛️ ÉCHELLE MATHÉMATIQUE DE L'EMPIRE
 DICTIONNAIRE_PALIERS = {
     "K": 10**3,   "M": 10**6,   "G": 10**9,   "T": 10**12,
     "P": 10**15,  "E": 10**18,  "Z": 10**21,  "Y": 10**24,
@@ -9,6 +12,20 @@ DICTIONNAIRE_PALIERS = {
     "X": 10**39,  "N": 10**42,  "D": 10**45
 }
 
+# 🔑 CONNEXION SÉCURISÉE À FIREBASE (CLIENT UNIQUE)
+DOSSIER_UTILS = os.path.dirname(os.path.abspath(__file__))
+CHEMIN_CLE = os.path.join(DOSSIER_UTILS, "data_cache", "firebase_credentials.json")
+
+if not firebase_admin._apps:
+    if os.path.exists(CHEMIN_CLE):
+        cred = credentials.Certificate(CHEMIN_CLE)
+        firebase_admin.initialize_app(cred)
+    else:
+        raise FileNotFoundError(f"Le fichier de clés Firebase est introuvable dans : {CHEMIN_CLE}")
+
+db = firestore.client()
+
+# 🧮 FONCTIONS DE TRADUCTION TEXTE <> NOMBRE
 def formater_monnaie_empire(nombre):
     try:
         n = int(nombre)
@@ -27,12 +44,10 @@ def formater_monnaie_empire(nombre):
     return f"{n:,}".replace(",", " ")
 
 def convertir_saisie_en_nombre(saisie_texte):
-    # Nettoyage initial de la chaîne
     texte_brut = str(saisie_texte).strip().upper().replace(" ", "").replace("€", "")
     if not texte_brut:
         return 0
         
-    # --- GESTION DES PROMOS INDIVIDUELLES VIA LE TAG * ---
     taux_promo = 0
     if "*" in texte_brut:
         try:
@@ -42,17 +57,15 @@ def convertir_saisie_en_nombre(saisie_texte):
         except:
             pass
 
-    # --- DÉTECTION DE LA NOTATION SCIENTIFIQUE EXCEL ---
     if "E+" in texte_brut or "E-" in texte_brut or ("E" in texte_brut and any(x in texte_brut for x in ["0","1","2","3","4","5","6","7","8","9"]) and not any(suffixe in texte_brut for suffixe in ["K","M","G","T","P"])):
         try:
             valeur_calculee = int(float(texte_brut))
-            if taux_promo > 0 and taux_promo < 100:
+            if 0 < taux_promo < 100:
                 valeur_calculee = int(valeur_calculee / (1 - (taux_promo / 100)))
             return valeur_calculee
         except:
             pass
 
-    # --- ANALYSE DES SUFFIXES DE L'EMPIRE ---
     match = re.match(r"^([0-9\.,]+)([A-Z]?)$", texte_brut)
     if match:
         nombre_partie = match.group(1).replace(",", ".")
@@ -69,7 +82,7 @@ def convertir_saisie_en_nombre(saisie_texte):
             else:
                 valeur_calculee = int(valeur_num)
                 
-            if taux_promo > 0 and taux_promo < 100:
+            if 0 < taux_promo < 100:
                 valeur_calculee = int(valeur_calculee / (1 - (taux_promo / 100)))
                 
             return valeur_calculee
@@ -86,7 +99,6 @@ def verifier_concordance_rapport(rapport_texte):
     for ligne in lignes:
         ligne_up = ligne.upper()
         if "RÉSULTAT NET" in ligne_up or "RESULTAT NET" in ligne_up:
-            # Capture les chiffres, les points, les virgules et la lettre de palier à la fin
             match = re.search(r'([\d.,]+\s*[A-Z]?)', ligne_up)
             if match: data["net"] = convertir_saisie_en_nombre(match.group(1))
         if "TOTAL ACTIF" in ligne_up or "TOTAL PASSIF" in ligne_up:
@@ -94,68 +106,53 @@ def verifier_concordance_rapport(rapport_texte):
             if match: data["actif"] = convertir_saisie_en_nombre(match.group(1))
     return erreurs, data
 
-import os
-import json
-
-DATA_DIR = "data_cache"
-
-def lire_donnees_locales_empire(endpoint):
-    """
-    Lit de manière sécurisée les données de l'Empire rafraîchies par le Cron.
-    endpoint peut être : 'buildings', 'works', 'materials' ou 'players'
-    """
-    chemin_fichier = os.path.join(DATA_DIR, f"{endpoint}.json")
-    
-    if not os.path.exists(chemin_fichier):
-        return None
-        
-    try:
-        with open(chemin_fichier, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return None
-
-import sqlite3
-import pandas as pd
-
-DB_NAME = "data_cache/empire_immo.db"
+# =========================================================
+# 📥 LECTEURS CLOUD FIREBASE (Extraction transparente vers Pandas)
+# =========================================================
 
 def recuperer_derniere_donnee_table(nom_table):
     """
-    Se connecte à la BDD et extrait les dernières données insérées 
-    par le Cron sous forme de DataFrame Pandas.
+    Trouve le timestamp de la synchronisation la plus récente dans Firebase
+    et extrait toutes les lignes correspondantes sous forme de DataFrame Pandas.
     """
     try:
-        conn = sqlite3.connect(DB_NAME)
-        # Étape 1 : Trouver la date de la dernière mise à jour globale dans cette table
-        query_date = f"SELECT MAX(date_extraction) FROM {nom_table}"
-        derniere_date = pd.read_sql_query(query_date, conn).iloc[0, 0]
+        from google.cloud.firestore_v1.base_query import Query
+        # 1. On cherche la date la plus récente
+        docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         
-        if derniere_date is None:
-            conn.close()
+        derniere_date = None
+        for doc in docs_ordre:
+            derniere_date = doc.to_dict().get("date_extraction")
+            
+        if not derniere_date:
             return None
             
-        # Étape 2 : Récupérer toutes les lignes correspondant à cette mise à jour précise
-        query_data = f"SELECT * FROM {nom_table} WHERE date_extraction = '{derniere_date}'"
-        df = pd.read_sql_query(query_data, conn)
+        # 2. On récupère le lot complet de cette même date
+        docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         
-        conn.close()
-        return df
+        liste_elements = []
+        for doc in docs_complets:
+            liste_elements.append(doc.to_dict())
+            
+        return pd.DataFrame(liste_elements) if liste_elements else None
+        
     except Exception as e:
-        print(f"Erreur lors de la lecture BDD : {e}")
+        print(f"Erreur extraction Firebase ({nom_table}) : {e}")
         return None
 
 def recuperer_historique_joueur(pseudo="Grego73"):
     """
-    Récupère toutes les lignes d'historique enregistrées par le Cron 
-    pour un joueur spécifique afin de suivre son évolution.
+    Récupère tout l'historique de croissance d'un joueur depuis le cloud.
     """
     try:
-        conn = sqlite3.connect(DB_NAME)
-        query = f"SELECT points, classement, niveau, date_extraction FROM players WHERE pseudo = '{pseudo}' ORDER BY date_extraction ASC"
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        return df
+        from google.cloud.firestore_v1.base_query import Query
+        docs = db.collection("players").where("pseudo", "==", pseudo).order_by("date_extraction", direction=Query.ASCENDING).stream()
+        
+        liste_historique = []
+        for doc in docs:
+            liste_historique.append(doc.to_dict())
+            
+        return pd.DataFrame(liste_historique) if liste_historique else None
     except Exception as e:
-        print(f"Erreur historique joueur : {e}")
+        print(f"Erreur historique Firebase pour {pseudo} : {e}")
         return None
