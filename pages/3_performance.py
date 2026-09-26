@@ -54,7 +54,8 @@ else:
                 if not l.strip(): continue
                 cols = [c.strip() for c in l.split('\t') if c.strip()]
                 if len(cols) < 2: continue
-                data_frais[cols[0]] = convertir_saisie_en_nombre(cols[-1])
+                # S'assure de récupérer la valeur numérique de la 2e colonne (Frais de gestion)
+                data_frais[cols[0]] = convertir_saisie_en_nombre(cols[1])
 
         # 4. Fusion et calculs statistiques
         analyse_rows = []
