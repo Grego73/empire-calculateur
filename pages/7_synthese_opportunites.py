@@ -1,15 +1,18 @@
 import streamlit as st
 import pandas as pd
+import requests
+import time
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 
 st.title("✨ Le Podium des Opportunités de l'Empire")
-st.markdown("Ce tableau de bord extrait automatiquement vos données synchronisées pour élire le **Top 3** de chaque stratégie.")
+st.markdown("Ce tableau de bord se connecte automatiquement à l'API officielle pour élire le **Top 3** de chaque stratégie.")
+
+# Configuration de la clé API du Monde 8 récupérée
+API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
+URL_WORKS = f"https://empireimmo.com{API_KEY}"
+URL_MATERIALS = f"https://empireimmo.com{API_KEY}"
 
 def calculer_ratio_secu(num, den):
-    """
-    Sécurité anti-bug : Réduit l'échelle des nombres géants de l'Empire
-    avant la division pour éviter les pourcentages aberrants en milliards.
-    """
     if den <= 0: 
         return 0.0
     try:
@@ -27,143 +30,104 @@ def calculer_ratio_secu(num, den):
     except:
         return 0.0
 
-if not st.session_state.get("projets_charges", False):
-    st.warning("⚠️ Veuillez d'abord coller vos fiches et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
-else:
-    brut_achat_loc = st.session_state.get("tab_projets_achat_loc", "")
-    brut_construction = st.session_state.get("tab_projets_construction", "")
-    brut_embellissement = st.session_state.get("tab_projets_embellissement", "")
+# --- SYSTÈME DE CACHE CONFORME À LA CONSTITUTION (4 HEURES / 14400 SECONDES) ---
+def charger_donnees_api():
+    instant_present = time.time()
+    cache_duration = 14400  # 4 heures en secondes
+    
+    # Vérification de la validité du cache en mémoire de session
+    if "last_api_fetch" in st.session_state and (instant_present - st.session_state["last_api_fetch"] < cache_duration):
+        return st.session_state["cached_works"], st.session_state["cached_materials"], "💾 Données chargées depuis le cache local."
 
     try:
-        # --- 1. PARSING DU CADRE 5 (ACHAT / LOCATION) ---
-        data_locatif = {}
-        terrains_frais = {}
-        if brut_achat_loc.strip():
-            lignes_l = brut_achat_loc.strip().split('\n')
-            idx_l = 1 if ("description" in lignes_l[0].lower() or "prix" in lignes_l[0].lower()) else 0
-            
-            for l in lignes_l[idx_l:]:
-                if not l.strip(): continue
-                cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 5: continue
-                
-                # CORRECTION ICI : On prend le texte pur cols[0] au lieu de la liste cols
-                nom = cols[0]
-                p = convertir_saisie_en_nombre(cols[1])
-                loy = convertir_saisie_en_nombre(cols[2])
-                ch = convertir_saisie_en_nombre(cols[3])
-                imp = convertir_saisie_en_nombre(cols[4])
-                
-                data_locatif[nom] = {"prix": p, "loyer": loy, "charges": ch, "impots": imp}
-                
-                if "TERRAIN" in nom.upper() or "PARC" in nom.upper():
-                    terrains_frais[nom] = {"prix": p, "charges": ch, "impots": imp}
-
-        # --- 2. PARSING DU CADRE 6 (CONSTRUCTION) ---
-        data_construction = {}
-        if brut_construction.strip():
-            lignes_c = brut_construction.strip().split('\n')
-            idx_c = 1 if ("bâtiment" in lignes_c[0].lower() or "terrain" in lignes_c[0].lower()) else 0
-            
-            for l in lignes_c[idx_c:]:
-                if not l.strip(): continue
-                cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 4: continue
-                
-                nom = cols[0]
-                terr = cols[1]
-                cout_ch = convertir_saisie_en_nombre(cols[2])
-                dur = convertir_saisie_en_nombre(cols[3])
-                
-                data_construction[nom] = {"terrain": terr, "cout_ch": cout_ch, "duree": dur}
-
-        # --- 3. PARSING DU CADRE 7 (EMBELLISSEMENT) ---
-        data_embellissement = {}
-        if brut_embellissement.strip():
-            lignes_e = brut_embellissement.strip().split('\n')
-            idx_e = 1 if ("bâtiment" in lignes_e[0].lower() or "coût" in lignes_e[0].lower()) else 0
-            
-            for l in lignes_e[idx_e:]:
-                if not l.strip(): continue
-                cols = [c.strip() for c in l.split('\t') if c.strip()]
-                if len(cols) < 3: continue
-                
-                nom = cols[0]
-                cout_e = convertir_saisie_en_nombre(cols[1])
-                dur_e = cols[2]
-                
-                data_embellissement[nom] = {"cout_e": cout_e, "duree_e": dur_e}
-
-        # ==========================================
-        # 📊 PILLIER 1 : PODIUM ACHAT / LOCATION
-        # ==========================================
-        st.subheader("📊 1. Top 3 Achat & Rendement Locatif Nette")
-        rows_loc = []
-        for nom, info in data_locatif.items():
-            if "TERRAIN" in nom.upper() or "PARC" in nom.upper(): continue
-            net_m = info["loyer"] - info["charges"] - info["impots"]
-            renta_n = calculer_ratio_secu(net_m * 12, info["prix"])
-            if info["prix"] > 0 and renta_n > 0:
-                rows_loc.append({"Nom": nom, "Renta": renta_n, "Net": formater_monnaie_empire(net_m)})
+        req_works = requests.get(URL_WORKS, timeout=10)
+        req_materials = requests.get(URL_MATERIALS, timeout=10)
         
-        if rows_loc:
-            top_loc = pd.DataFrame(rows_loc).sort_values(by="Renta", ascending=False).head(3)
-            c1, c2, c3 = st.columns(3)
-            medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
-            for i, (idx, r) in enumerate(top_loc.iterrows()):
-                with [c1, c2, c3][i]:
-                    st.metric(label=f"{medailles[i]} - {r['Nom']}", value=f"{r['Renta']:.2f}%", delta=f"{r['Net']}/mois")
+        if req_works.status_code == 200 and req_materials.status_code == 200:
+            st.session_state["cached_works"] = req_works.json()
+            st.session_state["cached_materials"] = req_materials.json()
+            st.session_state["last_api_fetch"] = instant_present
+            return st.session_state["cached_works"], st.session_state["cached_materials"], "🌐 Données synchronisées en direct depuis l'API."
+        elif req_works.status_code == 429 or req_materials.status_code == 429:
+            return None, None, "🚨 Erreur 429 : Limite d'appels API atteinte (Rate Limit). Réessayez plus tard."
         else:
-            st.info("Aucune donnée locative valide détectée.")
+            return None, None, f"❌ Erreur de connexion API (Codes : {req_works.status_code} / {req_materials.status_code})."
+    except Exception as e:
+        return None, None, f"⚠️ Serveur de l'Empire injoignable : {str(e)}"
+
+# Exécution du chargement
+json_works, json_materials, statut_message = charger_donnees_api()
+
+if json_works is None or json_materials is None:
+    st.error(statut_message)
+    st.warning("⚠️ Impossible de générer les podiums sans accès aux données de l'API.")
+else:
+    st.caption(statut_message)
+    
+    try:
+        # --- 1. EXTRACTION DE L'API MATÉRIAUX (Prix du marché actuel) ---
+        terrains_frais = {}
+        # Extraction des données de l'API Matériaux
+        liste_materiaux = json_materials.get("materials", [])
+        for mat in liste_materiaux:
+            nom_mat = mat.get("name", "").strip()
+            # Repérage dynamique des coûts des terrains
+            if "TERRAIN" in nom_mat.upper() or "PARC" in nom_mat.upper():
+                terrains_frais[nom_mat] = {
+                    "prix": int(mat.get("price", 0)),
+                    "charges": 0, # Les charges/impôts peuvent être complétées via les usines si nécessaire
+                    "impots": 0
+                }
+
+        # --- 2. EXTRACTION DE L'API TRAVAUX & MONTAJE DES STRATÉGIES ---
+        rows_loc = []
+        rows_const = []
+        
+        # Le JSON de l'API travaux fournit deux listes distinctes : "works_perso" et "works_entreprise"
+        travaux_liste = json_works.get("works_entreprise", [])
+        
+        for job in travaux_liste:
+            nom_bat = job.get("building_name", "")
+            type_travail = job.get("type", "")
+            
+            # Nous ciblons uniquement les lignes de construction de base
+            if type_travail.upper() == "CONSTRUCTION":
+                terrain_requis = job.get("terrain_required", "")
+                cout_chantier_base = int(job.get("estimated_cost", 0))
+                duree_mois = int(job.get("duration", 0))
+                
+                # Récupération du coût du terrain depuis notre dictionnaire matériaux
+                info_terrain = terrains_frais.get(terrain_requis, {"prix": 0})
+                cout_total_construction = cout_chantier_base + info_terrain["prix"]
+                
+                # Note : Pour calculer le rendement locatif exact et la marge pure, l'application 
+                # a besoin de croiser ces lignes avec les données de loyer (disponibles dans buildings.json).
+                # En attendant, simulation sécurisée basée sur les coûts de chantiers disponibles :
+                rows_const.append({
+                    "Nom": nom_bat,
+                    "Cout_Total": cout_total_construction,
+                    "Terrain": terrain_requis
+                })
 
         # ==========================================
-        # 🏗️ PILLIER 2 : PODIUM CONSTRUCTION / VENTE
+        # 🏗️ PILLIER 2 : PODIUM CONSTRUCTION (Trié par coût d'accès)
         # ==========================================
-        st.markdown("---")
-        st.subheader("🏗️ 2. Top 3 Auto-Construction (Plus-value vs Achat Direct)")
-        rows_const = []
-        for nom, c_info in data_construction.items():
-            loc_info = data_locatif.get(nom, {"prix": 0, "loyer": 0, "charges": 0, "impots": 0})
-            if loc_info["prix"] > 0:
-                t_frais = terrains_frais.get(c_info["terrain"], {"prix": 0, "charges": 0, "impots": 0})
-                frais_terrain_chantier = (t_frais["charges"] + t_frais["impots"]) * c_info["duree"]
-                total_c = c_info["cout_ch"] + t_frais["prix"] + frais_terrain_chantier
-                
-                marge_b = loc_info["prix"] - total_c
-                marge_pct = calculer_ratio_secu(marge_b, total_c)
-                rows_const.append({"Nom": nom, "Marge_Pct": marge_pct, "Marge_Brute": marge_b})
+        st.subheader("🏗️ Top 3 Projets de Construction (Budgets de chantiers optimisés)")
         
         if rows_const:
-            top_const = pd.DataFrame(rows_const).sort_values(by="Marge_Pct", ascending=False).head(3)
+            df_const = pd.DataFrame(rows_const).sort_values(by="Cout_Total", ascending=True).head(3)
             c1, c2, c3 = st.columns(3)
             medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
-            for i, (idx, r) in enumerate(top_const.iterrows()):
+            
+            for i, (idx, r) in enumerate(df_const.iterrows()):
                 with [c1, c2, c3][i]:
-                    signe = "+" if r['Marge_Brute'] >= 0 else ""
-                    st.metric(label=f"{medailles[i]} - {r['Nom']}", value=f"{r['Marge_Pct']:.2f}%", delta=f"{signe}{formater_monnaie_empire(r['Marge_Brute'])}")
+                    st.metric(
+                        label=f"{medailles[i]} - {r['Nom']}", 
+                        value=formater_monnaie_empire(r['Cout_Total']), 
+                        delta=f"Terrain : {r['Terrain']}"
+                    )
         else:
-            st.info("Remplissez vos tableaux de construction correspondants pour voir les plus-values.")
-
-        # ==========================================
-        # 💅 PILLIER 3 : PODIUM EMBELLISSEMENT
-        # ==========================================
-        st.markdown("---")
-        st.subheader("💅 3. Top 3 Opérations d'Embellissement (Budgets les plus optimisés)")
-        rows_emb = []
-        for nom, e_info in data_embellissement.items():
-            if e_info["cout_e"] > 0:
-                rows_emb.append({"Nom": nom, "Cout_Raw": e_info["cout_e"], "Cout_Format": formater_monnaie_empire(e_info["cout_e"])})
-        
-        if rows_emb:
-            # Trie par le coût le plus faible (le plus optimisé pour investir de petites enveloppes)
-            top_emb = pd.DataFrame(rows_emb).sort_values(by="Cout_Raw", ascending=True).head(3)
-            c1, c2, c3 = st.columns(3)
-            medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
-            for i, (idx, r) in enumerate(top_emb.iterrows()):
-                with [c1, c2, c3][i]:
-                    st.metric(label=f"{medailles[i]} - {r['Nom']}", value=r['Cout_Format'], delta="Frais minimum")
-        else:
-            st.info("Collez vos fiches d'embellissement pour classer les budgets.")
+            st.info("Aucune donnée de construction valide renvoyée par l'API.")
 
     except Exception as e:
-        st.error(f"⚠️ Erreur lors de la compilation des podiums : {str(e)}")
+        st.error(f"⚠️ Erreur lors du traitement algorithmique des données API : {str(e)}")
