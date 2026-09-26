@@ -144,3 +144,18 @@ def recuperer_derniere_donnee_table(nom_table):
     except Exception as e:
         print(f"Erreur lors de la lecture BDD : {e}")
         return None
+
+def recuperer_historique_joueur(pseudo="Grego73"):
+    """
+    Récupère toutes les lignes d'historique enregistrées par le Cron 
+    pour un joueur spécifique afin de suivre son évolution.
+    """
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        query = f"SELECT points, classement, niveau, date_extraction FROM players WHERE pseudo = '{pseudo}' ORDER BY date_extraction ASC"
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        return df
+    except Exception as e:
+        print(f"Erreur historique joueur : {e}")
+        return None
