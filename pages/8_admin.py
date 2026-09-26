@@ -33,24 +33,32 @@ else:
 
     DB_NAME = "data_cache/empire_immo.db"
 
-    # =========================================================
-    # 🚀 ZONE 1 : DÉCLENCHEMENT DU CRON EN DIRECT
-    # =========================================================
-    st.subheader("📡 Synchronisation Manuelle de l'API")
-    st.markdown(
-        "Cliquez sur le bouton ci-dessous pour forcer l'exécution du script de mise à jour. "
-        "⚠️ *Attention : Respectez la règle des 4 heures pour éviter le blocage automatique (Erreur 429).* "
-    )
+# Remplacez ensuite TOUTE la section du bouton (Zone 1) par ce bloc sécurisé :
 
-    if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_width=True):
+# =========================================================
+# 🚀 ZONE 1 : DÉCLENCHEMENT DU CRON EN DIRECT
+# =========================================================
+st.subheader("📡 Synchronisation Manuelle de l'API")
+st.markdown(
+    "Cliquez sur le bouton ci-dessous pour forcer l'exécution du script de mise à jour. "
+    "⚠️ *Attention : Respectez la règle des 4 heures pour éviter le blocage automatique (Erreur 429).* "
+)
+
+if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_width=True):
+    # 1. Vérification immédiate avant de lancer quoi que ce soit
+    if not CRON_DISPONIBLE:
+        st.error("❌ Impossible de lancer la synchronisation : Le fichier 'cron_update_api.py' est introuvable ou mal configuré à la racine de votre projet.")
+    else:
         try:
             with st.spinner("Connexion aux serveurs d'Empire Immo et écriture en base de données SQL..."):
                 executer_mise_a_jour_cron()
                 
+            # Ce message vert ne s'affichera DÉSORMAIS que si l'exécution a réellement fonctionné !
             st.success("🎉 Le script Cron s'est exécuté avec succès ! Les tables SQL ont été rafraîchies.")
             st.balloons()
         except Exception as e:
             st.error(f"❌ Erreur lors de l'exécution du script : {str(e)}")
+
 
     st.markdown("---")
 
