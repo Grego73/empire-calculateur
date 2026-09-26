@@ -4,6 +4,14 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 
+# 🌐 CONFIGURATION CENTRALE DE L'API EMPIRE IMMO
+API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
+BASE_URL = "https://empireimmo.com"
+
+# URLs découpées proprement par endpoint pour vos pages analytiques
+URL_WORKS = f"{BASE_URL}/works.json?key={API_KEY}"
+URL_MATERIALS = f"{BASE_URL}/materials.json?key={API_KEY}"
+
 # 🏛️ ÉCHELLE MATHÉMATIQUE DE L'EMPIRE
 DICTIONNAIRE_PALIERS = {
     "K": 10**3,   "M": 10**6,   "G": 10**9,   "T": 10**12,
@@ -107,7 +115,7 @@ def verifier_concordance_rapport(rapport_texte):
     return erreurs, data
 
 # =========================================================
-# 📥 LECTEURS CLOUD FIREBASE (Extraction transparente vers Pandas)
+# 📥 LECTEURS CLOUD FIREBASE
 # =========================================================
 
 def recuperer_derniere_donnee_table(nom_table):
@@ -117,7 +125,6 @@ def recuperer_derniere_donnee_table(nom_table):
     """
     try:
         from google.cloud.firestore_v1.base_query import Query
-        # 1. On cherche la date la plus récente
         docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         
         derniere_date = None
@@ -127,7 +134,6 @@ def recuperer_derniere_donnee_table(nom_table):
         if not derniere_date:
             return None
             
-        # 2. On récupère le lot complet de cette même date
         docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         
         liste_elements = []
