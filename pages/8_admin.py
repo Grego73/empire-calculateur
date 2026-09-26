@@ -2,28 +2,36 @@ import streamlit as st
 import sqlite3
 import os
 import sys
+import pandas as pd
 
 # Import de la fonction du cron existante
 # S'assure que le dossier racine est accessible pour l'import
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from cron_update_api import executer_mise_a_jour_cron
+try:
+    from cron_update_api import executer_mise_a_jour_cron
+except ImportError:
+    # Option de secours au cas où le fichier n'est pas au bon emplacement relatif
+    def executer_mise_a_jour_cron():
+        st.error("Impossible de trouver la fonction dans 'cron_update_api.py'.")
 
 st.title("⚙️ Espace Administration de l'Empire")
 st.markdown("Zone réservée à la maintenance de la base de données et au déclenchement des requêtes API.")
 
 # --- BARRIÈRE DE SÉCURITÉ : MOT DE PASSE ADMIN ---
-# Remplacer "Empire2026" par le mot de passe secret de votre choix
-MOT_DE PASSE_ADMIN = "Empire2026" 
+# Modifier "Empire2026" par le mot de passe secret de votre choix
+MOT_DE_PASSE_ADMIN = "Empire2026" 
 
 saisie_pwd = st.text_input("Saisissez le mot de passe Administrateur :", type="password")
 
 if not saisie_pwd:
     st.info("🔑 Veuillez vous authentifier pour accéder aux commandes de l'infrastructure.")
-elif saisie_pwd != MOT_DE PASSE_ADMIN:
+elif saisie_pwd != MOT_DE_PASSE_ADMIN:
     st.error("❌ Mot de passe incorrect. Accès refusé.")
 else:
     st.success("🔓 Authentification réussie. Bienvenue, Grego73.")
     st.markdown("---")
+
+    DB_NAME = "data_cache/empire_immo.db"
 
     # =========================================================
     # 🚀 ZONE 1 : DÉCLENCHEMENT DU CRON EN DIRECT
@@ -37,7 +45,6 @@ else:
     if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_width=True):
         try:
             with st.spinner("Connexion aux serveurs d'Empire Immo et écriture en base de données SQL..."):
-                # Exécution directe de votre fonction de synchronisation
                 executer_mise_a_jour_cron()
                 
             st.success("🎉 Le script Cron s'est exécuté avec succès ! Les tables SQL ont été rafraîchies.")
@@ -48,22 +55,50 @@ else:
     st.markdown("---")
 
     # =========================================================
-    # 📊 ZONE 2 : ÉTAT DE SANTÉ DE LA BASE DE DONNÉES (AUDIT SQL)
+    # 💾 ZONE 2 : SAUVEGARDE ET EXPORT DE LA BDD
     # =========================================================
-    st.subheader("🗄️ État de la Base de Données")
+    st.subheader("💾 Sauvegarde de l'Historique")
+    st.markdown("Téléchargez une copie physique complète de votre base de données SQLite pour sécuriser vos données de gestion.")
     
-    DB_NAME = "data_cache/empire_immo.db"
+    if os.path.exists(DB_NAME):
+        try:
+            with open(DB_NAME, "rb") as fichier_db:
+                donnees_base = fichier_db.read()
+                
+            st.download_button(
+                label="📥 Télécharger la base de données (.db)",
+                data=donnees_base,
+                file_name=f"sauvegarde_empire_immo_{os.path.basename(DB_NAME)}",
+                mime="application/x-sqlite3",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"⚠️ Erreur lors de la préparation du fichier de sauvegarde : {str(e)}")
+    else:
+        st.info("💡 La base de données n'existe pas encore. Elle apparaîtra après votre première synchronisation API.")
+
+    st.markdown("---")
+
+    # =========================================================
+    # 📊 ZONE 3 : ÉTAT DE SANTÉ DE LA BASE DE DONNÉES (AUDIT SQL)
+    # =========================================================
+    st.subheader("🗄️ État et Diagnostic de la Base de Données")
     
     if os.path.exists(DB_NAME):
         try:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             
-            # Récupération des volumes de données par table
             tables = ["materiaux", "batiments", "travaux", "players"]
             stats_tables = []
             
             for table in tables:
+                # Vérifie si la table existe avant de lancer le décompte
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+                if not cursor.fetchone():
+                    stats_tables.append({"Table SQL": table, "Total Enregistrements": "0", "Dernière Synchro": "Non initialisée"})
+                    continue
+
                 # Compte total des lignes
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 total_lignes = cursor.fetchone()[0]
@@ -75,15 +110,14 @@ else:
                 stats_tables.append({
                     "Table SQL": table,
                     "Total Enregistrements": f"{total_lignes:,}".replace(",", " "),
-                    "Dernière Synchro": "Aucune" if notCompliance or derniere_synchro is None else derniere_synchro
+                    "Dernière Synchro": "Aucune" if notCompliance or derniere_synchro is None else str(derniere_synchro)
                 })
                 
             conn.close()
             
-            # Affichage du tableau de diagnostic
             st.dataframe(pd.DataFrame(stats_tables), use_container_width=True, hide_index=True)
             
         except Exception as e:
             st.error(f"⚠️ Impossible de lire les métadonnées de la BDD : {str(e)}")
     else:
-        st.warning("🚨 Le fichier de base de données n'existe pas encore à l'emplacement prévu. Lancez la première synchro ci-dessus pour l'initialiser.")
+        st.warning("🚨 Le fichier de base de données n'est pas encore présent dans `data_cache/`.")
