@@ -1,5 +1,6 @@
 import re
 
+
 # ÉCHELLE UNIQUE ET SÉCURISÉE DE L'EMPIRE
 DICTIONNAIRE_PALIERS = {
     "K": 10**3,   "M": 10**6,   "G": 10**9,   "T": 10**12,
@@ -93,3 +94,23 @@ def verifier_concordance_rapport(rapport_texte):
             if match: data["actif"] = convertir_saisie_en_nombre(match.group(1))
     return erreurs, data
 
+import os
+import json
+
+DATA_DIR = "data_cache"
+
+def lire_donnees_locales_empire(endpoint):
+    """
+    Lit de manière sécurisée les données de l'Empire rafraîchies par le Cron.
+    endpoint peut être : 'buildings', 'works', 'materials' ou 'players'
+    """
+    chemin_fichier = os.path.join(DATA_DIR, f"{endpoint}.json")
+    
+    if not os.path.exists(chemin_fichier):
+        return None
+        
+    try:
+        with open(chemin_fichier, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return None
