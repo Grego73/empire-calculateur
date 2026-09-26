@@ -9,10 +9,10 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
     from cron_update_api import executer_mise_a_jour_cron
+    CRON_DISPONIBLE = True
 except ImportError:
-    # Option de secours au cas où le fichier n'est pas au bon emplacement relatif
-    def executer_mise_a_jour_cron():
-        st.error("Impossible de trouver la fonction dans 'cron_update_api.py'.")
+    CRON_DISPONIBLE = False
+    st.error("Impossible de trouver la fonction dans 'cron_update_api.py'.")
 
 st.title("⚙️ Espace Administration de l'Empire")
 st.markdown("Zone réservée à la maintenance de la base de données et au déclenchement des requêtes API.")
