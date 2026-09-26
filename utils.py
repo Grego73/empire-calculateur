@@ -131,7 +131,7 @@ def recuperer_derniere_donnee_table(nom_table):
         query_date = f"SELECT MAX(date_extraction) FROM {nom_table}"
         derniere_date = pd.read_sql_query(query_date, conn).iloc[0, 0]
         
-        if notCompliance or derniere_date is None:
+        if derniere_date is None:
             conn.close()
             return None
             
