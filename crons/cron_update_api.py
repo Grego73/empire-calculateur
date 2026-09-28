@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import sys
 import requests
-import csv
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -37,7 +36,7 @@ def executer_mise_a_jour_cron():
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # --- 1. MATÉRIAUX (JSON) ---
+    # --- 1. MATÉRIAUX ---
     try:
         req = requests.get(f"{BASE_URL}/api/materials.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
@@ -63,68 +62,71 @@ def executer_mise_a_jour_cron():
     except Exception as e: 
         notifier(f"💥 Crash Matériaux : {e}")
 
-    # --- 2. BÂTIMENTS (ASPIRES DEPUIS LES 3 FILES CSV DU JEU) ---
-    fichiers_csv = [
-        "buildings_batiments_terrain.csv",
-        "buildings_batiments_entreprise.csv",
-        "buildings_batiments_perso.csv"
-    ]
-    
-    total_batiments_sauves = 0
-    batch = db.batch()
-    c_batch = 0
-    
-    for nom_csv in fichiers_csv:
-        try:
-            url_csv = f"{BASE_URL}/api/{nom_csv}?key={API_KEY}"
-            req = requests.get(url_csv, timeout=15)
+    # --- 2. BÂTIMENTS (FUSION ET NETTOYAGE NUMÉRIQUE) ---
+    try:
+        req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
+        notifier(f"📡 API Bâtiments — Code : {req.status_code}")
+        if req.status_code == 200:
+            data_json = req.json()
             
-            if req.status_code == 200:
-                lignes = req.text.strip().split('\n')
-                # Séparateur par défaut du jeu (tabulation ou virgule)
-                lecteur = csv.DictReader(lignes, delimiter='\t')
-                if len(lecteur.fieldnames or []) <= 1:
-                    lecteur = csv.DictReader(lignes, delimiter=',')
-                
-                compteur_fichier = 0
-                for ligne in lecteur:
-                    id_j = ligne.get('id', ligne.get('id_jeu', str(total_batiments_sauves + 1)))
-                    nom_b = ligne.get('nom', ligne.get('name', 'Bâtiment Inconnu'))
-                    
-                    doc_id = f"{id_j}_{timestamp_id}"
-                    doc_ref = db.collection("batiments").document(doc_id)
-                    
-                    batch.set(doc_ref, {
-                        "id_jeu": id_j,
-                        "nom": nom_b,
-                        "type": ligne.get("type", nom_csv.split('_')[-1].replace('.csv', '')),
-                        "valeur": int(float(ligne.get("valeur", ligne.get("value", 0)))),
-                        "loyer": int(float(ligne.get("loyer", ligne.get("rent", 0)))),
-                        "charge": int(float(ligne.get("charge", ligne.get("charges", 0)))),
-                        "impot": int(float(ligne.get("impot", ligne.get("tax", 0)))),
-                        "date_extraction": date_now
-                    })
-                    
-                    compteur_fichier += 1
-                    total_batiments_sauves += 1
-                    c_batch += 1
-                    
-                    if c_batch >= 500:
-                        batch.commit()
-                        batch = db.batch()
-                        c_batch = 0
-                
-                notifier(f"🏢 {compteur_fichier} infrastructures chargées depuis {nom_csv}.")
-        except Exception as e:
-            notifier(f"💥 Incident sur {nom_csv} : {e}")
+            liste_perso = data_json.get("batiments_perso", [])
+            liste_entreprise = data_json.get("batiments_entreprise", [])
+            liste_terrain = data_json.get("batiments_terrain", [])
             
-    if c_batch > 0:
-        batch.commit()
-    notifier(f"✅ Collection 'batiments' synchronisée ({total_batiments_sauves} lignes au total).")
+            buildings_list = liste_perso + liste_entreprise + liste_terrain
+            
+            notifier(f"🏢 Détection JSON : {len(liste_perso)} perso, {len(liste_entreprise)} entreprise, {len(liste_terrain)} terrain.")
+            notifier(f"🚀 Traitement global de {len(buildings_list)} infrastructures...")
+            
+            # Limite maximale des entiers signés 64-bits pour Firestore
+            MAX_INT64 = 9223372036854775807
+            
+            def securiser_entier(valeur):
+                """Convertit proprement en int et sature à la limite max 64-bits si besoin"""
+                try:
+                    num = int(float(valeur))
+                    return min(num, MAX_INT64)
+                except (ValueError, TypeError):
+                    return 0
 
-    # --- 3. TRAVAUX (JSON FLUX SECOURS OU VIDE) ---
+            batch = db.batch()
+            c_batch = 0
+            
+            for b in buildings_list:
+                id_j = b.get('id', 0)
+                doc_id = f"{id_j}_{timestamp_id}"
+                doc_ref = db.collection("batiments").document(doc_id)
+                
+                batch.set(doc_ref, {
+                    "id_jeu": id_j, 
+                    "nom": b.get("nom", "Inconnu"), 
+                    "type": b.get("type", "Standard"), 
+                    "valeur": securiser_entier(b.get("valeur", 0)),
+                    "loyer": securiser_entier(b.get("loyer", 0)), 
+                    "charge": securiser_entier(b.get("charge", 0)), 
+                    "impot": securiser_entier(b.get("impot", 0)), 
+                    "date_extraction": date_now
+                })
+                
+                c_batch += 1
+                if c_batch >= 500:
+                    batch.commit()
+                    batch = db.batch()
+                    c_batch = 0
+                    
+            if c_batch > 0:
+                batch.commit()
+                
+            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({len(buildings_list)} lignes enregistrées).")
+        else:
+            notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
+    except Exception as e: 
+        notifier(f"💥 Crash Bâtiments : {e}")
+
+    # --- 3. TRAVAUX ---
     try:
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
+        notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             works_list = req.json().get("travaux", [])
             notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API.")
@@ -145,11 +147,14 @@ def executer_mise_a_jour_cron():
                     })
                 batch.commit()
             notifier("✅ Collection 'travaux' synchronisée avec succès.")
+        else:
+            notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
+
 
 
 if __name__ == "__main__":
