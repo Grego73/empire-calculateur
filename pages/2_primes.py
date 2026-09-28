@@ -66,8 +66,10 @@ else:
             reponse = requests.post(url_webhook, data={'content': msg}, files={'file': ('primes.txt', crlf_pur, 'text/plain')})
             
             # CONDITION CORRIGÉE ET SÉCURISÉE ICI
-            if reponse.status_code in:
-                st.success("🎉 Rapport Primes envoyé !")
+            if reponse.status_code in [200]  , [204] :
+                st.success("🎉 Rapport Primes envoyé avec succès sur Discord !")
                 st.dataframe(pd.DataFrame(lignes_tab), use_container_width=True, hide_index=True)
                 st.code(crlf_pur, language="text")
-        except Exception as e: st.error(f"⚠️ Erreur : {e}")
+            else:
+                st.error(f"❌ Erreur lors de l'envoi Discord (Code {reponse.status_code}) : {reponse.text}")
+
