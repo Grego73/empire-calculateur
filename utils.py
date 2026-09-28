@@ -101,18 +101,40 @@ def convertir_saisie_en_nombre(saisie_texte):
 def verifier_concordance_rapport(rapport_texte):
     erreurs = []
     data = {"net": 0, "actif": 0}
+    
     if not rapport_texte or not rapport_texte.strip():
         return ["Le rapport est vide."], data
+        
     lignes = rapport_texte.strip().split('\n')
+    net_trouve = False
+    actif_trouve = False
+    
     for ligne in lignes:
         ligne_up = ligne.upper()
         if "RÉSULTAT NET" in ligne_up or "RESULTAT NET" in ligne_up:
             match = re.search(r'([\d.,]+\s*[A-Z]?)', ligne_up)
-            if match: data["net"] = convertir_saisie_en_nombre(match.group(1))
+            if match: 
+                data["net"] = convertir_saisie_en_nombre(match.group(1))
+                net_trouve = True
         if "TOTAL ACTIF" in ligne_up or "TOTAL PASSIF" in ligne_up:
             match = re.search(r'([\d.,]+\s*[A-Z]?)', ligne_up)
-            if match: data["actif"] = convertir_saisie_en_nombre(match.group(1))
+            if match: 
+                data["actif"] = convertir_saisie_en_nombre(match.group(1))
+                actif_trouve = True
+
+    # 🚨 BLOC DE VÉRIFICATION MANQUANT
+    if not net_trouve:
+        erreurs.append("Impossible de trouver la ligne 'Résultat Net' dans le texte.")
+    if not actif_trouve:
+        erreurs.append("Impossible de trouver la ligne 'Total Actif' ou 'Total Passif'.")
+        
+    # Exemple de règle métier (à adapter selon les règles de votre jeu) :
+    # Si le résultat net ne doit pas dépasser une certaine proportion de l'actif par exemple
+    if net_trouve and actif_trouve and data["net"] > data["actif"]:
+        erreurs.append("Anomalie comptable : Le Résultat Net est supérieur au Total Actif.")
+
     return erreurs, data
+
 
 # =========================================================
 # 📥 LECTEURS CLOUD FIREBASE
