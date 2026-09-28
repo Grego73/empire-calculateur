@@ -151,13 +151,13 @@ def verifier_concordance_rapport(rapport_texte):
 
 def recuperer_derniere_donnee_table(nom_table):
     """
-    Récupère l'extraction la plus récente pour une table donnée.
-    S'adapte automatiquement à la structure sans filtre bloquant.
+    Récupère proprement les données du Monde 8 de Firebase
+    sans faire planter l'affichage de l'application.
     """
     try:
         from google.cloud.firestore_v1.base_query import Query
         
-        # 1. On cherche le document le plus récent pour trouver la dernière date d'extraction
+        # 1. On récupère le tout dernier document inséré pour identifier la dernière date
         docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         
         derniere_date = None
@@ -165,21 +165,18 @@ def recuperer_derniere_donnee_table(nom_table):
             derniere_date = doc.to_dict().get("date_extraction")
             
         if not derniere_date:
-            print(f"⚪ Firebase : La collection '{nom_table}' est vide en base.")
             return None
             
-        # 2. On télécharge toutes les infrastructures extraites à cette date précise
+        # 2. On charge tous les bâtiments ou travaux enregistrés à cette date précise
         docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         liste_elements = [doc.to_dict() for doc in docs_complets]
         
         if not liste_elements:
             return None
             
-        # 3. Conversion propre en DataFrame pour vos tableaux Streamlit
         df = pd.DataFrame(liste_elements)
         
-        # Sécurité Nettoyage : Si les colonnes financières ont été sauvées en texte, 
-        # on les remet en nombres pour éviter les bugs de calcul de ROI dans vos pages
+        # 3. Aligner les types de données : forcer en nombres entiers pour les calculs de ROI
         colonnes_argent = ["valeur", "loyer", "charge", "impot", "cout_estime"]
         for col in colonnes_argent:
             if col in df.columns:
@@ -188,8 +185,9 @@ def recuperer_derniere_donnee_table(nom_table):
         return df
         
     except Exception as e:
-        print(f"💥 Erreur extraction Firebase ({nom_table}) : {e}")
+        print(f"Erreur d'extraction sur la table {nom_table} : {e}")
         return None
+
 
 def recuperer_historique_joueur(pseudo="Grego73"):
     """
