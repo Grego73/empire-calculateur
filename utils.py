@@ -151,13 +151,14 @@ def verifier_concordance_rapport(rapport_texte):
 
 def recuperer_derniere_donnee_table(nom_table):
     """
-    Récupère proprement les données du Monde 8 de Firebase
-    sans faire planter l'affichage de l'application.
+    Récupère proprement l'extraction la plus récente pour une table donnée.
+    Force le typage numérique pour éviter les erreurs d'affichage de tableaux.
     """
     try:
         from google.cloud.firestore_v1.base_query import Query
+        import pandas as pd
         
-        # 1. On récupère le tout dernier document inséré pour identifier la dernière date
+        # 1. Récupération du document le plus récent pour trouver la dernière date de synchronisation
         docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         
         derniere_date = None
@@ -165,9 +166,10 @@ def recuperer_derniere_donnee_table(nom_table):
             derniere_date = doc.to_dict().get("date_extraction")
             
         if not derniere_date:
+            print(f"⚪ Firebase : La collection '{nom_table}' est introuvable ou vide.")
             return None
             
-        # 2. On charge tous les bâtiments ou travaux enregistrés à cette date précise
+        # 2. Téléchargement de toutes les lignes associées à cette date précise
         docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         liste_elements = [doc.to_dict() for doc in docs_complets]
         
@@ -176,7 +178,7 @@ def recuperer_derniere_donnee_table(nom_table):
             
         df = pd.DataFrame(liste_elements)
         
-        # 3. Aligner les types de données : forcer en nombres entiers pour les calculs de ROI
+        # 3. Alignement des types : conversion forcée en int pour les formules de ROI
         colonnes_argent = ["valeur", "loyer", "charge", "impot", "cout_estime"]
         for col in colonnes_argent:
             if col in df.columns:
@@ -185,8 +187,9 @@ def recuperer_derniere_donnee_table(nom_table):
         return df
         
     except Exception as e:
-        print(f"Erreur d'extraction sur la table {nom_table} : {e}")
+        print(f"💥 Erreur extraction Firebase ({nom_table}) : {e}")
         return None
+
 
 
 def recuperer_historique_joueur(pseudo="Grego73"):
