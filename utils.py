@@ -25,22 +25,22 @@ DICTIONNAIRE_PALIERS = {
 DOSSIER_UTILS = os.path.dirname(os.path.abspath(__file__))
 CHEMIN_CLE = os.path.join(DOSSIER_UTILS, "data_cache", "firebase_credentials.json")
 
+# Mettez à jour ce bloc d'initialisation :
 if not firebase_admin._apps:
-    if os.path.exists(CHEMIN_CLE):
-        cred = credentials.Certificate(CHEMIN_CLE)
-        firebase_admin.initialize_app(cred)
-    elif "firebase_credentials" in st.secrets:
-        # Convertit les secrets Streamlit en dictionnaire standard pour Firebase
+    if "firebase_credentials" in st.secrets:
         info_cles = dict(st.secrets["firebase_credentials"])
-        # Traitement indispensable des sauts de ligne pour la clé privée
         info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         cred = credentials.Certificate(info_cles)
         firebase_admin.initialize_app(cred)
     else:
-        raise FileNotFoundError(f"Clés Firebase introuvables localement ou dans les secrets Streamlit.")
+        # Repli local au cas où
+        DOSSIER_CRON = os.path.dirname(os.path.abspath(__file__))
+        RACINE_PROJET = os.path.dirname(DOSSIER_CRON)
+        CHEMIN_CLE = os.path.join(RACINE_PROJET, "data_cache", "firebase_credentials.json")
+        cred = credentials.Certificate(CHEMIN_CLE)
+        firebase_admin.initialize_app(cred)
 
 db = firestore.client()
-
 
 # 🧮 FONCTIONS DE TRADUCTION TEXTE <> NOMBRE
 def formater_monnaie_empire(nombre):
