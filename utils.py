@@ -20,18 +20,26 @@ DICTIONNAIRE_PALIERS = {
     "X": 10**39,  "N": 10**42,  "D": 10**45
 }
 
-# 🔑 CONNEXION SÉCURISÉE À FIREBASE (CLIENT UNIQUE)
+# 🔑 CONNEXION SÉCURISÉE À FIREBASE (COMPATIBLE LOCAL ET STREAMLIT CLOUD)
 DOSSIER_UTILS = os.path.dirname(os.path.abspath(__file__))
 CHEMIN_CLE = os.path.join(DOSSIER_UTILS, "data_cache", "firebase_credentials.json")
 
 if not firebase_admin._apps:
     if os.path.exists(CHEMIN_CLE):
+        # Utilisation locale (si le fichier de clé est présent sur votre PC)
         cred = credentials.Certificate(CHEMIN_CLE)
         firebase_admin.initialize_app(cred)
+    elif "firebase_credentials" in st.secrets:
+        # Utilisation sur Streamlit Cloud (via les Secrets sécurisés)
+        import dict
+        info_cles = dict(st.secrets["firebase_credentials"])
+        cred = credentials.Certificate(info_cles)
+        firebase_admin.initialize_app(cred)
     else:
-        raise FileNotFoundError(f"Le fichier de clés Firebase est introuvable dans : {CHEMIN_CLE}")
+        raise FileNotFoundError(f"Configuration Firebase introuvable. Ajoutez 'firebase_credentials' dans les Secrets Streamlit ou le fichier dans : {CHEMIN_CLE}")
 
 db = firestore.client()
+
 
 # 🧮 FONCTIONS DE TRADUCTION TEXTE <> NOMBRE
 def formater_monnaie_empire(nombre):
