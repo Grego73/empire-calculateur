@@ -51,7 +51,7 @@ else:
         from utils import db
         from google.cloud import firestore
         
-        tables = ["materiaux", "batiments", "travaux", "players"]
+        tables = ["materiaux", "batiments", "travaux", ]
         stats_tables = []
         
         with st.spinner("Analyse des tables Firestore..."):
