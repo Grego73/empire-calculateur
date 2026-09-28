@@ -3,6 +3,7 @@ import re
 import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
+import streamlit as st  # Ajoutez-le tout en haut si manquant
 
 # 🌐 CONFIGURATION CENTRALE DE L'API EMPIRE IMMO
 API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
@@ -20,23 +21,23 @@ DICTIONNAIRE_PALIERS = {
     "X": 10**39,  "N": 10**42,  "D": 10**45
 }
 
-# 🔑 CONNEXION SÉCURISÉE À FIREBASE (COMPATIBLE LOCAL ET STREAMLIT CLOUD)
+# 🔑 CONNEXION SÉCURISÉE À FIREBASE (CLIENT COMPATIBLE PC ET CLOUD)
 DOSSIER_UTILS = os.path.dirname(os.path.abspath(__file__))
 CHEMIN_CLE = os.path.join(DOSSIER_UTILS, "data_cache", "firebase_credentials.json")
 
 if not firebase_admin._apps:
     if os.path.exists(CHEMIN_CLE):
-        # Utilisation locale (si le fichier de clé est présent sur votre PC)
         cred = credentials.Certificate(CHEMIN_CLE)
         firebase_admin.initialize_app(cred)
     elif "firebase_credentials" in st.secrets:
-        # Utilisation sur Streamlit Cloud (via les Secrets sécurisés)
-        import dict
+        # Convertit les secrets Streamlit en dictionnaire standard pour Firebase
         info_cles = dict(st.secrets["firebase_credentials"])
+        # Traitement indispensable des sauts de ligne pour la clé privée
+        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
         cred = credentials.Certificate(info_cles)
         firebase_admin.initialize_app(cred)
     else:
-        raise FileNotFoundError(f"Configuration Firebase introuvable. Ajoutez 'firebase_credentials' dans les Secrets Streamlit ou le fichier dans : {CHEMIN_CLE}")
+        raise FileNotFoundError(f"Clés Firebase introuvables localement ou dans les secrets Streamlit.")
 
 db = firestore.client()
 
