@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import sys
 import requests
+import csv
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -36,7 +37,7 @@ def executer_mise_a_jour_cron():
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # --- 1. MATÉRIAUX ---
+    # --- 1. MATÉRIAUX (JSON) ---
     try:
         req = requests.get(f"{BASE_URL}/api/materials.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
@@ -62,85 +63,93 @@ def executer_mise_a_jour_cron():
     except Exception as e: 
         notifier(f"💥 Crash Matériaux : {e}")
 
-    # --- 2. BÂTIMENTS ---
-    try:
-        req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
-        notifier(f"📡 API Bâtiments — Code : {req.status_code}")
-        if req.status_code == 200:
-            buildings_list = req.json().get("batiments", [])
-            notifier(f"🏢 {len(buildings_list)} bâtiments détectés dans le flux API. Écriture par paquets...")
+    # --- 2. BÂTIMENTS (ASPIRES DEPUIS LES 3 FILES CSV DU JEU) ---
+    fichiers_csv = [
+        "buildings_batiments_terrain.csv",
+        "buildings_batiments_entreprise.csv",
+        "buildings_batiments_perso.csv"
+    ]
+    
+    total_batiments_sauves = 0
+    batch = db.batch()
+    c_batch = 0
+    
+    for nom_csv in fichiers_csv:
+        try:
+            url_csv = f"{BASE_URL}/api/{nom_csv}?key={API_KEY}"
+            req = requests.get(url_csv, timeout=15)
             
-            batch = db.batch()
-            c_batch = 0
-            for b in buildings_list:
-                id_j = b.get('id', 0)
-                doc_id = f"{id_j}_{timestamp_id}"
-                doc_ref = db.collection("batiments").document(doc_id)
-                batch.set(doc_ref, {
-                    "id_jeu": id_j, 
-                    "nom": b.get("nom", "Inconnu"), 
-                    "type": b.get("type", "Standard"), 
-                    "valeur": int(float(b.get("valeur", 0))),
-                    "loyer": int(float(b.get("loyer", 0))), 
-                    "charge": int(float(b.get("charge", 0))), 
-                    "impot": int(float(b.get("impot", 0))), 
-                    "date_extraction": date_now
-                })
-                c_batch += 1
-                if c_batch >= 500:
-                    batch.commit()
-                    batch = db.batch()
-                    c_batch = 0
-            if c_batch > 0:
-                batch.commit()
+            if req.status_code == 200:
+                lignes = req.text.strip().split('\n')
+                # Séparateur par défaut du jeu (tabulation ou virgule)
+                lecteur = csv.DictReader(lignes, delimiter='\t')
+                if len(lecteur.fieldnames or []) <= 1:
+                    lecteur = csv.DictReader(lignes, delimiter=',')
                 
-            notifier(f"✅ Collection 'batiments' synchronisée avec succès ({len(buildings_list)} lignes).")
-        else:
-            notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
-    except Exception as e: 
-        notifier(f"💥 Crash Bâtiments : {e}")
+                compteur_fichier = 0
+                for ligne in lecteur:
+                    id_j = ligne.get('id', ligne.get('id_jeu', str(total_batiments_sauves + 1)))
+                    nom_b = ligne.get('nom', ligne.get('name', 'Bâtiment Inconnu'))
+                    
+                    doc_id = f"{id_j}_{timestamp_id}"
+                    doc_ref = db.collection("batiments").document(doc_id)
+                    
+                    batch.set(doc_ref, {
+                        "id_jeu": id_j,
+                        "nom": nom_b,
+                        "type": ligne.get("type", nom_csv.split('_')[-1].replace('.csv', '')),
+                        "valeur": int(float(ligne.get("valeur", ligne.get("value", 0)))),
+                        "loyer": int(float(ligne.get("loyer", ligne.get("rent", 0)))),
+                        "charge": int(float(ligne.get("charge", ligne.get("charges", 0)))),
+                        "impot": int(float(ligne.get("impot", ligne.get("tax", 0)))),
+                        "date_extraction": date_now
+                    })
+                    
+                    compteur_fichier += 1
+                    total_batiments_sauves += 1
+                    c_batch += 1
+                    
+                    if c_batch >= 500:
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
+                
+                notifier(f"🏢 {compteur_fichier} infrastructures chargées depuis {nom_csv}.")
+        except Exception as e:
+            notifier(f"💥 Incident sur {nom_csv} : {e}")
+            
+    if c_batch > 0:
+        batch.commit()
+    notifier(f"✅ Collection 'batiments' synchronisée ({total_batiments_sauves} lignes au total).")
 
-    # --- 3. TRAVAUX ---
+    # --- 3. TRAVAUX (JSON FLUX SECOURS OU VIDE) ---
     try:
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
-        notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             works_list = req.json().get("travaux", [])
-            notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API. Écriture par paquets...")
-            
-            batch = db.batch()
-            c_batch = 0
-            for w in works_list:
-                b_name = w.get('nom_batiment', 'Inconnu')
-                t_type = w.get('type_travaux', 'Construction')
-                doc_id = f"{b_name.replace('/', '_')}_{t_type}_{timestamp_id}"
-                doc_ref = db.collection("travaux").document(doc_id)
-                batch.set(doc_ref, {
-                    "type_travaux": t_type, 
-                    "building_name": b_name, 
-                    "terrain_requis": w.get("terrain_requis", "Aucun"),
-                    "cout_estime": int(float(w.get("cout_estime", 0))), 
-                    "duree_mois": int(w.get("duree_mois", 0)), 
-                    "date_extraction": date_now
-                })
-                c_batch += 1
-                if c_batch >= 500:
-                    batch.commit()
-                    batch = db.batch()
-                    c_batch = 0
-            if c_batch > 0:
+            notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API.")
+            if works_list:
+                batch = db.batch()
+                for w in works_list:
+                    b_name = w.get('nom_batiment', 'Inconnu')
+                    t_type = w.get('type_travaux', 'Construction')
+                    doc_id = f"{b_name.replace('/', '_')}_{t_type}_{timestamp_id}"
+                    doc_ref = db.collection("travaux").document(doc_id)
+                    batch.set(doc_ref, {
+                        "type_travaux": t_type, 
+                        "building_name": b_name, 
+                        "terrain_requis": w.get("terrain_requis", "Aucun"),
+                        "cout_estime": int(float(w.get("cout_estime", 0))), 
+                        "duree_mois": int(w.get("duree_mois", 0)), 
+                        "date_extraction": date_now
+                    })
                 batch.commit()
-                
-            notifier(f"✅ Collection 'travaux' synchronisée avec succès ({len(works_list)} lignes).")
-        else:
-            notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
+            notifier("✅ Collection 'travaux' synchronisée avec succès.")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
-
-
 
 
 if __name__ == "__main__":
