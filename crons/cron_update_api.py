@@ -155,7 +155,7 @@ def executer_mise_a_jour_cron():
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX ---
+    # --- 3. TRAVAUX (ALIGNEMENT DES CLÉS DU MONDE 8) ---
     try:
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
@@ -175,6 +175,8 @@ def executer_mise_a_jour_cron():
             for w in works_list:
                 id_w = w.get('id', 0)
                 t_type = w.get('type', 'Construction')
+                
+                # Correction de la clé d'extraction : on lit 'nom' depuis l'API du Monde 8
                 b_name = w.get('nom', 'Inconnu')
                 
                 doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
@@ -183,7 +185,7 @@ def executer_mise_a_jour_cron():
                 batch.set(doc_ref, {
                     "id_jeu": id_w,
                     "type_travaux": t_type, 
-                    "building_name": b_name, 
+                    "building_name": b_name,  # Stocké sous 'building_name' pour la compatibilité de vos pages
                     "terrain_requis": w.get("terrain", "Aucun"),
                     "cout_estime": securiser_entier(w.get("cout", 0)), 
                     "duree_mois": securiser_entier(w.get("duree", 0)), 
@@ -204,6 +206,7 @@ def executer_mise_a_jour_cron():
             notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
+
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
