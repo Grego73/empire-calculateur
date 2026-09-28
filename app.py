@@ -1,11 +1,36 @@
 import streamlit as st
 import pandas as pd
+import os
+import sys
 from utils import (
     formater_monnaie_empire, 
     recuperer_derniere_donnee_table, 
     recuperer_historique_joueur,
     recuperer_historique_materiaux 
 )
+
+
+# 🚀 INTERCEPTION DU CRON JOB SUR L'ACCUEIL
+parametres = st.query_params
+
+if "page" in parametres and parametres["page"] == "webhook_cron":
+    if "token" in parametres and parametres["token"] == "MonCodeSecret2026":
+        # On force la configuration minimale
+        st.set_page_config(page_title="Cron Trigger", layout="centered")
+        st.title("🔄 Déclencheur automatique d'API")
+        
+        # Déclenchement du script
+        sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+        try:
+            from crons.cron_update_api import executer_mise_a_jour_cron
+            with st.spinner("Synchronisation Cloud Firestore en cours..."):
+                logs = executer_mise_a_jour_cron()
+            st.success("✅ Données synchronisées automatiquement avec succès !")
+            st.code("\n".join(logs), language="text")
+        except Exception as e:
+            st.error(f"Erreur lors de la synchronisation : {e}")
+        st.stop() # Arrête le chargement du reste de l'application pour le robot
+
 
 # ⚙️ CONFIGURATION GLOBALE (Doit être la toute première commande)
 st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="centered")
