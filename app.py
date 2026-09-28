@@ -3,7 +3,8 @@ import pandas as pd
 from utils import (
     formater_monnaie_empire, 
     recuperer_derniere_donnee_table, 
-    recuperer_historique_joueur
+    recuperer_historique_joueur,
+    recuperer_historique_materiaux 
 )
 
 # ⚙️ CONFIGURATION GLOBALE (Doit être la toute première commande)
@@ -25,33 +26,33 @@ if "projets_charges" not in st.session_state: st.session_state["projets_charges"
 
 
 def home_page():
-st.title("🏛️ Empire Calculateur — Tableau de Bord")
-st.write(f"Bienvenue, **Grego73** ! Votre calculateur automatique s'exécute en arrière-plan.")
-
-# --- 📈 BLOC GRAPHIQUE HISTORIQUE DES MATÉRIAUX ---
-st.subheader("📊 Évolution du Cours des Matériaux (Monde 8)")
-
-with st.spinner("Chargement du graphique des cours..."):
-    # Appel de la fonction créée dans utils.py
-    df_historique = recuperer_historique_materiaux()
-
-if df_historique is not None and not df_historique.empty:
-    # 🔄 Pivot des données pour avoir une colonne par matériau (Béton, Acier, Bois...)
-    # Cela permet à Streamlit de tracer automatiquement une ligne de couleur différente par ressource
-    df_pivot = df_historique.pivot_table(
-        index="Date", 
-        columns="Matériau", 
-        values="Prix ($)",
-        sort=False # Conserve l'ordre chronologique du tri précédent
-    )
+    st.title("🏛️ Empire Calculateur — Tableau de Bord")
+    st.write(f"Bienvenue, **Grego73** ! Votre calculateur automatique s'exécute en arrière-plan.")
     
-    # Affichage du graphique linéaire interactif
-    st.line_chart(df_pivot, width='stretch')
+    # --- 📈 BLOC GRAPHIQUE HISTORIQUE DES MATÉRIAUX ---
+    st.subheader("📊 Évolution du Cours des Matériaux (Monde 8)")
     
-    # Petit indicateur visuel en bonus
-    st.caption("💡 Astuce : Survolez les courbes avec votre souris pour voir les prix exacts à chaque heure d'extraction.")
-else:
-    st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
+    with st.spinner("Chargement du graphique des cours..."):
+        # Appel de la fonction créée dans utils.py
+        df_historique = recuperer_historique_materiaux()
+    
+    if df_historique is not None and not df_historique.empty:
+        # 🔄 Pivot des données pour avoir une colonne par matériau (Béton, Acier, Bois...)
+        # Cela permet à Streamlit de tracer automatiquement une ligne de couleur différente par ressource
+        df_pivot = df_historique.pivot_table(
+            index="Date", 
+            columns="Matériau", 
+            values="Prix ($)",
+            sort=False # Conserve l'ordre chronologique du tri précédent
+        )
+        
+        # Affichage du graphique linéaire interactif
+        st.line_chart(df_pivot, width='stretch')
+        
+        # Petit indicateur visuel en bonus
+        st.caption("💡 Astuce : Survolez les courbes avec votre souris pour voir les prix exacts à chaque heure d'extraction.")
+    else:
+        st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
 
     
     st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
