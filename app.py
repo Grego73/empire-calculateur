@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+from datetime import datetime, timedelta
 from utils import (
     formater_monnaie_empire, 
     recuperer_derniere_donnee_table, 
@@ -9,30 +10,7 @@ from utils import (
     recuperer_historique_materiaux 
 )
 
-
-# 🚀 INTERCEPTION DU CRON JOB SUR L'ACCUEIL
-parametres = st.query_params
-
-if "page" in parametres and parametres["page"] == "webhook_cron":
-    if "token" in parametres and parametres["token"] == "MonCodeSecret2026":
-        # On force la configuration minimale
-        st.set_page_config(page_title="Cron Trigger", layout="centered")
-        st.title("🔄 Déclencheur automatique d'API")
-        
-        # Déclenchement du script
-        sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-        try:
-            from crons.cron_update_api import executer_mise_a_jour_cron
-            with st.spinner("Synchronisation Cloud Firestore en cours..."):
-                logs = executer_mise_a_jour_cron()
-            st.success("✅ Données synchronisées automatiquement avec succès !")
-            st.code("\n".join(logs), language="text")
-        except Exception as e:
-            st.error(f"Erreur lors de la synchronisation : {e}")
-        st.stop() # Arrête le chargement du reste de l'application pour le robot
-
-
-# ⚙️ CONFIGURATION GLOBALE (Doit être la toute première commande)
+# ⚙️ CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1)
 st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="centered")
 
 # 📥 INITIALISATION DES VARIABLES DE SESSION (Optimisée)
@@ -49,6 +27,20 @@ if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduct
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
+# 🚀 SYNCHRONISATION AUTONOME ET TRANSPARENTE DU MONDE 8
+if "derniere_synchro_locale" not in st.session_state:
+    st.session_state["derniere_synchro_locale"] = datetime.min
+
+maintenant = datetime.now()
+# Si plus de 4 heures se sont écoulées, l'application se met à jour toute seule à l'ouverture
+if maintenant - st.session_state["derniere_synchro_locale"] > timedelta(hours=4):
+    sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+    try:
+        from crons.cron_update_api import executer_mise_a_jour_cron
+        executer_mise_a_jour_cron()
+        st.session_state["derniere_synchro_locale"] = maintenant
+    except Exception as e:
+        print(f"Mise à jour d'arrière-plan manquée : {e}")
 
 def home_page():
     st.title("🏛️ Empire Calculateur — Tableau de Bord")
