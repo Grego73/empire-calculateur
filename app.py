@@ -9,18 +9,20 @@ from utils import (
 # ⚙️ CONFIGURATION GLOBALE (Doit être la toute première commande)
 st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="centered")
 
-# 📥 INITIALISATION DES VARIABLES DE SESSION
-if "tab_finance" not in st.session_state: st.session_state["tab_finance"] = ""
-if "tab_capital" not in st.session_state: st.session_state["tab_capital"] = ""
-if "tab_primes" not in st.session_state: st.session_state["tab_primes"] = ""
-if "tab_frais" not in st.session_state: st.session_state["tab_frais"] = ""
-if "tab_projets_achat_loc" not in st.session_state: st.session_state["tab_projets_achat_loc"] = ""
-if "tab_projets_construction" not in st.session_state: st.session_state["tab_projets_construction"] = ""
-if "tab_projets_embellissement" not in st.session_state: st.session_state["tab_projets_embellissement"] = ""
+# 📥 INITIALISATION DES VARIABLES DE SESSION (Optimisée)
+cles_session = [
+    "tab_finance", "tab_capital", "tab_primes", "tab_frais", 
+    "tab_projets_achat_loc", "tab_projets_construction", "tab_projets_embellissement"
+]
+for cle in cles_session:
+    if cle not in st.session_state:
+        st.session_state[cle] = ""
+
 if "nom_bien_promo" not in st.session_state: st.session_state["nom_bien_promo"] = ""
 if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduction_promo"] = 0
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
+
 
 def home_page():
     st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
