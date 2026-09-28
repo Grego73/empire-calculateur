@@ -5,13 +5,13 @@ from firebase_admin import credentials, firestore
 import pandas as pd
 import streamlit as st  # Ajoutez-le tout en haut si manquant
 
-# 🌐 CONFIGURATION CENTRALE DE L'API EMPIRE IMMO
+# 🌐 CONFIGURATION CENTRALE DU MONDE 8 (CORRIGÉE)
 API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-BASE_URL = "https://empireimmo.com"
+BASE_URL = "https://monde8.empireimmo.com"
 
-# URLs découpées proprement par endpoint pour vos pages analytiques
-URL_WORKS = f"{BASE_URL}/works.json?key={API_KEY}"
-URL_MATERIALS = f"{BASE_URL}/materials.json?key={API_KEY}"
+# URLs découpées proprement pour vos pages analytiques
+URL_WORKS = f"{BASE_URL}/api/works.json?key={API_KEY}"
+URL_MATERIALS = f"{BASE_URL}/api/materials.json?key={API_KEY}"
 
 # 🏛️ ÉCHELLE MATHÉMATIQUE DE L'EMPIRE
 DICTIONNAIRE_PALIERS = {
