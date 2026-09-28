@@ -258,13 +258,11 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
     try:
         import pandas as pd
         
-        # Copie locale sécurisée
         df_calcul = df_filiales.copy()
         
-        # Conversion forcée en nombres décimaux (float) pour absorber les puissances géantes
+        # 🔒 Conversion forcée en float pour absorber les puissances géantes du M8
         df_calcul["Montant_Num"] = pd.to_numeric(df_calcul["Montant_RAW"], errors='coerce').fillna(0).astype(float)
         
-        # 1. Calcul du montant total strict requis pour équilibrer
         total_requis = float(df_calcul["Montant_Num"].sum())
         
         # --- RÉPARTITION 1 : STRICTE ---
@@ -288,3 +286,4 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
     except Exception as e:
         print(f"Erreur calcul répartition arbitrage : {e}")
         return 0.0, None, None, None
+
