@@ -10,13 +10,18 @@ from firebase_admin import credentials, firestore
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils import API_KEY, BASE_URL
 
-DOSSIER_CRON = os.path.dirname(os.path.abspath(__file__))
-RACINE_PROJET = os.path.dirname(DOSSIER_CRON)
-CHEMIN_CLE = os.path.join(RACINE_PROJET, "data_cache", "firebase_credentials.json")
-
 if not firebase_admin._apps:
-    cred = credentials.Certificate(CHEMIN_CLE)
-    firebase_admin.initialize_app(cred)
+    if "firebase_credentials" in st.secrets:
+        info_cles = dict(st.secrets["firebase_credentials"])
+        info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
+        cred = credentials.Certificate(info_cles)
+        firebase_admin.initialize_app(cred)
+    else:
+        DOSSIER_CRON = os.path.dirname(os.path.abspath(__file__))
+        RACINE_PROJET = os.path.dirname(DOSSIER_CRON)
+        CHEMIN_CLE = os.path.join(RACINE_PROJET, "data_cache", "firebase_credentials.json")
+        cred = credentials.Certificate(CHEMIN_CLE)
+        firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
@@ -25,7 +30,6 @@ def executer_mise_a_jour_cron():
     
     def notifier(texte):
         print(texte)
-        # On ajoute un horodatage à chaque ligne de log
         logs_session.append(f"[{datetime.now().strftime('%H:%M:%S')}] {texte}")
 
     notifier("⏰ [CRON CLOUD] Démarrage de la récupération...")
@@ -34,7 +38,7 @@ def executer_mise_a_jour_cron():
 
     # --- 1. MATÉRIAUX ---
     try:
-        req = requests.get(f"{BASE_URL}/materials.json?key={API_KEY}", timeout=15)
+        req = requests.get(f"{BASE_URL}/api/materials.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
         if req.status_code == 200:
             materials_list = req.json().get("materials", [])
@@ -52,7 +56,7 @@ def executer_mise_a_jour_cron():
 
     # --- 2. BÂTIMENTS ---
     try:
-        req = requests.get(f"{BASE_URL}/buildings.json?key={API_KEY}", timeout=15)
+        req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
             buildings_list = req.json().get("buildings_entreprise", [])
@@ -71,7 +75,7 @@ def executer_mise_a_jour_cron():
 
     # --- 3. TRAVAUX ---
     try:
-        req = requests.get(f"{BASE_URL}/works.json?key={API_KEY}", timeout=15)
+        req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             works_list = req.json().get("works_entreprise", [])
@@ -90,7 +94,7 @@ def executer_mise_a_jour_cron():
 
     # --- 4. PLAYERS ---
     try:
-        req = requests.get(f"{BASE_URL}/players.json?key={API_KEY}", timeout=15)
+        req = requests.get(f"{BASE_URL}/api/players.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Players — Code : {req.status_code}")
         if req.status_code == 200:
             players_list = req.json().get("players", [])
