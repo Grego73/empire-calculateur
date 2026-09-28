@@ -208,5 +208,6 @@ def executer_mise_a_jour_cron():
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
 
+
 if __name__ == "__main__":
     executer_mise_a_jour_cron()
