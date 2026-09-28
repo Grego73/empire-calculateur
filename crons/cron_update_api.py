@@ -43,15 +43,19 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             materials_list = req.json().get("materiaux", [])
             notifier(f"📦 {len(materials_list)} matériaux détectés dans le flux API.")
+            
+            batch = db.batch()
             for m in materials_list:
                 nom_brut = m.get('nom', 'Inconnu')
                 doc_id = f"{nom_brut.replace('/', '_')}_{timestamp_id}"
-                db.collection("materiaux").document(doc_id).set({
+                doc_ref = db.collection("materiaux").document(doc_id)
+                batch.set(doc_ref, {
                     "nom": nom_brut, 
                     "prix": int(float(m.get("prix", 0))), 
                     "unite": m.get("unite"), 
                     "date_extraction": date_now
                 })
+            batch.commit()
             notifier("✅ Collection 'materiaux' synchronisée avec succès.")
         else:
             notifier(f"❌ Erreur API Matériaux : {req.text[:200]}")
@@ -63,13 +67,16 @@ def executer_mise_a_jour_cron():
         req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
-            # Correction Clé : "batiments" pour le Monde 8
             buildings_list = req.json().get("batiments", [])
-            notifier(f"🏢 {len(buildings_list)} bâtiments détectés dans le flux API.")
+            notifier(f"🏢 {len(buildings_list)} bâtiments détectés dans le flux API. Écriture par paquets...")
+            
+            batch = db.batch()
+            c_batch = 0
             for b in buildings_list:
                 id_j = b.get('id', 0)
                 doc_id = f"{id_j}_{timestamp_id}"
-                db.collection("batiments").document(doc_id).set({
+                doc_ref = db.collection("batiments").document(doc_id)
+                batch.set(doc_ref, {
                     "id_jeu": id_j, 
                     "nom": b.get("nom", "Inconnu"), 
                     "type": b.get("type", "Standard"), 
@@ -79,7 +86,15 @@ def executer_mise_a_jour_cron():
                     "impot": int(float(b.get("impot", 0))), 
                     "date_extraction": date_now
                 })
-            notifier("✅ Collection 'batiments' synchronisée avec succès.")
+                c_batch += 1
+                if c_batch >= 500:
+                    batch.commit()
+                    batch = db.batch()
+                    c_batch = 0
+            if c_batch > 0:
+                batch.commit()
+                
+            notifier(f"✅ Collection 'batiments' synchronisée avec succès ({len(buildings_list)} lignes).")
         else:
             notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
     except Exception as e: 
@@ -90,14 +105,17 @@ def executer_mise_a_jour_cron():
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
-            # Correction Clé : "travaux" pour le Monde 8
             works_list = req.json().get("travaux", [])
-            notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API.")
+            notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API. Écriture par paquets...")
+            
+            batch = db.batch()
+            c_batch = 0
             for w in works_list:
                 b_name = w.get('nom_batiment', 'Inconnu')
                 t_type = w.get('type_travaux', 'Construction')
                 doc_id = f"{b_name.replace('/', '_')}_{t_type}_{timestamp_id}"
-                db.collection("travaux").document(doc_id).set({
+                doc_ref = db.collection("travaux").document(doc_id)
+                batch.set(doc_ref, {
                     "type_travaux": t_type, 
                     "building_name": b_name, 
                     "terrain_requis": w.get("terrain_requis", "Aucun"),
@@ -105,42 +123,23 @@ def executer_mise_a_jour_cron():
                     "duree_mois": int(w.get("duree_mois", 0)), 
                     "date_extraction": date_now
                 })
-            notifier("✅ Collection 'travaux' synchronisée avec succès.")
+                c_batch += 1
+                if c_batch >= 500:
+                    batch.commit()
+                    batch = db.batch()
+                    c_batch = 0
+            if c_batch > 0:
+                batch.commit()
+                
+            notifier(f"✅ Collection 'travaux' synchronisée avec succès ({len(works_list)} lignes).")
         else:
             notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
-    # --- 4. PLAYERS ---
-    try:
-        req = requests.get(f"{BASE_URL}/api/players.json?key={API_KEY}", timeout=15)
-        notifier(f"📡 API Players — Code : {req.status_code}")
-        if req.status_code == 200:
-            # Correction Clé : "joueurs" pour le Monde 8
-            players_list = req.json().get("joueurs", [])
-            notifier(f"🏆 {len(players_list)} joueurs détectés dans le flux API.")
-            for p in players_list:
-                pseudo_j = p.get('pseudo')
-                doc_id = f"{pseudo_j}_{timestamp_id}"
-                
-                # 🔒 SÉCURISATION DU SCORE GIGANTESQUE (String de sécurité pour Firestore)
-                points_bruts = str(p.get("points", 0))
-                
-                db.collection("players").document(doc_id).set({
-                    "pseudo": pseudo_j, 
-                    "points": points_bruts, 
-                    "classement": int(p.get("classement", 0)),
-                    "niveau": int(p.get("niveau", 0)), 
-                    "date_extraction": date_now
-                })
-            notifier("✅ Collection 'players' synchronisée avec succès.")
-        else:
-            notifier(f"❌ Erreur API Players : {req.text[:200]}")
-    except Exception as e: 
-        notifier(f"💥 Crash Players : {e}")
-
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
+
 
 
 
