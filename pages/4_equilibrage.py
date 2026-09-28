@@ -3,94 +3,88 @@ import pandas as pd
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre, calculer_repartitions_equilibrage
 
 st.title("⚖️ Équilibrage des Capitaux Propres")
-st.markdown("Visualisez le besoin théorique global et comparez vos 3 modèles de répartition de capital.")
+st.markdown("Calculez les injections nécessaires pour équilibrer vos filiales selon la méthode de votre choix.")
 
 if not st.session_state.get("holding_chargee", False):
-    st.warning("⚠️ Synchronisez d'abord vos données sur l'accueil 🏠.")
+    st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     try:
-        # 1. Lecture et extraction rapide de la session
+        # 1. Lecture et extraction rapide depuis st.session_state
         data_fin = {l.split('\t')[0].strip(): convertir_saisie_en_nombre(l.split('\t')[1]) for l in st.session_state["tab_finance"].strip().split('\n')[1:] if len(l.split('\t')) >= 2}
         data_cap = {l.split('\t')[0].strip(): {"propres": convertir_saisie_en_nombre(l.split('\t')[2])} for l in st.session_state["tab_capital"].strip().split('\n')[1:] if len(l.split('\t')) >= 3}
 
         filiales = [{"Filiale": k, "Treso": data_fin[k], "Propres": data_cap[k]["propres"]} for k in data_fin if k in data_cap]
         df = pd.DataFrame(filiales)
 
-        # 2. Interface utilisateur et sélection des cibles
+        # 2. Sélection des filiales cibles
         f_choisies = st.multiselect("Filiales à équilibrer :", options=df["Filiale"].tolist(), default=df["Filiale"].tolist())
         
         if f_choisies:
             df_f = df[df["Filiale"].isin(f_choisies)].copy()
-            
-            # Utilisation de float64 pour éviter le débordement d'entier (Value out of range)
             max_c = float(df_f["Propres"].max())
             
             import_rows = []
-            lignes_import = []
-            
             for _, r in df_f.iterrows():
-                # Calcul de l'écart individuel en flottant sécurisé
                 injecter = max(0.0, max_c - float(r["Propres"]))
                 import_rows.append({
                     "Filiale": r["Filiale"], 
                     "Montant à Injecter": formater_monnaie_empire(injecter),
                     "Montant_RAW": injecter
                 })
-                if injecter > 0: 
-                    lignes_import.append(f"{r['Filiale']}\t{int(injecter)}")
 
             df_selection = pd.DataFrame(import_rows)
             
-            # Affichage de la table de base validée
-            st.dataframe(df_selection[["Filiale", "Montant à Injecter"]], use_container_width=True, hide_index=True)
-            
-            # Saisie de l'enveloppe disponible dans votre Holding pour alimenter les répartitions 2 et 3
-            st.markdown("---")
+            # Saisie de l'enveloppe Holding
             st.subheader("💰 Configuration du budget Holding")
-            saisie_holding = st.text_input("Montant disponible actuellement dans la Holding :", value="100 M")
+            saisie_holding = st.text_input("Montant disponible dans la Holding (pour répartition 2 and 3) :", value="100 M")
             montant_holding = convertir_saisie_en_nombre(saisie_holding)
-            st.caption(f"ℹ️ Budget interprété : **{formater_monnaie_empire(montant_holding)}**")
+            st.caption(f"ℹ️ Budget Holding interprété : **{formater_monnaie_empire(montant_holding)}**")
 
             # 3. Exécution des calculs des 3 répartitions d'origine
             total_requis, rep_strict, rep_egal, rep_prop = calculer_repartitions_equilibrage(df_selection, montant_holding)
             
-            # Affichage du métrique général
-            st.metric(
-                label="🔴 Montant Total Théorique Requis pour l'Équilibrage Strict", 
-                value=formater_monnaie_empire(total_requis)
-            )
-            
-            # 4. Affichage des 3 Répartitions en colonnes (Ancien Modèle Restauré)
-            st.markdown("### 📊 Comparatif des modèles d'injection")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.markdown("#### 🎯 1. Strict")
-                if rep_strict is not None:
-                    # Application visuelle du format monétaire Empire sur les lignes du tableau
-                    rep_strict_visuel = rep_strict.copy()
-                    rep_strict_visuel["Montant"] = rep_strict_visuel["Montant"].apply(formater_monnaie_empire)
-                    st.dataframe(rep_strict_visuel, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("#### ⚖️ 2. Égalitaire")
-                if rep_egal is not None:
-                    rep_egal_visuel = rep_egal.copy()
-                    rep_egal_visuel["Montant"] = rep_egal_visuel["Montant"].apply(formater_monnaie_empire)
-                    st.dataframe(rep_egal_visuel, use_container_width=True, hide_index=True)
-            
-            with col3:
-                st.markdown("#### 📈 3. Proportionnelle")
-                if rep_prop is not None:
-                    rep_prop_visuel = rep_prop.copy()
-                    rep_prop_visuel["Montant"] = rep_prop_visuel["Montant"].apply(formater_monnaie_empire)
-                    st.dataframe(rep_prop_visuel, use_container_width=True, hide_index=True)
-
-            # 5. Bloc d'importation direct (CRLF standard) basé sur l'injection stricte
             st.markdown("---")
-            st.subheader("📋 Bloc d'importation direct (Strict)")
-            crlf_txt = "\r\n".join(lignes_import) + "\r\n"
-            st.code(crlf_txt, language="text")
+            st.subheader("🛠️ Choix de la méthode d'injection")
             
+            # 🔘 LES 3 BOUTONS HORIZONTAUX COMME DANS VOTRE ANCIEN MODÈLE
+            choix_methode = st.radio(
+                "**Sélectionnez le modèle à appliquer pour générer le bloc d'import :**",
+                ["🎯 1. Injection Stricte (Besoin réel)", "⚖️ 2. Répartition Égalitaire", "📈 3. Répartition Proportionnelle"],
+                horizontal=True
+            )
+
+            df_active = None
+            message_info = ""
+
+            if choix_methode == "🎯 1. Injection Stricte (Besoin réel)":
+                df_active = rep_strict
+                message_info = f"Le besoin théorique total pour niveler les filiales est de **{formater_monnaie_empire(total_requis)}**."
+            elif choix_methode == "⚖️ 2. Répartition Égalitaire":
+                df_active = rep_egal
+                message_info = f"Le budget de la Holding est divisé strictement équitablement entre toutes les filiales cibles."
+            else:
+                df_active = rep_prop
+                message_info = f"Le budget de la Holding est distribué proportionnellement selon l'importance du déficit de chaque filiale."
+
+            # 4. Affichage dynamique du tableau de la méthode sélectionnée
+            if df_active is not None:
+                st.info(message_info)
+                
+                df_visuel = df_active.copy()
+                df_visuel["Montant à Injecter"] = df_visuel["Montant"].apply(formater_monnaie_empire)
+                st.dataframe(df_visuel[["Filiale", "Montant à Injecter"]], use_container_width=True, hide_index=True)
+                
+                # 📋 Génération du BLOC D'IMPORTATION direct (CRLF) spécifique au bouton cliqué
+                lignes_import = []
+                for _, row in df_active.iterrows():
+                    valeur_brute = int(float(row["Montant"]))
+                    if valeur_brute > 0:
+                        lignes_import.append(f"{row['Filiale']}\t{valeur_brute}")
+                
+                st.subheader("📋 Bloc d'importation direct pour le jeu")
+                crlf_txt = "\r\n".join(lignes_import) + "\r\n"
+                st.code(crlf_txt, language="text")
+                st.download_button("📥 Télécharger le fichier (.txt)", data=crlf_txt, file_name="equilibrage_capitaux_empire.txt", mime="text/plain")
+
     except Exception as e: 
         st.error(f"⚠️ Erreur lors de la génération des arbitrages : {e}")
