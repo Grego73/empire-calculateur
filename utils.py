@@ -193,3 +193,44 @@ def recuperer_historique_joueur(pseudo="Grego73"):
     except Exception as e:
         print(f"Erreur historique Firebase pour {pseudo} : {e}")
         return None
+
+def recuperer_historique_materiaux():
+    """
+    Récupère l'historique des prix de tous les matériaux 
+    pour alimenter le graphique de l'accueil.
+    """
+    try:
+        # Extraction de tous les documents de la collection materiaux
+        docs = db.collection("materiaux").stream()
+        
+        donnees = []
+        for doc in docs:
+            d = doc.to_dict()
+            # Sécurité : On s'assure que le document contient les clés nécessaires
+            if "nom" in d and "prix" in d and "date_extraction" in d:
+                # Extraction uniquement de l'heure et du jour pour un affichage plus propre (JJ/MM HH:mm)
+                try:
+                    dt = datetime.strptime(d["date_extraction"], "%Y-%m-%d %H:%M:%S")
+                    date_formatee = dt.strftime("%d/%m %H:%M")
+                except:
+                    date_formatee = d["date_extraction"]
+                    
+                donnees.append({
+                    "Matériau": d["nom"],
+                    "Prix ($)": d["prix"],
+                    "Date": date_formatee,
+                    "Brute": d["date_extraction"] # Gardé pour le tri chronologique
+                })
+        
+        if not donnees:
+            return None
+            
+        # Conversion en DataFrame Pandas
+        df = pd.DataFrame(donnees)
+        # Tri par ordre chronologique pour que la courbe aille de gauche à droite
+        df = df.sort_values(by="Brute")
+        return df
+        
+    except Exception as e:
+        print(f"Erreur lors de la récupération de l'historique matériaux : {e}")
+        return None
