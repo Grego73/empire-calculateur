@@ -54,8 +54,9 @@ else:
                 
                 stats_tables.append({
                     "Collection Cloud NoSQL": table,
-                    "Statut": "🟢 Connectée & Opérationnelle" if d_synchro != "Aucune" else "⚪ Vide",
+                    "Statut": "🟢 Connectée & Opérationnelle" if derniere_synchro != "Aucune" else "⚪ Vide",
                     "Dernière Extraction": derniere_synchro
                 })
+
         st.dataframe(pd.DataFrame(stats_tables), use_container_width=True, hide_index=True)
     except Exception as e: st.error(f"⚠️ Erreur diagnostic Firebase : {e}")
