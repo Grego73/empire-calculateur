@@ -63,21 +63,20 @@ def executer_mise_a_jour_cron():
         req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
-            # Adaptation automatique aux clés françaises (batiments / batiments_entreprise)
-            data_json = req.json()
-            buildings_list = data_json.get("batiments", data_json.get("buildings_entreprise", []))
+            # Correction Clé : "batiments" pour le Monde 8
+            buildings_list = req.json().get("batiments", [])
             notifier(f"🏢 {len(buildings_list)} bâtiments détectés dans le flux API.")
             for b in buildings_list:
-                id_j = b.get('id', b.get('id_jeu'))
+                id_j = b.get('id', 0)
                 doc_id = f"{id_j}_{timestamp_id}"
                 db.collection("batiments").document(doc_id).set({
                     "id_jeu": id_j, 
-                    "nom": b.get("nom", b.get("name")), 
-                    "type": b.get("type"), 
-                    "valeur": int(float(b.get("valeur", b.get("value", 0)))),
-                    "loyer": int(float(b.get("loyer", b.get("rent", 0)))), 
+                    "nom": b.get("nom", "Inconnu"), 
+                    "type": b.get("type", "Standard"), 
+                    "valeur": int(float(b.get("valeur", 0))),
+                    "loyer": int(float(b.get("loyer", 0))), 
                     "charge": int(float(b.get("charge", 0))), 
-                    "impot": int(float(b.get("impot", b.get("tax", 0)))), 
+                    "impot": int(float(b.get("impot", 0))), 
                     "date_extraction": date_now
                 })
             notifier("✅ Collection 'batiments' synchronisée avec succès.")
@@ -91,19 +90,19 @@ def executer_mise_a_jour_cron():
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
-            data_json = req.json()
-            works_list = data_json.get("travaux", data_json.get("works_entreprise", []))
+            # Correction Clé : "travaux" pour le Monde 8
+            works_list = req.json().get("travaux", [])
             notifier(f"🏗️ {len(works_list)} chantiers détectés dans le flux API.")
             for w in works_list:
-                b_name = w.get('building_name', w.get('nom_batiment', 'Inconnu'))
-                t_type = w.get('type', w.get('type_travaux'))
+                b_name = w.get('nom_batiment', 'Inconnu')
+                t_type = w.get('type_travaux', 'Construction')
                 doc_id = f"{b_name.replace('/', '_')}_{t_type}_{timestamp_id}"
                 db.collection("travaux").document(doc_id).set({
                     "type_travaux": t_type, 
                     "building_name": b_name, 
-                    "terrain_requis": w.get("terrain_required", w.get("terrain_requis")),
-                    "cout_estime": int(float(w.get("estimated_cost", w.get("cout_estime", 0)))), 
-                    "duree_mois": int(w.get("duration", w.get("duree_mois", 0))), 
+                    "terrain_requis": w.get("terrain_requis", "Aucun"),
+                    "cout_estime": int(float(w.get("cout_estime", 0))), 
+                    "duree_mois": int(w.get("duree_mois", 0)), 
                     "date_extraction": date_now
                 })
             notifier("✅ Collection 'travaux' synchronisée avec succès.")
@@ -117,17 +116,21 @@ def executer_mise_a_jour_cron():
         req = requests.get(f"{BASE_URL}/api/players.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Players — Code : {req.status_code}")
         if req.status_code == 200:
-            data_json = req.json()
-            players_list = data_json.get("joueurs", data_json.get("players", []))
-            notifier(f"🏆 {len(players_list)} joueurs dètectés dans le flux API.")
+            # Correction Clé : "joueurs" pour le Monde 8
+            players_list = req.json().get("joueurs", [])
+            notifier(f"🏆 {len(players_list)} joueurs détectés dans le flux API.")
             for p in players_list:
                 pseudo_j = p.get('pseudo')
                 doc_id = f"{pseudo_j}_{timestamp_id}"
+                
+                # 🔒 SÉCURISATION DU SCORE GIGANTESQUE (String de sécurité pour Firestore)
+                points_bruts = str(p.get("points", 0))
+                
                 db.collection("players").document(doc_id).set({
                     "pseudo": pseudo_j, 
-                    "points": int(float(p.get("points", 0))), 
-                    "classement": int(p.get("ranking", p.get("classement", 0))),
-                    "niveau": int(p.get("level", p.get("niveau", 0))), 
+                    "points": points_bruts, 
+                    "classement": int(p.get("classement", 0)),
+                    "niveau": int(p.get("niveau", 0)), 
                     "date_extraction": date_now
                 })
             notifier("✅ Collection 'players' synchronisée avec succès.")
@@ -138,6 +141,7 @@ def executer_mise_a_jour_cron():
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
+
 
 
 if __name__ == "__main__":
