@@ -24,16 +24,25 @@ else:
     st.markdown("---")
 
     st.subheader("📡 Synchronisation Manuelle de l'API vers Firebase")
-    if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_width=True):
+    if st.button("🔄 Lancer le script de synchronisation (Cron)", width='stretch'):
         if not CRON_DISPONIBLE:
             st.error("❌ Erreur : Script 'cron_update_api.py' introuvable.")
         else:
             try:
                 with st.spinner("Envoi des flux d'API vers Firebase Cloud..."):
-                    executer_mise_a_jour_cron()
-                st.success("🎉 Le script s'est exécuté avec succès ! Collections rafraîchies.")
+                    # On exécute le script et on récupère la liste de logs
+                    historique_logs = executer_mise_a_jour_cron()
+                
+                st.success("🎉 Le script s'est exécuté ! Consultez le journal ci-dessous :")
+                
+                # On assemble les logs avec des retours à la ligne et on les affiche à l'écran
+                texte_journal = "\n".join(historique_logs)
+                st.code(texte_journal, language="text")
                 st.balloons()
-            except Exception as e: st.error(f"❌ Erreur : {e}")
+                
+            except Exception as e: 
+                st.error(f"❌ Erreur générale d'exécution : {e}")
+
 
     st.markdown("---")
     st.subheader("🗄️ État et Diagnostic de la Base de Données Cloud")
