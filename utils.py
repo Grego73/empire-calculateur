@@ -249,3 +249,42 @@ def recuperer_historique_materiaux():
     except Exception as e:
         print(f"Erreur lors de la récupération de l'historique matériaux : {e}")
         return None
+
+def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
+    """
+    Calcule le montant total théorique requis ainsi que les 3 modèles 
+    de répartition (Strict, Égalitaire, Proportionnel) pour le Monde 8.
+    """
+    try:
+        import pandas as pd
+        
+        # Copie locale sécurisée
+        df_calcul = df_filiales.copy()
+        
+        # Conversion forcée en nombres décimaux (float) pour absorber les puissances géantes
+        df_calcul["Montant_Num"] = pd.to_numeric(df_calcul["Montant_RAW"], errors='coerce').fillna(0).astype(float)
+        
+        # 1. Calcul du montant total strict requis pour équilibrer
+        total_requis = float(df_calcul["Montant_Num"].sum())
+        
+        # --- RÉPARTITION 1 : STRICTE ---
+        rep_strict = df_calcul[["Filiale", "Montant_Num"]].copy()
+        rep_strict["Montant"] = rep_strict["Montant_Num"]
+        
+        # --- RÉPARTITION 2 : ÉGALITAIRE ---
+        rep_egal = df_calcul[["Filiale"]].copy()
+        nb_filiales = max(len(rep_egal), 1)
+        rep_egal["Montant"] = float(montant_total_dispo) / nb_filiales
+        
+        # --- RÉPARTITION 3 : PROPORTIONNELLE ---
+        rep_prop = df_calcul[["Filiale", "Montant_Num"]].copy()
+        if total_requis > 0:
+            rep_prop["Montant"] = (rep_prop["Montant_Num"] / total_requis) * float(montant_total_dispo)
+        else:
+            rep_prop["Montant"] = 0.0
+            
+        return total_requis, rep_strict[["Filiale", "Montant"]], rep_egal[["Filiale", "Montant"]], rep_prop[["Filiale", "Montant"]]
+        
+    except Exception as e:
+        print(f"Erreur calcul répartition arbitrage : {e}")
+        return 0.0, None, None, None
