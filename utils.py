@@ -2,7 +2,6 @@ import os
 import re
 import firebase_admin
 from firebase_admin import credentials, firestore
-from google.cloud.firestore_v1.base_query import Query # Centralisé ici
 import pandas as pd
 import streamlit as st  
 from datetime import datetime
@@ -141,7 +140,10 @@ def verifier_concordance_rapport(rapport_texte):
 
 def recuperer_derniere_donnee_table(nom_table):
     try:
-        docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
+        import pandas as pd
+        
+        # 1. Utilisation de la chaîne de caractères "DESCENDING" directement, comprise nativement par Firestore
+        docs_ordre = db.collection(nom_table).order_by("date_extraction", direction="DESCENDING").limit(1).stream()
         
         derniere_date = None
         for doc in docs_ordre:
@@ -151,6 +153,7 @@ def recuperer_derniere_donnee_table(nom_table):
             print(f"⚪ Firebase : La collection '{nom_table}' est introuvable ou vide.")
             return None
             
+        # 2. Téléchargement de toutes les lignes associées à cette date précise
         docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         liste_elements = [doc.to_dict() for doc in docs_complets]
         
@@ -159,6 +162,7 @@ def recuperer_derniere_donnee_table(nom_table):
             
         df = pd.DataFrame(liste_elements)
         
+        # 3. Alignement des types
         colonnes_argent = ["valeur", "loyer", "charge", "impot", "cout_estime"]
         for col in colonnes_argent:
             if col in df.columns:
@@ -172,7 +176,8 @@ def recuperer_derniere_donnee_table(nom_table):
 
 def recuperer_historique_joueur(pseudo="Grego73"):
     try:
-        docs = db.collection("players").where("pseudo", "==", pseudo).order_by("date_extraction", direction=Query.ASCENDING).stream()
+        # Utilisation de "ASCENDING" en chaîne brute pour l'historique
+        docs = db.collection("players").where("pseudo", "==", pseudo).order_by("date_extraction", direction="ASCENDING").stream()
         liste_historique = [doc.to_dict() for doc in docs]
         return pd.DataFrame(liste_historique) if liste_historique else None
     except Exception as e:
@@ -248,7 +253,8 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
 
 def recuperer_derniers_taux_configuration():
     try:
-        docs = db.collection("configuration").order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
+        # Utilisation de "DESCENDING" en chaîne brute pour la configuration
+        docs = db.collection("configuration").order_by("date_extraction", direction="DESCENDING").limit(1).stream()
         for doc in docs:
             d = doc.to_dict()
             return {
