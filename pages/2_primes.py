@@ -58,7 +58,6 @@ else:
                     if nom not in plafonds_extraits: continue
                     val_exp = convertir_saisie_en_nombre(cols[2].strip())
                     
-                    # 🔒 SÉCURITÉ COMPTABLE : Si le résultat est négatif (perte), la prime brute est de 0
                     if val_exp <= 0:
                         val_prime = 0
                         p_max = plafonds_extraits[nom]
@@ -71,7 +70,6 @@ else:
                         statut = "🚨 Plafonné" if val_prime > p_max else "✅ Conforme"
                     
                     import_primes.append(f"{nom}\t{final_p}")
-                    
                     lignes_tab.append({
                         "Filiale": nom, 
                         "Prime Calculée": formater_monnaie_empire(val_prime), 
@@ -85,9 +83,7 @@ else:
             
             reponse = requests.post(url_webhook, data={'content': msg}, files={'file': ('primes.txt', crlf_pur, 'text/plain')})
             
-            # Utilisation de la syntaxe de contournement du filtre système
-            status_code = reponse.status_code
-            if status_code == 200 or status_code == 204:
+            if reponse.status_code in [ 200, 204] :
                 st.success("🎉 Rapport Primes envoyé avec succès sur Discord !")
                 st.dataframe(pd.DataFrame(lignes_tab), use_container_width=True, hide_index=True)
                 st.code(crlf_pur, language="text")
