@@ -8,7 +8,6 @@ from firebase_admin import credentials, firestore
 
 # Alignement du chemin d'importation
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils import API_KEY, BASE_URL
 
 if not firebase_admin._apps:
     if "firebase_credentials" in st.secrets:
@@ -25,7 +24,6 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# 🔥 AJOUT DU PARAMÈTRE DE FILTRAGE OPTIMISÉ POUR 03H30
 def executer_mise_a_jour_cron(exclure_players=False):
     logs_session = []
     
@@ -36,6 +34,10 @@ def executer_mise_a_jour_cron(exclure_players=False):
     notifier("⏰ [CRON CLOUD] Démarrage de la récupération...")
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # 🌐 CONFIGURATION STRICTE ET FORCEE POUR L'API DU MONDE 8
+    API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
+    BASE_URL = "https://empireimmo.com"  # ◄--- FIXÉ : Redirection sur le bon sous-domaine de jeu
 
     # Limites des entiers signés 64-bits pour Firestore Google Cloud
     MAX_INT64 = 9223372036854775807
@@ -53,12 +55,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
 
     # --- 1. MATÉRIAUX & USINES (JSON) ---
     try:
-        req = requests.get(f"{BASE_URL}/api/materials.json?key={API_KEY}", timeout=15)
+        url_mat = f"{BASE_URL}/api/materials.json?key={API_KEY}"
+        req = requests.get(url_mat, timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
             
-            # 🎯 Extraction du taux promoteur MATÉRIAUX
+            # Extraction du taux promoteur MATÉRIAUX
             taux_materiaux = securiser_entier(data_json.get("taux_promoteur", 0))
             
             # Enregistrement ou mise à jour de l'historique temporel
@@ -67,7 +70,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
                 "date_extraction": date_now
             }, merge=True)
             
-            # ✨ CORRECTION DOUBLE ÉCRITURE : Mise à jour immédiate du document maître fixe lu par Streamlit
+            # Mise à jour immédiate du document maître fixe lu par Streamlit
             db.collection("configuration").document("config_actuelle").set({
                 "taux_promoteur_materiaux": taux_materiaux,
                 "date_extraction": date_now
@@ -120,13 +123,14 @@ def executer_mise_a_jour_cron(exclure_players=False):
             notifier("✅ Collection 'usines' synchronisée avec succès.")
             
         else:
-            notifier(f"❌ Erreur API Matériaux : {req.text[:200]}")
+            notifier(f"❌ Erreur API Matériaux (Code {req.status_code})")
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS (AVEC SÉPARATION DES 3 CATÉGORIES ET TAUX PROMOTEUR) ---
+    # --- 2. BÂTIMENTS ---
     try:
-        req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
+        url_bld = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
+        req = requests.get(url_bld, timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
@@ -134,20 +138,14 @@ def executer_mise_a_jour_cron(exclure_players=False):
             # Extraction du taux promoteur global BÂTIMENTS
             taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Fusion sécurisée dans le document d'historique du run actuel
-            db.collection("configuration").document(f"config_{timestamp_id}").set({
+            # Fusion sécurisée dans le document d'historique et le document fixe maître
+            payload_config_bld = {
                 "taux_promoteur_batiments": taux_batiments,
                 "date_mise_a_jour": data_json.get("mise a jour", date_now),
                 "date_extraction": date_now
-            }, merge=True)
-            
-            # ✨ CORRECTION DOUBLE ÉCRITURE : Fusion sécurisée dans le document maître fixe lu par Streamlit
-            db.collection("configuration").document("config_actuelle").set({
-                "taux_promoteur_batiments": taux_batiments,
-                "date_mise_a_jour": data_json.get("mise a jour", date_now),
-                "date_extraction": date_now
-            }, merge=True)
-            
+            }
+            db.collection("configuration").document(f"config_{timestamp_id}").set(payload_config_bld, merge=True)
+            db.collection("configuration").document("config_actuelle").set(payload_config_bld, merge=True)
             notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
 
             liste_perso = data_json.get("batiments_perso", [])
@@ -166,8 +164,8 @@ def executer_mise_a_jour_cron(exclure_players=False):
             c_batch = 0
             total_enregistre = 0
             
-            for categorie, liste in categories_batiments:
-                for b in liste:
+            for categorie, listes in categories_batiments:
+                for b in listes:
                     id_j = b.get('id', 0)
                     doc_id = f"{id_j}_{timestamp_id}"
                     doc_ref = db.collection("batiments").document(doc_id)
@@ -202,13 +200,14 @@ def executer_mise_a_jour_cron(exclure_players=False):
                 
             notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées).")
         else:
-            notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
+            notifier(f"❌ Erreur API Bâtiments (Code {req.status_code})")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (ALIGNEMENT ET SYNCHRONISATION MONDE 8) ---
+    # --- 3. TRAVAUX ---
     try:
-        req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
+        url_wrk = f"{BASE_URL}/api/works.json?key={API_KEY}"
+        req = requests.get(url_wrk, timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
@@ -227,8 +226,8 @@ def executer_mise_a_jour_cron(exclure_players=False):
             c_batch = 0
             total_travaux_enregistre = 0
             
-            for categorie, liste in categories_travaux:
-                for w in liste:
+            for categorie, listes in categories_travaux:
+                for w in listes:
                     id_w = w.get('id', 0)
                     t_type = w.get('type', 'Construction')
                     b_name = w.get('nom', 'Inconnu')
@@ -250,6 +249,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     c_batch += 1
                     total_travaux_enregistre += 1
                     
+                    # 💡 Écriture par paquets pour respecter les limites Google Cloud Firestore
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
@@ -260,14 +260,15 @@ def executer_mise_a_jour_cron(exclure_players=False):
                 
             notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes enregistrées).")
         else:
-            notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
+            notifier(f"❌ Erreur API Travaux (Code {req.status_code})")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
-    # --- 4. CLASSEMENT DES JOUEURS (AVEC FILTRAGE REQUIS) ---
+    # --- 4. CLASSEMENT DES JOUEURS (SOUMIS AU FILTRE QUOTIDIEN DE 03H30) ---
     if not exclure_players:
         try:
-            req = requests.get(f"{BASE_URL}/api/players.json?key={API_KEY}", timeout=15)
+            url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
+            req = requests.get(url_ply, timeout=15)
             notifier(f"📡 API Players — Code : {req.status_code}")
             if req.status_code == 200:
                 players_list = req.json().get("players", [])
@@ -297,10 +298,11 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     batch.commit()
                 notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
             else:
-                notifier(f"❌ Erreur API Players : {req.text[:200]}")
+                notifier(f"❌ Erreur API Players (Code {req.status_code})")
         except Exception as e:
             notifier(f"💥 Crash Classement Players : {e}")
     else:
+        # Trace explicite visible dans vos rapports de console GitHub Actions tous les matins
         notifier("⏭️ Table 'players' volontairement ignorée pour ce créneau quotidien d'optimisation des quotas.")
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
@@ -308,4 +310,3 @@ def executer_mise_a_jour_cron(exclure_players=False):
 
 if __name__ == "__main__":
     executer_mise_a_jour_cron()
-            
