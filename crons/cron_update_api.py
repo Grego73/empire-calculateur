@@ -184,15 +184,16 @@ def executer_mise_a_jour_cron():
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (SÉPARATION DES 2 CATÉGORIES MONDE 8) ---
+    # --- 3. TRAVAUX (ALIGNEMENT ET SYNCHRONISATION MONDE 8) ---
     try:
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
             
+            # 💡 Correction des clés d'API au pluriel pour le Monde 8
             liste_t_perso = data_json.get("travaux_perso", [])
-            liste_t_entreprise = data_json.get("travaux_entreprise", [])
+            liste_t_entreprise = data_json.get("travaux_entreprises", []) # ◄--- 'entreprises' au pluriel
             
             notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
             
@@ -205,38 +206,34 @@ def executer_mise_a_jour_cron():
             c_batch = 0
             total_travaux_enregistre = 0
             
-            for categorie, liste in categories_batiments:
-                for b in liste:
-                    id_j = b.get('id', 0)
-                    doc_id = f"{id_j}_{timestamp_id}"
-                    doc_ref = db.collection("batiments").document(doc_id)
+            for categorie, liste in categories_travaux:
+                for w in liste:
+                    id_w = w.get('id', 0)
+                    t_type = w.get('type', 'Construction')
+                    b_name = w.get('nom', 'Inconnu')
                     
-                    # 💡 Extraction et sécurisation de TOUTES les valeurs individuelles du JSON
+                    doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
+                    doc_ref = db.collection("travaux").document(doc_id)
+                    
                     batch.set(doc_ref, {
-                        "id_jeu": int(id_j), 
-                        "nom": str(b.get("nom", "Inconnu")), 
-                        "type": str(b.get("type", "Standard")), 
-                        "niveau": securiser_entier(b.get("niveau", 0)),
-                        "valeur": securiser_entier(b.get("valeur", 0)),
-                        "loyer": securiser_entier(b.get("loyer", 0)), 
-                        "charge": securiser_entier(b.get("charge", 0)), 
-                        "impot": securiser_entier(b.get("impot", 0)), 
-                        "promotion": securiser_entier(b.get("promotion", 0)),
-                        "construction": securiser_entier(b.get("construction", 0)),
-                        # Nettoie les chaînes comme "5074" en entiers réels
-                        "embellissement": securiser_entier(b.get("embellissement", 0)),
-                        "reparation": securiser_entier(b.get("reparation", 0)),
+                        "id_jeu": int(id_w),
+                        "type_travaux": str(t_type), 
+                        "building_name": str(b_name), 
+                        "terrain_requis": str(w.get("terrain", "Aucun")),
+                        "cout_estime": securiser_entier(w.get("cout", 0)), 
+                        "duree_mois": securiser_entier(w.get("duree", 0)), 
                         "categorie": categorie,
                         "date_extraction": date_now
                     })
                     
                     c_batch += 1
-                    total_enregistre += 1
+                    total_travaux_enregistre += 1
+                    
+                    # 💡 Alignement de l'indentation de l'écriture par paquets (20 espaces de décalage)
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
-
                     
             if c_batch > 0:
                 batch.commit()
@@ -246,6 +243,7 @@ def executer_mise_a_jour_cron():
             notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
+
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
