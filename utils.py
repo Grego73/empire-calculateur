@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import streamlit as st  # Ajoutez-le tout en haut si manquant
+from datetime import datetime
 
 # 🌐 CONFIGURATION CENTRALE DU MONDE 8 (CORRIGÉE)
 API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
