@@ -8,7 +8,7 @@ from utils import (
     recuperer_derniere_donnee_table, 
     recuperer_historique_joueur,
     recuperer_historique_materiaux,
-    verifier_concordance_rapport  # Centralisé ici pour éviter l'importation locale répétitive
+    verifier_concordance_rapport  # Tout est propre ici
 )
 
 # ⚙️ CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1)
