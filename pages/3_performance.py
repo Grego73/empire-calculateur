@@ -8,15 +8,11 @@ if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez synchroniser vos tableaux sur l'accueil 🏠.")
 else:
     try:
-        # Extraction Finance
         data_fin = {}
         for l in st.session_state["tab_finance"].strip().split('\n')[1:]:
-            if not l.strip():
-                continue
-            # 💡 Sécurisation Monde 8 : On sépare d'abord, sans supprimer les colonnes vides
+            if not l.strip(): continue
             cols = [c.strip() for c in l.split('\t')]
-            if len(cols) < 5: 
-                continue
+            if len(cols) < 5: continue
             data_fin[cols[0]] = {
                 "treso": convertir_saisie_en_nombre(cols[1]), 
                 "expo": convertir_saisie_en_nombre(cols[2]), 
@@ -24,26 +20,20 @@ else:
                 "prof": convertir_saisie_en_nombre(cols[4])
             }
 
-        # Extraction Capital
         data_cap = {}
         for l in st.session_state["tab_capital"].strip().split('\n')[1:]:
-            if not l.strip():
-                continue
-            # 💡 Sécurisation Monde 8 : On protège également l'extraction du capital contre le crash d'index
+            if not l.strip(): continue
             cols = [c.strip() for c in l.split('\t')]
-            if len(cols) < 4:  # Sécurité minimale pour accéder jusqu'à cols[3]
-                continue
+            if len(cols) < 4: continue
             data_cap[cols[0]] = {
                 "apport": convertir_saisie_en_nombre(cols[1]), 
                 "propres": convertir_saisie_en_nombre(cols[2]), 
                 "latence": convertir_saisie_en_nombre(cols[3])
             }
 
-        # Fusion & Calculs
         rows = []
         for f, fin in data_fin.items():
-            if f not in data_cap: 
-                continue
+            if f not in data_cap: continue
             cap = data_cap[f]
             rendement = (fin["expo"] / cap["apport"] * 100) if cap["apport"] > 0 else 0
             rows.append({
@@ -56,8 +46,6 @@ else:
             })
 
         df = pd.DataFrame(rows)
-        
-        # Formatage de l'affichage du rendement pour plus de lisibilité
         if not df.empty:
             df["Rendement (%)"] = df["Rendement (%)"].apply(lambda x: f"{x:.2f}%")
             
