@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
-from utils import formater_monnaie_empire, recuperer_derniere_donnee_table
+from utils import (
+    formater_monnaie_empire, 
+    recuperer_derniere_donnee_table,
+    recuperer_derniers_taux_configuration  # Utilisation directe du lecteur optimisé
+)
 
 # 📋 CONFIGURATION DU TITRE DE LA PAGE
 st.title("✨ Opportunités du Jour — Biens en Promo")
@@ -9,19 +13,16 @@ st.markdown("Consultez immédiatement l'ensemble des infrastructures en promotio
 # 1. Chargement des tables Firebase Cloud Firestore
 with st.spinner("Analyse des flux NoSQL Firestore..."):
     df_batiments = recuperer_derniere_donnee_table("batiments")
-    df_config = recuperer_derniere_donnee_table("configuration")
+    # Récupération sécurisée des taux du promoteur depuis la base NoSQL
+    config_taux = recuperer_derniers_taux_configuration()
 
-# Initialisation du taux de matériau de la configuration générale (pour information)
-taux_batiments = 0
-taux_materiaux = 0
-if df_config is not None and not df_config.empty:
-    ligne_config = df_config.iloc[0]
-    taux_batiments = int(ligne_config.get("taux_promoteur_batiments", 0))
-    taux_materiaux = int(ligne_config.get("taux_promoteur_materiaux", 0))
+taux_batiments = config_taux.get("batiments", 0)
+taux_materiaux = config_taux.get("materiaux", 0)
 
 # =========================================================
 # 🧮 EXTRACTION DIRECTE ET CALCULS COMPTABLES INVERSÉS
 # =========================================================
+
 if df_batiments is None or df_batiments.empty:
     st.error("🚨 Base de données des bâtiments indisponible ou vide.")
 else:
