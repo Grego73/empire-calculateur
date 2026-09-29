@@ -5,7 +5,7 @@ import zoneinfo
 import firebase_admin
 from firebase_admin import credentials
 
-# 1. Analyse du type de déclenchement
+# 1. Analyse du type de déclenchement GitHub
 evenement_github = os.environ.get("GITHUB_EVENT_NAME", "").strip().lower()
 force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
 
@@ -21,7 +21,7 @@ print("🔍 SCRIPT CRON GLOBAL — DIAGNOSTIC HORLOGE")
 print("==========================================================================")
 print(f"[TRACE] Heure France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
 
-# 3. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h25 et 3h55 pour parer les retards GitHub)
+# 3. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h25 et 3h55)
 if force_run or (heure_locale == 3 and 25 <= minute_locale <= 55):
     print("🚀 Créneau de 03h30 validé ou Exécution forcée. Démarrage de la mise à jour complète...")
     
@@ -44,13 +44,11 @@ if force_run or (heure_locale == 3 and 25 <= minute_locale <= 55):
             sys.exit(1)
 
     # 4. Chargement et exécution de votre script d'origine
-try:
+    try:
         sys.path.append(os.path.abspath(os.path.dirname(__file__)))
         from crons.cron_update_api import executer_mise_a_jour_cron
 
-        print("[TRACE] Déclenchement du traitement quotidien (sans la table 'players')...")
-        
-        # 🔥 MODIFICATION : On passe le paramètre à True ici
+        print("[TRACE] Déclenchement du traitement lourd (sans la table 'players')...")
         journaux_execution = executer_mise_a_jour_cron(exclure_players=True)
         
         print("\n------------------- JOURNAUX DU ROBOT GLOBAL -------------------")
