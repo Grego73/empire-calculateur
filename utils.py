@@ -2,15 +2,16 @@ import os
 import re
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.cloud.firestore_v1.base_query import Query # Centralisé ici
 import pandas as pd
-import streamlit as st  # Ajoutez-le tout en haut si manquant
+import streamlit as st  
 from datetime import datetime
 
-# 🌐 CONFIGURATION CENTRALE DU MONDE 8 (CORRIGÉE)
-API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-BASE_URL = "https://monde8.empireimmo.com"
+# 🌐 CONFIGURATION CENTRALE DU MONDE 8 (SÉCURISÉE)
+# Cherche d'abord dans st.secrets, sinon utilise la valeur par défaut
+API_KEY = st.secrets.get("GAME_API_KEY", "eiK8_110b18473efc48e9c63f76b5494ea18f")
+BASE_URL = "https://empireimmo.com"
 
-# URLs découpées proprement pour vos pages analytiques
 URL_WORKS = f"{BASE_URL}/api/works.json?key={API_KEY}"
 URL_MATERIALS = f"{BASE_URL}/api/materials.json?key={API_KEY}"
 
@@ -22,11 +23,7 @@ DICTIONNAIRE_PALIERS = {
     "X": 10**39,  "N": 10**42,  "D": 10**45
 }
 
-# 🔑 CONNEXION SÉCURISÉE À FIREBASE (CLIENT COMPATIBLE PC ET CLOUD)
-DOSSIER_UTILS = os.path.dirname(os.path.abspath(__file__))
-CHEMIN_CLE = os.path.join(DOSSIER_UTILS, "data_cache", "firebase_credentials.json")
-
-# Mettez à jour ce bloc d'initialisation :
+# 🔑 CONNEXION SÉCURISÉE À FIREBASE
 if not firebase_admin._apps:
     if "firebase_credentials" in st.secrets:
         info_cles = dict(st.secrets["firebase_credentials"])
@@ -34,7 +31,6 @@ if not firebase_admin._apps:
         cred = credentials.Certificate(info_cles)
         firebase_admin.initialize_app(cred)
     else:
-        # Repli local au cas où
         DOSSIER_CRON = os.path.dirname(os.path.abspath(__file__))
         RACINE_PROJET = os.path.dirname(DOSSIER_CRON)
         CHEMIN_CLE = os.path.join(RACINE_PROJET, "data_cache", "firebase_credentials.json")
@@ -75,7 +71,7 @@ def convertir_saisie_en_nombre(saisie_texte):
         except:
             pass
 
-    if "E+" in texte_brut or "E-" in texte_brut or ("E" in texte_brut and any(x in texte_brut for x in ["0","1","2","3","4","5","6","7","8","9"]) and not any(suffixe in texte_brut for suffixe in ["K","M","G","T","P"])):
+    if "E+" in texte_brut or "E-" in texte_brut or ("E" in texte_brut and any(x in texte_brut for x in "0123456789") and not any(suffixe in texte_brut for suffixe in ["K","M","G","T","P"])):
         try:
             valeur_calculee = int(float(texte_brut))
             if 0 < taux_promo < 100:
@@ -90,10 +86,7 @@ def convertir_saisie_en_nombre(saisie_texte):
         suffixe_partie = match.group(2)
         
         try:
-            if "." not in nombre_partie:
-                valeur_num = int(nombre_partie)
-            else:
-                valeur_num = float(nombre_partie)
+            valeur_num = float(nombre_partie) if "." in nombre_partie else int(nombre_partie)
                 
             if suffixe_partie in DICTIONNAIRE_PALIERS:
                 valeur_calculee = int(valeur_num * DICTIONNAIRE_PALIERS[suffixe_partie])
@@ -132,34 +125,22 @@ def verifier_concordance_rapport(rapport_texte):
                 data["actif"] = convertir_saisie_en_nombre(match.group(1))
                 actif_trouve = True
 
-    # 🚨 BLOC DE VÉRIFICATION MANQUANT
     if not net_trouve:
         erreurs.append("Impossible de trouver la ligne 'Résultat Net' dans le texte.")
     if not actif_trouve:
         erreurs.append("Impossible de trouver la ligne 'Total Actif' ou 'Total Passif'.")
         
-    # Exemple de règle métier (à adapter selon les règles de votre jeu) :
-    # Si le résultat net ne doit pas dépasser une certaine proportion de l'actif par exemple
     if net_trouve and actif_trouve and data["net"] > data["actif"]:
         erreurs.append("Anomalie comptable : Le Résultat Net est supérieur au Total Actif.")
 
     return erreurs, data
-
 
 # =========================================================
 # 📥 LECTEURS CLOUD FIREBASE
 # =========================================================
 
 def recuperer_derniere_donnee_table(nom_table):
-    """
-    Récupère proprement l'extraction la plus récente pour une table donnée.
-    Force le typage numérique pour éviter les erreurs d'affichage de tableaux.
-    """
     try:
-        from google.cloud.firestore_v1.base_query import Query
-        import pandas as pd
-        
-        # 1. Récupération du document le plus récent pour trouver la dernière date de synchronisation
         docs_ordre = db.collection(nom_table).order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         
         derniere_date = None
@@ -170,7 +151,6 @@ def recuperer_derniere_donnee_table(nom_table):
             print(f"⚪ Firebase : La collection '{nom_table}' est introuvable ou vide.")
             return None
             
-        # 2. Téléchargement de toutes les lignes associées à cette date précise
         docs_complets = db.collection(nom_table).where("date_extraction", "==", derniere_date).stream()
         liste_elements = [doc.to_dict() for doc in docs_complets]
         
@@ -179,7 +159,6 @@ def recuperer_derniere_donnee_table(nom_table):
             
         df = pd.DataFrame(liste_elements)
         
-        # 3. Alignement des types : conversion forcée en int pour les formules de ROI
         colonnes_argent = ["valeur", "loyer", "charge", "impot", "cout_estime"]
         for col in colonnes_argent:
             if col in df.columns:
@@ -191,40 +170,22 @@ def recuperer_derniere_donnee_table(nom_table):
         print(f"💥 Erreur extraction Firebase ({nom_table}) : {e}")
         return None
 
-
-
 def recuperer_historique_joueur(pseudo="Grego73"):
-    """
-    Récupère tout l'historique de croissance d'un joueur depuis le cloud.
-    """
     try:
-        from google.cloud.firestore_v1.base_query import Query
         docs = db.collection("players").where("pseudo", "==", pseudo).order_by("date_extraction", direction=Query.ASCENDING).stream()
-        
-        liste_historique = []
-        for doc in docs:
-            liste_historique.append(doc.to_dict())
-            
+        liste_historique = [doc.to_dict() for doc in docs]
         return pd.DataFrame(liste_historique) if liste_historique else None
     except Exception as e:
         print(f"Erreur historique Firebase pour {pseudo} : {e}")
         return None
 
 def recuperer_historique_materiaux():
-    """
-    Récupère l'historique des prix de tous les matériaux 
-    pour alimenter le graphique de l'accueil.
-    """
     try:
-        # Extraction de tous les documents de la collection materiaux
         docs = db.collection("materiaux").stream()
-        
         donnees = []
         for doc in docs:
             d = doc.to_dict()
-            # Sécurité : On s'assure que le document contient les clés nécessaires
             if "nom" in d and "prix" in d and "date_extraction" in d:
-                # Extraction uniquement de l'heure et du jour pour un affichage plus propre (JJ/MM HH:mm)
                 try:
                     dt = datetime.strptime(d["date_extraction"], "%Y-%m-%d %H:%M:%S")
                     date_formatee = dt.strftime("%d/%m %H:%M")
@@ -235,68 +196,46 @@ def recuperer_historique_materiaux():
                     "Matériau": d["nom"],
                     "Prix ($)": d["prix"],
                     "Date": date_formatee,
-                    "Brute": d["date_extraction"] # Gardé pour le tri chronologique
+                    "Brute": d["date_extraction"]
                 })
         
         if not donnees:
             return None
             
-        # Conversion en DataFrame Pandas
-        df = pd.DataFrame(donnees)
-        # Tri par ordre chronologique pour que la courbe aille de gauche à droite
-        df = df.sort_values(by="Brute")
+        df = pd.DataFrame(donnees).sort_values(by="Brute")
         return df
-        
     except Exception as e:
         print(f"Erreur lors de la récupération de l'historique matériaux : {e}")
         return None
 
 def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
-    """
-    Modèle Monde 8 : Équilibre d'abord les filiales (Nivellement strict) 
-    puis distribue tout le budget restant de la Holding équitablement.
-    """
     try:
         from decimal import Decimal
-        import pandas as pd
-        
         df_calcul = df_filiales.copy()
-        
-        # 🔒 Conversion précise en Decimal pour le Monde 8
         df_calcul["Montant_Num"] = df_calcul["Montant_RAW"].apply(lambda x: Decimal(str(x)))
         
-        # 1. Calcul du besoin strict total pour niveler l'empire
         total_requis = df_calcul["Montant_Num"].sum()
         montant_holding = Decimal(str(montant_total_dispo))
         nb_filiales = max(len(df_calcul), 1)
         
-        # --- RÉPARTITION 1 : STRICTE (Besoin réel brut) ---
         rep_strict = df_calcul[["Filiale", "Montant_Num"]].copy()
         rep_strict["Montant"] = rep_strict["Montant_Num"]
         
-        # --- RÉPARTITION 2 : ÉGALITAIRE BRUTE (Votre ancien modèle inchangé) ---
         rep_egal = df_calcul[["Filiale"]].copy()
         rep_egal["Montant"] = montant_holding / Decimal(nb_filiales)
         
-        # --- RÉPARTITION 3 : CASCADE (Nivellement + Partage du reste) ---
         rep_prop = df_calcul[["Filiale", "Montant_Num"]].copy()
         
         if montant_holding >= total_requis:
-            # Cas idéal : On a assez pour combler le déficit ET partager un reste
             reste_a_partager = montant_holding - total_requis
             part_du_reste = reste_a_partager / Decimal(nb_filiales)
-            
-            # Chaque filiale reçoit : son besoin de mise à niveau + sa part du bonus restant
             rep_prop["Montant"] = rep_prop["Montant_Num"] + part_du_reste
         else:
-            # Cas de crise : La Holding n'a pas assez pour couvrir le besoin strict de nivellement.
-            # On distribue le peu qu'on a au prorata du déficit pour réduire les écarts au maximum.
             if total_requis > 0:
                 rep_prop["Montant"] = rep_prop["Montant_Num"].apply(lambda x: (x / total_requis) * montant_holding)
             else:
                 rep_prop["Montant"] = montant_holding / Decimal(nb_filiales)
             
-        # Reconversion finale pour l'affichage de Streamlit
         rep_strict["Montant"] = rep_strict["Montant"].astype(float)
         rep_egal["Montant"] = rep_egal["Montant"].astype(float)
         rep_prop["Montant"] = rep_prop["Montant"].astype(float)
@@ -308,9 +247,7 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
         return 0.0, None, None, None
 
 def recuperer_derniers_taux_configuration():
-    """Récupère le dictionnaire des taux les plus récents depuis la table configuration."""
     try:
-        from google.cloud.firestore_v1.base_query import Query
         docs = db.collection("configuration").order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         for doc in docs:
             d = doc.to_dict()
@@ -321,4 +258,3 @@ def recuperer_derniers_taux_configuration():
         return {"batiments": 0, "materiaux": 0}
     except:
         return {"batiments": 0, "materiaux": 0}
-
