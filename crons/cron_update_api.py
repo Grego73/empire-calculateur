@@ -6,7 +6,7 @@ from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Alignement du chemin d'importation
+# Alignement du chemin d'importation NoSQL
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 if not firebase_admin._apps:
@@ -35,6 +35,10 @@ def executer_mise_a_jour_cron(exclure_players=False):
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (FORCEE ET SURCHEF)
+    API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
+    BASE_URL = "https://empireimmo.com"
+
     # Limites des entiers signés 64-bits pour Firestore Google Cloud
     MAX_INT64 = 9223372036854775807
     MIN_INT64 = -9223372036854775808
@@ -48,9 +52,9 @@ def executer_mise_a_jour_cron(exclure_players=False):
         except (ValueError, TypeError):
             return 0
 
-    # --- 1. MATÉRIAUX & USINES (PLURIEL OFFICIEL) ---
+    # --- 1. MATÉRIAUX & USINES (PLURIEL OFFICIEL MONDE 8) ---
     try:
-        url_mat = "https://empireimmo.com"
+        url_mat = f"{BASE_URL}/api/materials.json?key={API_KEY}"
         notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_mat}")
         req = requests.get(url_mat, timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
@@ -111,13 +115,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
                 batch.commit()
             notifier("✅ Collection 'usines' synchronisée avec succès.")
         else:
-            notifier(f"❌ Erreur API Matériaux : {req.status_code}")
+            notifier(f"❌ Erreur API Matériaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS (PLURIEL OFFICIEL) ---
+    # --- 2. BÂTIMENTS (PLURIEL OFFICIEL MONDE 8) ---
     try:
-        url_bld = "https://empireimmo.com"
+        url_bld = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
         notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_bld}")
         req = requests.get(url_bld, timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
@@ -181,13 +185,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
                 batch.commit()
             notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes).")
         else:
-            notifier(f"❌ Erreur API Bâtiments : {req.status_code}")
+            notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (PLURIEL OFFICIEL CORRIGÉ) ---
+    # --- 3. TRAVAUX (PLURIEL OFFICIEL MONDE 8) ---
     try:
-        url_wrk = "https://empireimmo.com"
+        url_wrk = f"{BASE_URL}/api/works.json?key={API_KEY}"
         notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_wrk}")
         req = requests.get(url_wrk, timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
@@ -208,8 +212,8 @@ def executer_mise_a_jour_cron(exclure_players=False):
             c_batch = 0
             total_travaux_enregistre = 0
             
-            for categorie, liste in categories_travaux:  # ◄--- FIXÉ ICI
-                for w in liste:                           # ◄--- FIXÉ ICI (Plus de 's' à liste)
+            for categorie, liste in categories_travaux:
+                for w in liste:
                     id_w = w.get('id', 0)
                     t_type = w.get('type', 'Construction')
                     b_name = w.get('nom', 'Inconnu')
@@ -229,14 +233,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     })
                     c_batch += 1
                     total_travaux_enregistre += 1
-                    
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
             if c_batch > 0:
                 batch.commit()
-            notifier("✅ Collection 'travaux' entièrement synchronisée.")
+            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes).")
         else:
             notifier(f"❌ Erreur API Travaux : {req.status_code}")
     except Exception as e: 
@@ -245,7 +248,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
     # --- 4. CLASSEMENT DES JOUEURS (SOUMIS AU FILTRE QUOTIDIEN DE 03H30) ---
     if not exclure_players:
         try:
-            url_ply = "https://empireimmo.com"
+            url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
             notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_ply}")
             req = requests.get(url_ply, timeout=15)
             notifier(f"📡 API Players — Code : {req.status_code}")
@@ -276,7 +279,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     batch.commit()
                 notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
             else:
-                notifier(f"❌ Erreur API Players : {req.text[:200]}")
+                notifier(f"❌ Erreur API Players : {req.status_code}")
         except Exception as e:
             notifier(f"💥 Crash Classement Players : {e}")
     else:
@@ -287,4 +290,3 @@ def executer_mise_a_jour_cron(exclure_players=False):
 
 if __name__ == "__main__":
     executer_mise_a_jour_cron()
-                   
