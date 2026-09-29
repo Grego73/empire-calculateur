@@ -123,23 +123,24 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             data_json = req.json()
             
-            # 🎯 Extraction du taux promoteur BÂTIMENTS
+            # Extraction du taux promoteur global BÂTIMENTS
             taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Fusion dans le même document de configuration du run actuel
+            # Fusion sécurisée dans le document de configuration unique du run actuel
             db.collection("configuration").document(f"config_{timestamp_id}").set({
                 "taux_promoteur_batiments": taux_batiments,
                 "date_mise_a_jour": data_json.get("mise a jour", date_now),
                 "date_extraction": date_now
             }, merge=True)
             notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
-            
+
             liste_perso = data_json.get("batiments_perso", [])
             liste_entreprise = data_json.get("batiments_entreprise", [])
             liste_terrain = data_json.get("batiments_terrain", [])
             
             notifier(f"🏢 Détection JSON : {len(liste_perso)} personnels, {len(liste_entreprise)} entreprises, {len(liste_terrain)} terrains.")
             
+            # Structuration par sous-groupes pour injecter la catégorie d'origine
             categories_batiments = [
                 ("perso", liste_perso),
                 ("entreprise", liste_entreprise),
@@ -156,20 +157,28 @@ def executer_mise_a_jour_cron():
                     doc_id = f"{id_j}_{timestamp_id}"
                     doc_ref = db.collection("batiments").document(doc_id)
                     
+                    # Enregistrement absolu de CHAQUE colonne et variable du Monde 8
                     batch.set(doc_ref, {
-                        "id_jeu": id_j, 
-                        "nom": b.get("nom", "Inconnu"), 
-                        "type": b.get("type", "Standard"), 
+                        "id_jeu": int(id_j), 
+                        "nom": str(b.get("nom", "Inconnu")), 
+                        "type": str(b.get("type", "Standard")), 
+                        "niveau": securiser_entier(b.get("niveau", 0)),
                         "valeur": securiser_entier(b.get("valeur", 0)),
                         "loyer": securiser_entier(b.get("loyer", 0)), 
                         "charge": securiser_entier(b.get("charge", 0)), 
                         "impot": securiser_entier(b.get("impot", 0)), 
+                        "promotion": securiser_entier(b.get("promotion", 0)),
+                        "construction": securiser_entier(b.get("construction", 0)),
+                        "embellissement": securiser_entier(b.get("embellissement", 0)),
+                        "reparation": securiser_entier(b.get("reparation", 0)),
                         "categorie": categorie,
                         "date_extraction": date_now
                     })
                     
                     c_batch += 1
                     total_enregistre += 1
+                    
+                    # Écriture par paquets pour éviter les limites de Google Cloud
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
@@ -178,11 +187,12 @@ def executer_mise_a_jour_cron():
             if c_batch > 0:
                 batch.commit()
                 
-            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées avec tags).")
+            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées avec toutes leurs colonnes).")
         else:
             notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
+
 
     # --- 3. TRAVAUX (ALIGNEMENT ET SYNCHRONISATION MONDE 8) ---
     try:
