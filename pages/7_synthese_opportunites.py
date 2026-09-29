@@ -2,158 +2,110 @@ import streamlit as st
 import pandas as pd
 from utils import formater_monnaie_empire, recuperer_derniere_donnee_table
 
-st.title("✨ Le Podium des Opportunités de l'Empire")
-st.markdown("Analyse des projets les plus rentables basée sur les dernières données synchronisées dans le Cloud NoSQL.")
+# 📋 DÉCORATION ET NOMMAGE DE LA PAGE
+st.title("✨ Opportunités du Jour — Biens en Promo")
+st.markdown("Identification exclusive des infrastructures profitant d'une réduction active relevée en base de données.")
 
-# 1. Extraction des données Firebase Cloud Firestore
-with st.spinner("Analyse des tables Firebase et de la configuration..."):
-    df_travaux = recuperer_derniere_donnee_table("travaux")
-    df_materiaux = recuperer_derniere_donnee_table("materiaux")
+# 1. Chargement des tables Firebase Cloud Firestore
+with st.spinner("Analyse des flux NoSQL Firestore..."):
+    df_batiments = recuperer_derniere_donnee_table("batiments")
+    df_materiaux = recuperer_derniere_donnee_table("materials") if "materials" in st.session_state else recuperer_derniere_donnee_table("materiaux")
     df_config = recuperer_derniere_donnee_table("configuration")
 
-# Initialisation des variables de configuration
-taux_batiments = 0
+# Initialisation du taux de matériau de la configuration générale (pour les terrains)
 taux_materiaux = 0
-promos_perso = []
-promos_entreprise = []
-
 if df_config is not None and not df_config.empty:
     ligne_config = df_config.iloc[0]
-    
-    # Récupération des taux
-    taux_batiments = int(ligne_config.get("taux_promoteur_batiments", 0))
-    taux_materiaux = int(ligne_config.get("taux_promoteur_materiaux", 0))
-    
-    # Récupération des listes de biens en promotion
-    if "promos_perso" in ligne_config:
-        promos_perso = [str(x).strip() for x in ligne_config["promos_perso"] if x]
-    if "promos_entreprise" in ligne_config:
-        promos_entreprise = [str(x).strip() for x in ligne_config["promos_entreprise"] if x]
+    taux_materiaux = int(ligne_config.get("taux_promoteur_materials", ligne_config.get("taux_promoteur_materiaux", 0)))
 
 # =========================================================
-# 📊 SECTION VISUELLE : LES GRAPHISTES DE TAUX DU PROMOTEUR
+# 📊 SECTION VISUELLE : SUIVI DU TAUX MATÉRIAU GLOBAL
 # =========================================================
-st.subheader("🏛️ État des Taux du Promoteur")
+st.subheader("🏛️ État du Taux Promoteur Global")
+st.markdown(f"**Taux Promoteur Matériau (Terrains) : `{taux_materiaux}%`**")
+st.bar_chart(pd.DataFrame({"Taux (%)": [taux_materiaux]}, index=["Matériau"]), y_label="Pourcentage", color="#00C49F", use_container_width=True)
 
-col_g1, col_g2 = st.columns(2)
-
-with col_g1:
-    st.markdown(f"**Taux Promoteur Bâtiment : `{taux_batiments}%`**")
-    # Création d'un graphique à barres horizontal pour faire office de jauge de progression
-    df_jauge_bat = pd.DataFrame({"Taux (%)": [taux_batiments]}, index=["Bâtiment"])
-    st.bar_chart(df_jauge_bat, x_label="", y_label="Pourcentage", color="#FF4B4B", use_container_width=True)
-
-with col_g2:
-    st.markdown(f"**Taux Promoteur Matériau : `{taux_materiaux}%`**")
-    # Création du deuxième graphique pour le taux matériau
-    df_jauge_mat = pd.DataFrame({"Taux (%)": [taux_materiaux]}, index=["Matériau"])
-    st.bar_chart(df_jauge_mat, x_label="", y_label="Pourcentage", color="#00C49F", use_container_width=True)
-
-
-# =========================================================
-# 🏷️ SECTION RECHERCHE : BIENS EN PROMOTION DETECTES
-# =========================================================
-st.markdown("---")
-st.subheader("🏷️ Biens actuellement en Promotion")
-
-cp1, cp2 = st.columns(2)
-
-with cp1:
-    st.markdown("##### 📦 Promos Perso")
-    if promos_perso:
-        for p in promos_perso:
-            st.markdown(f"• ✨ **{p}**")
-    else:
-        st.info("⚪ Aucun bien personnel en promotion actuellement.")
-
-with cp2:
-    st.markdown("##### 🏢 Promos Entreprise")
-    if promos_entreprise:
-        for e in promos_entreprise:
-            st.markdown(f"• 💼 **{e}**")
-    else:
-        st.info("⚪ Aucun bien d'entreprise en promotion actuellement.")
-
-
-# =========================================================
-# 🏆 SECTION ALGORITHME : CALCUL ET CALCULATEUR DU PODIUM
-# =========================================================
 st.markdown("---")
 
-if df_travaux is None or df_materiaux is None or df_travaux.empty or df_materiaux.empty:
-    st.error("🚨 Données Firebase incomplètes ou absentes pour le calcul du podium.")
+# =========================================================
+# 🧮 EXTRACTION DIRECTE ET FILTRAGE DES PROMOTIONS FIRESTORE
+# =========================================================
+if df_batiments is None or df_batiments.empty:
+    st.error("🚨 Base de données des bâtiments indisponible ou vide.")
 else:
     try:
-        # Filtrage des constructions
-        df_const = df_travaux[df_travaux["type_travaux"].str.upper() == "CONSTRUCTION"].copy()
+        # Harmonisation forcée du type de la colonne promotion
+        if "promotion" in df_batiments.columns:
+            df_batiments["promotion"] = pd.to_numeric(df_batiments["promotion"], errors='coerce').fillna(0).astype(int)
+        else:
+            df_batiments["promotion"] = 0
 
-        if not df_const.empty:
-            # Dictionnaire des prix des matériaux
-            col_nom_mat = "nom" if "nom" in df_materiaux.columns else "name"
-            col_prix_mat = "prix" if "prix" in df_materiaux.columns else "price"
-            dict_materiaux = dict(zip(df_materiaux[col_nom_mat].str.upper(), df_materiaux[col_prix_mat]))
+        # 🚨 FILTRE MAJEUR : On retient uniquement les bâtiments ayant une promotion STRICTEMENT SUPÉRIEURE À ZERO
+        df_promos_actives = df_batiments[df_batiments["promotion"] > 0].copy()
 
-            # Listes en majuscules pour une comparaison robuste
-            promos_perso_upper = [x.upper() for x in promos_perso]
-            promos_entreprise_upper = [x.upper() for x in promos_entreprise]
+        if df_promos_actives.empty:
+            st.info("⚪ Aucun bâtiment ne possède de promotion supérieure à 0% dans la base de données à cette heure.")
+        else:
+            # Table de correspondance pour le calcul optionnel du terrain remisé si nécessaire
+            dict_materiaux = {}
+            if df_materiaux is not None and not df_materiaux.empty:
+                col_nom_mat = "nom" if "nom" in df_materiaux.columns else "name"
+                col_prix_mat = "prix" if "prix" in df_materiaux.columns else "price"
+                dict_materiaux = dict(zip(df_materiaux[col_nom_mat].str.upper(), df_materiaux[col_prix_mat]))
 
-            rows_opportunites = []
-            for _, r in df_const.iterrows():
-                terrain_requis = r.get("terrain_requis", r.get("terrain_required", ""))
-                if not terrain_requis:
-                    continue
+            liste_opportunites = []
+
+            for _, r in df_promos_actives.iterrows():
+                nom_bien = r.get("nom", "Infrastructure")
+                cat_bien = str(r.get("categorie", "perso")).strip().lower()
+                valeur_brute = int(r.get("valeur", 0))
+                taux_promo_bien = int(r.get("promotion", 0))
                 
-                terrain_clean = str(terrain_requis).strip().upper()
-                nom_batiment = r.get("building_name", r.get("nom", "Infrastructure Inconnue"))
-                nom_batiment_clean = str(nom_batiment).strip().upper()
+                # Le champ 'construction' ou 'valeur' sert de pivot pour le calcul financier final
+                base_calcul = int(r.get("construction", valeur_brute))
                 
-                # Prix de base bruts
-                cout_main_oeuvre = int(r.get("cout_estime", r.get("estimated_cost", 0)))
-                prix_du_terrain = int(dict_materiaux.get(terrain_clean, 0))
-                
-                # 🛠️ LOGIQUE CORRIGÉE : Application sélective des promotions
-                # 1. Le taux matériau s'applique globalement sur les terrains
-                if taux_materiaux > 0:
-                    prix_du_terrain = int(prix_du_terrain * (1 - (taux_materiaux / 100)))
-                
-                # 2. Le taux bâtiment s'applique UNIQUEMENT si le nom est dans les listes de promos relevées
-                if nom_batiment_clean in promos_perso_upper or nom_batiment_clean in promos_entreprise_upper:
-                    if taux_batiments > 0:
-                        cout_main_oeuvre = int(cout_main_oeuvre * (1 - (taux_batiments / 100)))
+                # Application de la réduction individuelle du bâtiment enregistrée dans Firestore
+                montant_remise = int(base_calcul * (taux_promo_bien / 100))
+                prix_final_remise = max(0, base_calcul - montant_remise)
 
-                cout_total = max(1, cout_main_oeuvre + prix_du_terrain)
-
-                rows_opportunites.append({
-                    "Nom": nom_batiment,
-                    "Cout_Total": cout_total,
-                    "Terrain": terrain_requis
+                liste_opportunites.append({
+                    "Infrastructure": nom_bien,
+                    "Type": r.get("type", "Non défini"),
+                    "Niveau": f"Niv. {r.get('niveau', 1)}",
+                    "Valeur Initiale": formater_monnaie_empire(base_calcul),
+                    "Promotion": f"-{taux_promo_bien}%",
+                    "Prix Après Remise Num": prix_final_remise,
+                    "Prix Après Remise": formater_monnaie_empire(prix_final_remise),
+                    "Économie Réalisée": formater_monnaie_empire(montant_remise),
+                    "Catégorie": cat_bien
                 })
 
-            if rows_opportunites:
-                df_opportunites = pd.DataFrame(rows_opportunites).sort_values(by="Cout_Total", ascending=True)
+            df_opportunites_final = pd.DataFrame(liste_opportunites)
 
-                st.subheader("🏗️ Top 3 Projets de Construction Économiques (Prix Réduits inclus)")
-                df_top3 = df_opportunites.head(3)
-                
-                cols_m = st.columns(3)
-                medailles = ["🥇 1er", "🥈 2e", "🥉 3e"]
-                
-                for i, (_, r) in enumerate(df_top3.iterrows()):
-                    with cols_m[i]: 
-                        st.metric(
-                            label=f"{medailles[i]} - {r['Nom']}", 
-                            value=formater_monnaie_empire(r['Cout_Total']), 
-                            delta=f"Terrain : {r['Terrain']}",
-                            delta_color="off"
-                        )
+            # =========================================================
+            # 📦 SÉPARATION ÉTANCHE ET RESTITUTION PAR ONGLET
+            # =========================================================
+            # Tri systématique du moins cher au plus cher pour mettre en avant le podium
+            df_ong_entreprise = df_opportunites_final[df_opportunites_final["Catégorie"] == "entreprise"].sort_values(by="Prix Après Remise Num")
+            df_ong_perso = df_opportunites_final[df_opportunites_final["Catégorie"] == "perso"].sort_values(by="Prix Après Remise Num")
 
-                with st.expander("📋 Visualiser le catalogue complet des opportunités triées"):
-                    df_complet_visuel = df_opportunites.copy()
-                    df_complet_visuel["Coût Total Projet"] = df_complet_visuel["Cout_Total"].apply(formater_monnaie_empire)
-                    st.dataframe(
-                        df_complet_visuel[["Nom", "Coût Total Projet", "Terrain"]], 
-                        use_container_width=True, 
-                        hide_index=True
-                    )
+            tab_ent, tab_perso = st.tabs(["🏢 Bâtiments d'Entreprises en Promotion", "📦 Bâtiments Personnels en Promotion"])
+
+            with tab_ent:
+                if df_ong_entreprise.empty:
+                    st.info("⚪ Aucun bâtiment d'entreprise avec une promotion active (>0%) n'a été détecté.")
+                else:
+                    st.success(f"🎯 `{len(df_ong_entreprise)}` bâtiments d'entreprises en promotion trouvés.")
+                    colonnes_affichage = ["Infrastructure", "Type", "Niveau", "Valeur Initiale", "Promotion", "Prix Après Remise", "Économie Réalisée"]
+                    st.dataframe(df_ong_entreprise[colonnes_affichage], use_container_width=True, hide_index=True)
+
+            with tab_perso:
+                if df_ong_perso.empty:
+                    st.info("⚪ Aucun bâtiment personnel avec une promotion active (>0%) n'a été détecté.")
+                else:
+                    st.success(f"🎯 `{len(df_ong_perso)}` bâtiments personnels en promotion trouvés.")
+                    colonnes_affichage = ["Infrastructure", "Type", "Niveau", "Valeur Initiale", "Promotion", "Prix Après Remise", "Économie Réalisée"]
+                    st.dataframe(df_ong_perso[colonnes_affichage], use_container_width=True, hide_index=True)
+
     except Exception as e:
-        st.error(f"⚠️ Erreur lors du calcul des opportunités : {e}")
+        st.error(f"⚠️ Erreur lors du parsing des attributs NoSQL de promotions : {e}")
