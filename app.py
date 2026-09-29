@@ -7,7 +7,8 @@ from utils import (
     formater_monnaie_empire, 
     recuperer_derniere_donnee_table, 
     recuperer_historique_joueur,
-    recuperer_historique_materiaux 
+    recuperer_historique_materiaux,
+    verifier_concordance_rapport  # Centralisé ici pour éviter l'importation locale répétitive
 )
 
 # ⚙️ CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1)
@@ -27,24 +28,23 @@ if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduct
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
-# 🚀 SYNCHRONISATION EN ARRIÈRE-PLAN SUPPRIMÉE D'ICI POUR ÉVITER LES RALENTISSEMENTS
 
 def home_page():
-    st.title("🏛️ Empire Calculateur — Tableau de Bord")
+    st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
     st.write(f"Bienvenue, **Grego73** ! Votre calculateur s'exécute avec les données du Cloud.")
     
     # --- 📈 BLOC GRAPHIQUE HISTORIQUE DES MATÉRIAUX ---
-    st.subheader("📊 Évolution du Cours des Matériaux (Monde 8)")
+    st.subheader("📊 Évolution du Cours des Matériaux")
     
     with st.spinner("Chargement du graphique des cours..."):
-        df_historique = recuperer_historique_materiaux()
+        df_historique_mat = recuperer_historique_materiaux()
     
-    if df_historique is not None and not df_historique.empty:
-        # 🔄 Pivot des données (Correction du nom de la colonne Prix)
-        df_pivot = df_historique.pivot_table(
+    if df_historique_mat is not None and not df_historique_mat.empty:
+        # 🔄 Pivot des données (Correction : Échappement du caractère \$ pour éviter les conflits de rendu Markdown Streamlit)
+        df_pivot = df_historique_mat.pivot_table(
             index="Date", 
             columns="Matériau", 
-            values="Prix ($)", # ◄--- CORRECTION : Utilisation de la clé exacte sans l'anti-slash
+            values="Prix (\$)", 
             sort=False 
         )
         st.line_chart(df_pivot, width='stretch')
@@ -52,12 +52,11 @@ def home_page():
     else:
         st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
 
-    st.header("🏛️ Centre de Contrôle de l'Empire — Monde 8")
-    
-    st.subheader("📊 Tableau de Bord de votre Personnage")
+    st.markdown("---")
+    st.subheader("👑 Tableau de Bord de votre Personnage")
     PSEUDO_JOUEUR = "Grego73"
     df_players_actuel = recuperer_derniere_donnee_table("players")
-    df_historique = recuperer_historique_joueur(PSEUDO_JOUEUR)
+    df_historique_joueur = recuperer_historique_joueur(PSEUDO_JOUEUR)
     
     if df_players_actuel is not None and not df_players_actuel.empty:
         infos_joueur = df_players_actuel[df_players_actuel["pseudo"].str.upper() == PSEUDO_JOUEUR.upper()]
@@ -69,10 +68,10 @@ def home_page():
             with m3: st.metric(label="🎯 Score (Points)", value=formater_monnaie_empire(row_j['points']))
             st.caption(f"📅 *Dernière synchronisation automatique : {row_j['date_extraction']}*")
             
-        if df_historique is not None and len(df_historique) > 1:
+        if df_historique_joueur is not None and len(df_historique_joueur) > 1:
             with st.expander("📈 Visualiser la courbe de progression", expanded=False):
-                df_historique["Date"] = pd.to_datetime(df_historique["date_extraction"]).dt.strftime("%d/%m %H:%M")
-                st.line_chart(data=df_historique, x="Date", y="points", use_container_width=True)
+                df_historique_joueur["Date"] = pd.to_datetime(df_historique_joueur["date_extraction"]).dt.strftime("%d/%m %H:%M")
+                st.line_chart(data=df_historique_joueur, x="Date", y="points", use_container_width=True)
     else:
         st.info("📥 En attente de la première synchronisation Firebase depuis l'Espace Admin.")
 
@@ -109,7 +108,6 @@ def home_page():
         if not rapport_audit.strip():
             st.error("❌ Veuillez coller un rapport.")
         else:
-            from utils import verifier_concordance_rapport
             erreurs, data = verifier_concordance_rapport(rapport_audit)
             if erreurs:
                 st.error("🚨 CONCORDANCE INCORRECTE !")
@@ -120,7 +118,8 @@ def home_page():
                 with col1_aud: st.write(f"• Résultat NET : `{formater_monnaie_empire(data.get('net', 0))}`")
                 with col2_aud: st.write(f"• Total Actif/Passif : `{formater_monnaie_empire(data.get('actif', 0))}`")
 
-# DÉCLARATION DES PAGES NATIVES
+
+# DÉCLARATION DES PAGES NATIVES (Système de navigation Streamlit >= 1.30)
 page_home = st.Page(lambda: home_page(), title="📥 Accueil & Saisie Unique", icon="🏠")
 page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📉")
 page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
@@ -137,4 +136,5 @@ pg = st.navigation({
     "🏗️ Calculs de Rentabilité": [page_renta_const, page_renta_reno, page_synthese],
     "🛠️ Administration": [page_admin]
 })
+
 pg.run()
