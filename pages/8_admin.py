@@ -71,3 +71,74 @@ else:
 
         st.dataframe(pd.DataFrame(stats_tables), use_container_width=True, hide_index=True)
     except Exception as e: st.error(f"⚠️ Erreur diagnostic Firebase : {e}")
+
+    # =========================================================
+    # 🔍 NOUVEAU MODULE : EXPLORATEUR DE DONNÉES CLOUD NO-SQL
+    # =========================================================
+    st.markdown("---")
+    st.subheader("🔮 Explorateur de Tables Firebase (Vue brute)")
+    st.markdown("Sélectionnez une collection pour auditer l'intégralité des documents enregistrés en base.")
+
+    # Liste de vos tables du Monde 8
+    tables_disponibles = ["batiments", "materiaux", "travaux", "usines", "players"]
+    
+    # Sélecteur de table
+    table_selectionnee = st.selectbox("📁 Choisissez la table à inspecter :", options=tables_disponibles, index=0)
+    
+    if table_selectionnee:
+        with st.spinner(f"Lecture de la table '{table_selectionnee}'..."):
+            try:
+                # 1. Flux de streaming depuis Google Firestore
+                docs_bruts = db.collection(table_selectionnee).stream()
+                liste_documents = [doc.to_dict() for doc in docs_bruts]
+                
+                if not liste_documents:
+                    st.info(f"⚪ La table '{table_selectionnee}' est actuellement vide ou n'a pas encore été synchronisée.")
+                else:
+                    # 2. Conversion en DataFrame pour l'exploitation
+                    df_exploration = pd.DataFrame(liste_documents)
+                    
+                    # 3. Métriques rapides de la table
+                    total_lignes = len(df_exploration)
+                    total_colonnes = len(df_exploration.columns)
+                    
+                    m_db1, m_db2 = st.columns(2)
+                    with m_db1:
+                        st.metric(label="📊 Nombre d'entrées (Documents)", value=f"{total_lignes} lignes")
+                    with m_db2:
+                        st.metric(label="⚙️ Attributs détectés", value=f"{total_colonnes} colonnes")
+                    
+                    # 4. Moteur de recherche interne à la table
+                    st.markdown("##### 🔍 Recherche rapide dans la table")
+                    terme_recherche = st.text_input("Filtrer par mot-clé (Nom, Date, ID...) :", key=f"search_{table_selectionnee}").strip()
+                    
+                    if terme_recherche:
+                        # Filtre dynamique insensible à la casse sur l'ensemble du tableau
+                        masque_recherche = df_exploration.astype(str).apply(
+                            lambda x: x.str.contains(terme_recherche, case=False, na=False)
+                        ).any(axis=1)
+                        df_filtre = df_exploration[masque_recherche]
+                        st.caption(f"🎯 {len(df_filtre)} résultat(s) trouvé(s) pour '{terme_recherche}'")
+                    else:
+                        df_filtre = df_exploration
+                    
+                    # 5. Affichage du tableau de données interactif
+                    st.markdown("##### 📄 Table de données interactive")
+                    st.dataframe(
+                        df_filtre, 
+                        use_container_width=True, 
+                        hide_index=False # On garde l'index pour se repérer facilement
+                    )
+                    
+                    # 6. Option d'export de secours pour l'Admin
+                    st.download_button(
+                        label=f"📥 Exporter la table {table_selectionnee} en CSV",
+                        data=df_exploration.to_csv(index=False).encode('utf-8'),
+                        file_name=f"export_admin_{table_selectionnee}.csv",
+                        mime="text/csv",
+                        key=f"dl_{table_selectionnee}"
+                    )
+                    
+            except Exception as e:
+                st.error(f"💥 Impossible de charger la table '{table_selectionnee}' : {e}")
+
