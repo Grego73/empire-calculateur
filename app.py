@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from utils import (
     formater_monnaie_empire, 
     recuperer_derniere_donnee_table, 
@@ -27,51 +27,30 @@ if "taux_reduction_promo" not in st.session_state: st.session_state["taux_reduct
 if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"] = False
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
-# 🚀 SYNCHRONISATION AUTONOME ET TRANSPARENTE DU MONDE 8
-if "derniere_synchro_locale" not in st.session_state:
-    st.session_state["derniere_synchro_locale"] = datetime.min
-
-maintenant = datetime.now()
-# Si plus de 4 heures se sont écoulées, l'application se met à jour toute seule à l'ouverture
-if maintenant - st.session_state["derniere_synchro_locale"] > timedelta(hours=4):
-    sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-    try:
-        from crons.cron_update_api import executer_mise_a_jour_cron
-        executer_mise_a_jour_cron()
-        st.session_state["derniere_synchro_locale"] = maintenant
-    except Exception as e:
-        print(f"Mise à jour d'arrière-plan manquée : {e}")
+# 🚀 SYNCHRONISATION EN ARRIÈRE-PLAN SUPPRIMÉE D'ICI POUR ÉVITER LES RALENTISSEMENTS
 
 def home_page():
     st.title("🏛️ Empire Calculateur — Tableau de Bord")
-    st.write(f"Bienvenue, **Grego73** ! Votre calculateur automatique s'exécute en arrière-plan.")
+    st.write(f"Bienvenue, **Grego73** ! Votre calculateur s'exécute avec les données du Cloud.")
     
     # --- 📈 BLOC GRAPHIQUE HISTORIQUE DES MATÉRIAUX ---
     st.subheader("📊 Évolution du Cours des Matériaux (Monde 8)")
     
     with st.spinner("Chargement du graphique des cours..."):
-        # Appel de la fonction créée dans utils.py
         df_historique = recuperer_historique_materiaux()
     
     if df_historique is not None and not df_historique.empty:
-        # 🔄 Pivot des données pour avoir une colonne par matériau (Béton, Acier, Bois...)
-        # Cela permet à Streamlit de tracer automatiquement une ligne de couleur différente par ressource
         df_pivot = df_historique.pivot_table(
             index="Date", 
             columns="Matériau", 
-            values="Prix ($)",
-            sort=False # Conserve l'ordre chronologique du tri précédent
+            values="Prix (\$)",
+            sort=False 
         )
-        
-        # Affichage du graphique linéaire interactif
         st.line_chart(df_pivot, width='stretch')
-        
-        # Petit indicateur visuel en bonus
         st.caption("💡 Astuce : Survolez les courbes avec votre souris pour voir les prix exacts à chaque heure d'extraction.")
     else:
         st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
 
-    
     st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
     
     st.subheader("📊 Tableau de Bord de votre Personnage")
