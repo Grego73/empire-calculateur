@@ -52,7 +52,7 @@ def home_page():
     else:
         st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
 
-    st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
+    st.header("🏛️ Centre de Contrôle de l'Empire — Monde 8")
     
     st.subheader("📊 Tableau de Bord de votre Personnage")
     PSEUDO_JOUEUR = "Grego73"
