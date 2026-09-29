@@ -57,6 +57,16 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             data_json = req.json()
             
+            # 🎯 Extraction du taux promoteur MATÉRIAUX
+            taux_materiaux = securiser_entier(data_json.get("taux_promoteur", 0))
+            
+            # Enregistrement ou mise à jour du document de configuration du run actuel
+            db.collection("configuration").document(f"config_{timestamp_id}").set({
+                "taux_promoteur_materiaux": taux_materiaux,
+                "date_extraction": date_now
+            }, merge=True) # merge=True évite d'écraser si le document existe déjà
+            notifier(f"⚙️ Configuration : Taux Promoteur MATÉRIAUX mis à jour ({taux_materiaux}%).")
+            
             # A. Traitement des Matériaux
             materials_list = data_json.get("materiaux", [])
             notifier(f"📦 {len(materials_list)} matériaux détectés dans le flux API.")
@@ -113,16 +123,17 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             data_json = req.json()
             
-            # Extraction du taux promoteur global si disponible dans l'API
-            if "taux_promoteur" in data_json:
-                taux_p = securiser_entier(data_json.get("taux_promoteur", 0))
-                db.collection("configuration").document(f"config_{timestamp_id}").set({
-                    "taux_promoteur": taux_p,
-                    "date_mise_a_jour": data_json.get("mise a jour", date_now),
-                    "date_extraction": date_now
-                })
-                notifier(f"⚙️ Métadonnées : Taux Promoteur à {taux_p}% enregistré dans 'configuration'.")
-
+            # 🎯 Extraction du taux promoteur BÂTIMENTS
+            taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
+            
+            # Fusion dans le même document de configuration du run actuel
+            db.collection("configuration").document(f"config_{timestamp_id}").set({
+                "taux_promoteur_batiments": taux_batiments,
+                "date_mise_a_jour": data_json.get("mise a jour", date_now),
+                "date_extraction": date_now
+            }, merge=True)
+            notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
+            
             liste_perso = data_json.get("batiments_perso", [])
             liste_entreprise = data_json.get("batiments_entreprise", [])
             liste_terrain = data_json.get("batiments_terrain", [])
@@ -194,32 +205,38 @@ def executer_mise_a_jour_cron():
             c_batch = 0
             total_travaux_enregistre = 0
             
-            for categorie, liste in categories_travaux:
-                for w in liste:
-                    id_w = w.get('id', 0)
-                    t_type = w.get('type', 'Construction')
-                    b_name = w.get('nom', 'Inconnu')
+            for categorie, liste in categories_batiments:
+                for b in liste:
+                    id_j = b.get('id', 0)
+                    doc_id = f"{id_j}_{timestamp_id}"
+                    doc_ref = db.collection("batiments").document(doc_id)
                     
-                    doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
-                    doc_ref = db.collection("travaux").document(doc_id)
-                    
+                    # 💡 Extraction et sécurisation de TOUTES les valeurs individuelles du JSON
                     batch.set(doc_ref, {
-                        "id_jeu": id_w,
-                        "type_travaux": t_type, 
-                        "building_name": b_name, 
-                        "terrain_requis": w.get("terrain", "Aucun"),
-                        "cout_estime": securiser_entier(w.get("cout", 0)), 
-                        "duree_mois": securiser_entier(w.get("duree", 0)), 
+                        "id_jeu": int(id_j), 
+                        "nom": str(b.get("nom", "Inconnu")), 
+                        "type": str(b.get("type", "Standard")), 
+                        "niveau": securiser_entier(b.get("niveau", 0)),
+                        "valeur": securiser_entier(b.get("valeur", 0)),
+                        "loyer": securiser_entier(b.get("loyer", 0)), 
+                        "charge": securiser_entier(b.get("charge", 0)), 
+                        "impot": securiser_entier(b.get("impot", 0)), 
+                        "promotion": securiser_entier(b.get("promotion", 0)),
+                        "construction": securiser_entier(b.get("construction", 0)),
+                        # Nettoie les chaînes comme "5074" en entiers réels
+                        "embellissement": securiser_entier(b.get("embellissement", 0)),
+                        "reparation": securiser_entier(b.get("reparation", 0)),
                         "categorie": categorie,
                         "date_extraction": date_now
                     })
                     
                     c_batch += 1
-                    total_travaux_enregistre += 1
+                    total_enregistre += 1
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
+
                     
             if c_batch > 0:
                 batch.commit()
