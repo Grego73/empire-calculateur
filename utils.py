@@ -194,7 +194,7 @@ def recuperer_historique_materiaux():
                     
                 donnees.append({
                     "Matériau": d["nom"],
-                    "Prix ($)": d["prix"],
+                    "Prix": d["prix"],
                     "Date": date_formatee,
                     "Brute": d["date_extraction"]
                 })
