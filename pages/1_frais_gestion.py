@@ -76,7 +76,7 @@ else:
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
             # 🛠️ CORRECTION LOGIQUE : Validation des deux codes de retour Discord valides (200 et 204)
-            if reponse.status_code in:
+            if reponse.status_code in [200, 204]:
                 st.success("🎉 Traitement réussi et envoyé sur Discord !")
                 
                 # --- AFFICHAGE DU BLOC NOIR AVEC BOUTON COPIER DIRECT SUR LE SITE ---
