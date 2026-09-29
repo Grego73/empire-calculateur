@@ -253,9 +253,8 @@ def recuperer_historique_materiaux():
 
 def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
     """
-    Calcule les répartitions pour le Monde 8.
-    Modèle Proportionnel basé sur la TAILLE RÉELLE des capitaux propres (et non le déficit)
-    pour que la filiale la plus grosse touche sa part des 100Z.
+    Modèle Monde 8 : Équilibre d'abord les filiales (Nivellement strict) 
+    puis distribue tout le budget restant de la Holding équitablement.
     """
     try:
         from decimal import Decimal
@@ -263,36 +262,41 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
         
         df_calcul = df_filiales.copy()
         
-        # Sécurisation des données
+        # 🔒 Conversion précise en Decimal pour le Monde 8
         df_calcul["Montant_Num"] = df_calcul["Montant_RAW"].apply(lambda x: Decimal(str(x)))
+        
+        # 1. Calcul du besoin strict total pour niveler l'empire
         total_requis = df_calcul["Montant_Num"].sum()
         montant_holding = Decimal(str(montant_total_dispo))
         nb_filiales = max(len(df_calcul), 1)
         
-        # --- RÉPARTITION 1 : STRICTE (Besoin réel de nivellement) ---
+        # --- RÉPARTITION 1 : STRICTE (Besoin réel brut) ---
         rep_strict = df_calcul[["Filiale", "Montant_Num"]].copy()
         rep_strict["Montant"] = rep_strict["Montant_Num"]
         
-        # --- RÉPARTITION 2 : ÉGALITAIRE (Tout le monde touche une part égale) ---
+        # --- RÉPARTITION 2 : ÉGALITAIRE BRUTE (Votre ancien modèle inchangé) ---
         rep_egal = df_calcul[["Filiale"]].copy()
         rep_egal["Montant"] = montant_holding / Decimal(nb_filiales)
         
-        # --- RÉPARTITION 3 : PROPORTIONNELLE BASÉE SUR LE POIDS GLOBAL ---
-        rep_prop = df_calcul[["Filiale"]].copy()
+        # --- RÉPARTITION 3 : CASCADE (Nivellement + Partage du reste) ---
+        rep_prop = df_calcul[["Filiale", "Montant_Num"]].copy()
         
-        # Si vous avez stocké la valeur des capitaux propres d'origine dans votre dataframe
-        # On distribue au prorata de l'importance de la filiale. 
-        # Si non disponible, on utilise une répartition inversée ou équitable pour inclure les filiales riches.
-        if total_requis > 0:
-            # Pour que ATAV12 ne soit pas à 0, si son besoin est 0, on lui attribue un poids minimal 
-            # ou on répartit le budget Holding restant équitablement après comblement.
-            boids_filiales = df_calcul["Montant_Num"].apply(lambda x: Decimal('1') if x == 0 else x)
-            total_poids = sum(boids_filiales)
-            rep_prop["Montant"] = boids_filiales.apply(lambda x: (x / total_poids) * montant_holding)
-        else:
-            rep_prop["Montant"] = montant_holding / Decimal(nb_filiales)
+        if montant_holding >= total_requis:
+            # Cas idéal : On a assez pour combler le déficit ET partager un reste
+            reste_a_partager = montant_holding - total_requis
+            part_du_reste = reste_a_partager / Decimal(nb_filiales)
             
-        # Reconversion finale pour Streamlit
+            # Chaque filiale reçoit : son besoin de mise à niveau + sa part du bonus restant
+            rep_prop["Montant"] = rep_prop["Montant_Num"] + part_du_reste
+        else:
+            # Cas de crise : La Holding n'a pas assez pour couvrir le besoin strict de nivellement.
+            # On distribue le peu qu'on a au prorata du déficit pour réduire les écarts au maximum.
+            if total_requis > 0:
+                rep_prop["Montant"] = rep_prop["Montant_Num"].apply(lambda x: (x / total_requis) * montant_holding)
+            else:
+                rep_prop["Montant"] = montant_holding / Decimal(nb_filiales)
+            
+        # Reconversion finale pour l'affichage de Streamlit
         rep_strict["Montant"] = rep_strict["Montant"].astype(float)
         rep_egal["Montant"] = rep_egal["Montant"].astype(float)
         rep_prop["Montant"] = rep_prop["Montant"].astype(float)
@@ -300,5 +304,6 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
         return float(total_requis), rep_strict[["Filiale", "Montant"]], rep_egal[["Filiale", "Montant"]], rep_prop[["Filiale", "Montant"]]
         
     except Exception as e:
-        print(f"Erreur calcul répartition arbitrage : {e}")
+        print(f"Erreur calcul répartition cascade : {e}")
         return 0.0, None, None, None
+
