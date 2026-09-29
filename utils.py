@@ -258,14 +258,21 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
 
 def recuperer_derniers_taux_configuration():
     try:
-        # Utilisation de "DESCENDING" en chaîne brute pour la configuration
+        # Trie l'ensemble des configurations par ordre décroissant de la date d'extraction
         docs = db.collection("configuration").order_by("date_extraction", direction="DESCENDING").limit(1).stream()
+        
         for doc in docs:
             d = doc.to_dict()
+            # Diagnostic en console locale Streamlit pour validation
+            print(f"📊 [PROMO] Lecture de la configuration Cloud : Document ID = {doc.id}")
             return {
-                "batiments": d.get("taux_promoteur_batiments", 0),
-                "materiaux": d.get("taux_promoteur_materiaux", 0)
+                "batiments": int(d.get("taux_promoteur_batiments", 0)),
+                "materiaux": int(d.get("taux_promoteur_materiaux", 0))
             }
+            
+        # Si aucun document n'est trouvé, retour des valeurs par défaut (0)
         return {"batiments": 0, "materiaux": 0}
-    except:
+    except Exception as e:
+        print(f"❌ Erreur lors de la récupération des taux de configuration : {e}")
         return {"batiments": 0, "materiaux": 0}
+
