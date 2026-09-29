@@ -35,7 +35,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (FORCEE ET SURCHEF)
+    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (ISOLÉE EN DUR)
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
     BASE_URL = "https://empireimmo.com"
 
@@ -52,10 +52,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
         except (ValueError, TypeError):
             return 0
 
-    # --- 1. MATÉRIAUX & USINES (PLURIEL OFFICIEL MONDE 8) ---
+    # --- 1. MATÉRIAUX & USINES (PLURIEL OFFICIEL) ---
     try:
         url_mat = f"{BASE_URL}/api/materials.json?key={API_KEY}"
-        notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_mat}")
+        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
+        notifier("==========================================================================")
+        notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_mat}")
+        notifier("==========================================================================")
         req = requests.get(url_mat, timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
         
@@ -119,10 +122,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS (PLURIEL OFFICIEL MONDE 8) ---
+    # --- 2. BÂTIMENTS (PLURIEL OFFICIEL) ---
     try:
         url_bld = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
-        notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_bld}")
+        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
+        notifier("==========================================================================")
+        notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_bld}")
+        notifier("==========================================================================")
         req = requests.get(url_bld, timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         
@@ -189,10 +195,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (PLURIEL OFFICIEL MONDE 8) ---
+    # --- 3. TRAVAUX (PLURIEL OFFICIEL) ---
     try:
         url_wrk = f"{BASE_URL}/api/works.json?key={API_KEY}"
-        notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_wrk}")
+        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
+        notifier("==========================================================================")
+        notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_wrk}")
+        notifier("==========================================================================")
         req = requests.get(url_wrk, timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         
@@ -233,6 +242,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     })
                     c_batch += 1
                     total_travaux_enregistre += 1
+                    
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
@@ -249,7 +259,10 @@ def executer_mise_a_jour_cron(exclure_players=False):
     if not exclure_players:
         try:
             url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
-            notifier(f"🔍 [TRACE URL] Interrogation de l'adresse : {url_ply}")
+            # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS JOUEURS
+            notifier("==========================================================================")
+            notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_ply}")
+            notifier("==========================================================================")
             req = requests.get(url_ply, timeout=15)
             notifier(f"📡 API Players — Code : {req.status_code}")
             if req.status_code == 200:
@@ -279,7 +292,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     batch.commit()
                 notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
             else:
-                notifier(f"❌ Erreur API Players : {req.status_code}")
+                notifier(f"❌ Erreur API Players : {req.text[:200]}")
         except Exception as e:
             notifier(f"💥 Crash Classement Players : {e}")
     else:
