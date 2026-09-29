@@ -25,7 +25,8 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-def executer_mise_a_jour_cron():
+# 🔥 AJOUT DU PARAMÈTRE DE FILTRAGE OPTIMISÉ POUR 03H30
+def executer_mise_a_jour_cron(exclure_players=False):
     logs_session = []
     
     def notifier(texte):
@@ -60,11 +61,18 @@ def executer_mise_a_jour_cron():
             # 🎯 Extraction du taux promoteur MATÉRIAUX
             taux_materiaux = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Enregistrement ou mise à jour du document de configuration du run actuel
+            # Enregistrement ou mise à jour de l'historique temporel
             db.collection("configuration").document(f"config_{timestamp_id}").set({
                 "taux_promoteur_materiaux": taux_materiaux,
                 "date_extraction": date_now
-            }, merge=True) # merge=True évite d'écraser si le document existe déjà
+            }, merge=True)
+            
+            # ✨ CORRECTION DOUBLE ÉCRITURE : Mise à jour immédiate du document maître fixe lu par Streamlit
+            db.collection("configuration").document("config_actuelle").set({
+                "taux_promoteur_materiaux": taux_materiaux,
+                "date_extraction": date_now
+            }, merge=True)
+            
             notifier(f"⚙️ Configuration : Taux Promoteur MATÉRIAUX mis à jour ({taux_materiaux}%).")
             
             # A. Traitement des Matériaux
@@ -84,7 +92,7 @@ def executer_mise_a_jour_cron():
             batch.commit()
             notifier("✅ Collection 'materiaux' synchronisée avec succès.")
             
-            # B. Traitement des Usines (Nouveau Bloc Monde 8)
+            # B. Traitement des Usines
             factories_list = data_json.get("usines", [])
             notifier(f"🏭 {len(factories_list)} usines détectées dans le flux API. Écriture par paquets...")
             batch = db.batch()
@@ -126,12 +134,20 @@ def executer_mise_a_jour_cron():
             # Extraction du taux promoteur global BÂTIMENTS
             taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Fusion sécurisée dans le document de configuration unique du run actuel
+            # Fusion sécurisée dans le document d'historique du run actuel
             db.collection("configuration").document(f"config_{timestamp_id}").set({
                 "taux_promoteur_batiments": taux_batiments,
                 "date_mise_a_jour": data_json.get("mise a jour", date_now),
                 "date_extraction": date_now
             }, merge=True)
+            
+            # ✨ CORRECTION DOUBLE ÉCRITURE : Fusion sécurisée dans le document maître fixe lu par Streamlit
+            db.collection("configuration").document("config_actuelle").set({
+                "taux_promoteur_batiments": taux_batiments,
+                "date_mise_a_jour": data_json.get("mise a jour", date_now),
+                "date_extraction": date_now
+            }, merge=True)
+            
             notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
 
             liste_perso = data_json.get("batiments_perso", [])
@@ -140,7 +156,6 @@ def executer_mise_a_jour_cron():
             
             notifier(f"🏢 Détection JSON : {len(liste_perso)} personnels, {len(liste_entreprise)} entreprises, {len(liste_terrain)} terrains.")
             
-            # Structuration par sous-groupes pour injecter la catégorie d'origine
             categories_batiments = [
                 ("perso", liste_perso),
                 ("entreprise", liste_entreprise),
@@ -157,7 +172,6 @@ def executer_mise_a_jour_cron():
                     doc_id = f"{id_j}_{timestamp_id}"
                     doc_ref = db.collection("batiments").document(doc_id)
                     
-                    # Enregistrement absolu de CHAQUE colonne et variable du Monde 8
                     batch.set(doc_ref, {
                         "id_jeu": int(id_j), 
                         "nom": str(b.get("nom", "Inconnu")), 
@@ -178,7 +192,6 @@ def executer_mise_a_jour_cron():
                     c_batch += 1
                     total_enregistre += 1
                     
-                    # Écriture par paquets pour éviter les limites de Google Cloud
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
@@ -187,12 +200,11 @@ def executer_mise_a_jour_cron():
             if c_batch > 0:
                 batch.commit()
                 
-            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées avec toutes leurs colonnes).")
+            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées).")
         else:
             notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
-
 
     # --- 3. TRAVAUX (ALIGNEMENT ET SYNCHRONISATION MONDE 8) ---
     try:
@@ -201,9 +213,8 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             data_json = req.json()
             
-            # 💡 Correction des clés d'API au pluriel pour le Monde 8
             liste_t_perso = data_json.get("travaux_perso", [])
-            liste_t_entreprise = data_json.get("travaux_entreprises", []) # ◄--- 'entreprises' au pluriel
+            liste_t_entreprise = data_json.get("travaux_entreprises", [])
             
             notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
             
@@ -239,7 +250,6 @@ def executer_mise_a_jour_cron():
                     c_batch += 1
                     total_travaux_enregistre += 1
                     
-                    # 💡 Alignement de l'indentation de l'écriture par paquets (20 espaces de décalage)
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
@@ -248,15 +258,54 @@ def executer_mise_a_jour_cron():
             if c_batch > 0:
                 batch.commit()
                 
-            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes enregistrées avec tags).")
+            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes enregistrées).")
         else:
             notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
+    # --- 4. CLASSEMENT DES JOUEURS (AVEC FILTRAGE REQUIS) ---
+    if not exclure_players:
+        try:
+            req = requests.get(f"{BASE_URL}/api/players.json?key={API_KEY}", timeout=15)
+            notifier(f"📡 API Players — Code : {req.status_code}")
+            if req.status_code == 200:
+                players_list = req.json().get("players", [])
+                notifier(f"🏆 {len(players_list)} comptes de joueurs détectés. Écriture NoSQL...")
+                
+                batch = db.batch()
+                c_batch = 0
+                for p in players_list:
+                    pseudo_j = p.get('pseudo', 'Inconnu')
+                    doc_id = f"{pseudo_j.replace(' ', '_')}_{timestamp_id}"
+                    doc_ref = db.collection("players").document(doc_id)
+                    
+                    batch.set(doc_ref, {
+                        "pseudo": pseudo_j,
+                        "classement": securiser_entier(p.get("classement", 0)),
+                        "niveau": securiser_entier(p.get("niveau", 0)),
+                        "points": securiser_entier(p.get("points", 0)),
+                        "date_extraction": date_now
+                    })
+                    
+                    c_batch += 1
+                    if c_batch >= 500:
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
+                if c_batch > 0:
+                    batch.commit()
+                notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
+            else:
+                notifier(f"❌ Erreur API Players : {req.text[:200]}")
+        except Exception as e:
+            notifier(f"💥 Crash Classement Players : {e}")
+    else:
+        notifier("⏭️ Table 'players' volontairement ignorée pour ce créneau quotidien d'optimisation des quotas.")
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
 
 if __name__ == "__main__":
     executer_mise_a_jour_cron()
+            
