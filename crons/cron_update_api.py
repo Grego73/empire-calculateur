@@ -35,16 +35,15 @@ def executer_mise_a_jour_cron(exclure_players=False):
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # 🌐 CONFIGURATION STRICTE ET FORCEE POUR L'API DU MONDE 8
+    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-    BASE_URL = "https://empireimmo.com"  # ◄--- FIXÉ : Redirection sur le bon sous-domaine de jeu
+    BASE_URL = "https://empireimmo.com"
 
     # Limites des entiers signés 64-bits pour Firestore Google Cloud
     MAX_INT64 = 9223372036854775807
     MIN_INT64 = -9223372036854775808
 
     def securiser_entier(valeur):
-        """Convertit proprement en int réel et sature aux limites 64-bits si besoin"""
         try:
             num = int(float(valeur))
             if num > MAX_INT64: return MAX_INT64
@@ -53,61 +52,52 @@ def executer_mise_a_jour_cron(exclure_players=False):
         except (ValueError, TypeError):
             return 0
 
-    # --- 1. MATÉRIAUX & USINES (JSON) ---
+    # --- 1. SÉCURISATION DU BLOC MATÉRIAUX & USINES ---
     try:
         url_mat = f"{BASE_URL}/api/materials.json?key={API_KEY}"
         req = requests.get(url_mat, timeout=15)
+        
+        # Fallback automatique au singulier si 404
+        if req.status_code == 404:
+            notifier("⚠️ Endpoint 'materials.json' non trouvé (404). Tentative sur 'material.json'...")
+            url_mat = f"{BASE_URL}/api/material.json?key={API_KEY}"
+            req = requests.get(url_mat, timeout=15)
+
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
-            
-            # Extraction du taux promoteur MATÉRIAUX
             taux_materiaux = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Enregistrement ou mise à jour de l'historique temporel
-            db.collection("configuration").document(f"config_{timestamp_id}").set({
-                "taux_promoteur_materiaux": taux_materiaux,
-                "date_extraction": date_now
-            }, merge=True)
+            payload_mat = {"taux_promoteur_materiaux": taux_materiaux, "date_extraction": date_now}
+            db.collection("configuration").document(f"config_{timestamp_id}").set(payload_mat, merge=True)
+            db.collection("configuration").document("config_actuelle").set(payload_mat, merge=True)
             
-            # Mise à jour immédiate du document maître fixe lu par Streamlit
-            db.collection("configuration").document("config_actuelle").set({
-                "taux_promoteur_materiaux": taux_materiaux,
-                "date_extraction": date_now
-            }, merge=True)
-            
-            notifier(f"⚙️ Configuration : Taux Promoteur MATÉRIAUX mis à jour ({taux_materiaux}%).")
-            
-            # A. Traitement des Matériaux
-            materials_list = data_json.get("materiaux", [])
-            notifier(f"📦 {len(materials_list)} matériaux détectés dans le flux API.")
+            materials_list = data_json.get("materiaux", data_json.get("materials", []))
             batch = db.batch()
             for m in materials_list:
-                nom_brut = m.get('nom', 'Inconnu')
+                nom_brut = m.get('nom', m.get('name', 'Inconnu'))
                 doc_id = f"{nom_brut.replace('/', '_')}_{timestamp_id}"
                 doc_ref = db.collection("materiaux").document(doc_id)
                 batch.set(doc_ref, {
                     "nom": nom_brut, 
-                    "prix": securiser_entier(m.get("prix", 0)), 
+                    "prix": securiser_entier(m.get("prix", m.get("price", 0))), 
                     "unite": m.get("unite"), 
                     "date_extraction": date_now
                 })
             batch.commit()
             notifier("✅ Collection 'materiaux' synchronisée avec succès.")
             
-            # B. Traitement des Usines
-            factories_list = data_json.get("usines", [])
-            notifier(f"🏭 {len(factories_list)} usines détectées dans le flux API. Écriture par paquets...")
+            factories_list = data_json.get("usines", data_json.get("factories", []))
             batch = db.batch()
             c_batch = 0
             for u in factories_list:
-                nom_usine = u.get('usine', 'Usine Inconnue')
+                nom_usine = u.get('usine', u.get('name', 'Usine Inconnue'))
                 doc_id = f"{nom_usine.replace('/', '_').replace(' ', '_')}_{timestamp_id}"
                 doc_ref = db.collection("usines").document(doc_id)
                 batch.set(doc_ref, {
                     "nom": nom_usine,
-                    "matiere": u.get("matiere"),
-                    "valeur": securiser_entier(u.get("valeur", 0)),
+                    "matiere": u.get("matiere", u.get("material", "Inconnu")),
+                    "valeur": securiser_entier(u.get("valeur", u.get("value", 0))),
                     "charge": securiser_entier(u.get("charge", 0)),
                     "impot": securiser_entier(u.get("impot", 0)),
                     "production": securiser_entier(u.get("production", 0)),
@@ -118,61 +108,46 @@ def executer_mise_a_jour_cron(exclure_players=False):
                     batch.commit()
                     batch = db.batch()
                     c_batch = 0
-            if c_batch > 0:
-                batch.commit()
-            notifier("✅ Collection 'usines' synchronisée avec succès.")
-            
+            if c_batch > 0: batch.commit()
+            notifier("✅ Collection 'usines' synchronisée.")
         else:
-            notifier(f"❌ Erreur API Matériaux (Code {req.status_code})")
-    except Exception as e: 
-        notifier(f"💥 Crash Matériaux/Usines : {e}")
+            notifier(f"❌ Erreur API Matériaux : {req.status_code}")
+    except Exception as e: notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS ---
+    # --- 2. SÉCURISATION DU BLOC BÂTIMENTS ---
     try:
         url_bld = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
         req = requests.get(url_bld, timeout=15)
+        
+        if req.status_code == 404:
+            notifier("⚠️ Endpoint 'buildings.json' non trouvé (404). Tentative sur 'building.json'...")
+            url_bld = f"{BASE_URL}/api/building.json?key={API_KEY}"
+            req = requests.get(url_bld, timeout=15)
+
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
-            
-            # Extraction du taux promoteur global BÂTIMENTS
             taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
             
-            # Fusion sécurisée dans le document d'historique et le document fixe maître
-            payload_config_bld = {
-                "taux_promoteur_batiments": taux_batiments,
-                "date_mise_a_jour": data_json.get("mise a jour", date_now),
-                "date_extraction": date_now
-            }
-            db.collection("configuration").document(f"config_{timestamp_id}").set(payload_config_bld, merge=True)
-            db.collection("configuration").document("config_actuelle").set(payload_config_bld, merge=True)
-            notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
+            payload_bld = {"taux_promoteur_batiments": taux_batiments, "date_extraction": date_now}
+            db.collection("configuration").document(f"config_{timestamp_id}").set(payload_bld, merge=True)
+            db.collection("configuration").document("config_actuelle").set(payload_bld, merge=True)
 
             liste_perso = data_json.get("batiments_perso", [])
             liste_entreprise = data_json.get("batiments_entreprise", [])
-            liste_terrain = data_json.get("batiments_terrain", [])
+            liste_terrain = data_json.get("batiments_terrain", data_json.get("batiments_terrains", []))
             
-            notifier(f"🏢 Détection JSON : {len(liste_perso)} personnels, {len(liste_entreprise)} entreprises, {len(liste_terrain)} terrains.")
-            
-            categories_batiments = [
-                ("perso", liste_perso),
-                ("entreprise", liste_entreprise),
-                ("terrain", liste_terrain)
-            ]
-            
+            categories_batiments = [("perso", liste_perso), ("entreprise", liste_entreprise), ("terrain", liste_terrain)]
             batch = db.batch()
             c_batch = 0
-            total_enregistre = 0
-            
             for categorie, listes in categories_batiments:
                 for b in listes:
                     id_j = b.get('id', 0)
                     doc_id = f"{id_j}_{timestamp_id}"
                     doc_ref = db.collection("batiments").document(doc_id)
-                    
                     batch.set(doc_ref, {
                         "id_jeu": int(id_j), 
-                        "nom": str(b.get("nom", "Inconnu")), 
+                        "nom": str(b.get("nom", b.get("name", "Inconnu"))), 
                         "type": str(b.get("type", "Standard")), 
                         "niveau": securiser_entier(b.get("niveau", 0)),
                         "valeur": securiser_entier(b.get("valeur", 0)),
@@ -186,123 +161,97 @@ def executer_mise_a_jour_cron(exclure_players=False):
                         "categorie": categorie,
                         "date_extraction": date_now
                     })
-                    
                     c_batch += 1
-                    total_enregistre += 1
-                    
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
-                        
-            if c_batch > 0:
-                batch.commit()
-                
-            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées).")
+            if c_batch > 0: batch.commit()
+            notifier("✅ Collection 'batiments' synchronisée.")
         else:
-            notifier(f"❌ Erreur API Bâtiments (Code {req.status_code})")
-    except Exception as e: 
-        notifier(f"💥 Crash Bâtiments : {e}")
+            notifier(f"❌ Erreur API Bâtiments : {req.status_code}")
+    except Exception as e: notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX ---
+    # --- 3. SÉCURISATION DU BLOC TRAVAUX ---
     try:
         url_wrk = f"{BASE_URL}/api/works.json?key={API_KEY}"
         req = requests.get(url_wrk, timeout=15)
+        
+        if req.status_code == 404:
+            notifier("⚠️ Endpoint 'works.json' non trouvé (404). Tentative sur 'work.json'...")
+            url_wrk = f"{BASE_URL}/api/work.json?key={API_KEY}"
+            req = requests.get(url_wrk, timeout=15)
+
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
-            
             liste_t_perso = data_json.get("travaux_perso", [])
-            liste_t_entreprise = data_json.get("travaux_entreprises", [])
+            liste_t_entreprise = data_json.get("travaux_entreprises", data_json.get("travaux_entreprise", []))
             
-            notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
-            
-            categories_travaux = [
-                ("perso", liste_t_perso),
-                ("entreprise", liste_t_entreprise)
-            ]
-            
+            categories_travaux = [("perso", liste_t_perso), ("entreprise", liste_t_entreprise)]
             batch = db.batch()
             c_batch = 0
-            total_travaux_enregistre = 0
-            
             for categorie, listes in categories_travaux:
                 for w in listes:
                     id_w = w.get('id', 0)
                     t_type = w.get('type', 'Construction')
-                    b_name = w.get('nom', 'Inconnu')
-                    
+                    b_name = w.get('nom', w.get('name', 'Inconnu'))
                     doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
                     doc_ref = db.collection("travaux").document(doc_id)
-                    
                     batch.set(doc_ref, {
-                        "id_jeu": int(id_w),
-                        "type_travaux": str(t_type), 
-                        "building_name": str(b_name), 
-                        "terrain_requis": str(w.get("terrain", "Aucun")),
-                        "cout_estime": securiser_entier(w.get("cout", 0)), 
-                        "duree_mois": securiser_entier(w.get("duree", 0)), 
-                        "categorie": categorie,
-                        "date_extraction": date_now
+                        "id_jeu": int(id_w), "type_travaux": str(t_type), "building_name": str(b_name), 
+                        "terrain_requis": str(w.get("terrain", "Aucun")), "cout_estime": securiser_entier(w.get("cout", 0)), 
+                        "duree_mois": securiser_entier(w.get("duree", 0)), "categorie": categorie, "date_extraction": date_now
                     })
-                    
                     c_batch += 1
-                    total_travaux_enregistre += 1
-                    
-                    # 💡 Écriture par paquets pour respecter les limites Google Cloud Firestore
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
-                    
-            if c_batch > 0:
+            if c_batch > 0: 
                 batch.commit()
-                
-            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes enregistrées).")
+            notifier("✅ Collection 'travaux' synchronisée.")
         else:
-            notifier(f"❌ Erreur API Travaux (Code {req.status_code})")
+            notifier(f"❌ Erreur API Travaux : {req.status_code}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
-    # --- 4. CLASSEMENT DES JOUEURS (SOUMIS AU FILTRE QUOTIDIEN DE 03H30) ---
+    # --- 4. CLASSEMENT DES JOUEURS ---
     if not exclure_players:
         try:
             url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
             req = requests.get(url_ply, timeout=15)
+            if req.status_code == 404:
+                url_ply = f"{BASE_URL}/api/player.json?key={API_KEY}"
+                req = requests.get(url_ply, timeout=15)
+
             notifier(f"📡 API Players — Code : {req.status_code}")
             if req.status_code == 200:
                 players_list = req.json().get("players", [])
-                notifier(f"🏆 {len(players_list)} comptes de joueurs détectés. Écriture NoSQL...")
-                
                 batch = db.batch()
                 c_batch = 0
                 for p in players_list:
                     pseudo_j = p.get('pseudo', 'Inconnu')
                     doc_id = f"{pseudo_j.replace(' ', '_')}_{timestamp_id}"
                     doc_ref = db.collection("players").document(doc_id)
-                    
                     batch.set(doc_ref, {
-                        "pseudo": pseudo_j,
+                        "pseudo": pseudo_j, 
                         "classement": securiser_entier(p.get("classement", 0)),
-                        "niveau": securiser_entier(p.get("niveau", 0)),
-                        "points": securiser_entier(p.get("points", 0)),
+                        "niveau": securiser_entier(p.get("niveau", 0)), 
+                        "points": securiser_entier(p.get("points", 0)), 
                         "date_extraction": date_now
                     })
-                    
                     c_batch += 1
                     if c_batch >= 500:
                         batch.commit()
                         batch = db.batch()
                         c_batch = 0
-                if c_batch > 0:
+                if c_batch > 0: 
                     batch.commit()
-                notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
-            else:
-                notifier(f"❌ Erreur API Players (Code {req.status_code})")
-        except Exception as e:
-            notifier(f"💥 Crash Classement Players : {e}")
+                notifier("✅ Collection 'players' synchronisée.")
+        except Exception as e: 
+            notifier(f"💥 Crash Players : {e}")
     else:
-        # Trace explicite visible dans vos rapports de console GitHub Actions tous les matins
         notifier("⏭️ Table 'players' volontairement ignorée pour ce créneau quotidien d'optimisation des quotas.")
 
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
