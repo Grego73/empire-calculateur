@@ -9,7 +9,7 @@ if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
     try:
-        # 1. Extraction sécurisée du tableau Finance (sans crash d'index)
+        # 1. Extraction sécurisée du tableau Finance
         data_fin = {}
         for l in st.session_state["tab_finance"].strip().split('\n')[1:]:
             if not l.strip():
@@ -54,6 +54,7 @@ else:
                     injecter = max(0.0, max_c - float(r["Propres"]))
                     import_rows.append({
                         "Filiale": r["Filiale"], 
+                        "Capitaux_Propres_Brut": r["Propres"], # Sauvegarde pour le tableau visuel
                         "Montant à Injecter": formater_monnaie_empire(injecter),
                         "Montant_RAW": injecter
                     })
@@ -62,7 +63,7 @@ else:
                 
                 # Saisie de l'enveloppe Holding
                 st.subheader("💰 Configuration du budget Holding")
-                saisie_holding = st.text_input("Montant disponible dans la Holding (pour répartition 2 et 3) :", value="100 M")
+                saisie_holding = st.text_input("Montant disponible dans la Holding :", value="100 M")
                 montant_holding = convertir_saisie_en_nombre(saisie_holding)
                 st.caption(f"ℹ️ Budget Holding interprété : **{formater_monnaie_empire(montant_holding)}**")
 
@@ -74,7 +75,7 @@ else:
                 
                 choix_methode = st.radio(
                     "**Sélectionnez le modèle à appliquer pour générer le bloc d'import :**",
-                    ["🎯 1. Injection Stricte (Besoin réel)", "⚖️ 2. Répartition Égalitaire", "📈 3. Répartition Proportionnelle"],
+                    ["🎯 1. Injection Stricte (Besoin réel)", "⚖️ 2. Répartition Égalitaire", "📈 3. Répartition Cascade (Nivellement + Reste)"],
                     horizontal=True
                 )
 
@@ -89,15 +90,26 @@ else:
                     message_info = f"Le budget de la Holding est divisé strictement équitablement entre toutes les filiales cibles."
                 else:
                     df_active = rep_prop
-                    message_info = f"Le budget de la Holding est distribué proportionnellement selon l'importance du déficit de chaque filiale."
+                    message_info = f"Le budget comble d'abord le déficit, puis distribue le reste équitablement entre toutes les filiales."
 
-                # 4. Affichage dynamique du tableau de la méthode sélectionnée
+                # 4. Affichage dynamique avec les nouvelles colonnes demandées
                 if df_active is not None:
                     st.info(message_info)
                     
-                    df_visuel = df_active.copy()
+                    # Reconstruction du tableau visuel complet
+                    df_visuel = pd.merge(df_active, df_selection[["Filiale", "Capitaux_Propres_Brut"]], on="Filiale")
+                    
+                    # Calcul de la nouvelle colonne : Avant + Injection
+                    df_visuel["Capitaux après Injection Num"] = df_visuel["Capitaux_Propres_Brut"] + df_visuel["Montant"]
+                    
+                    # Formatage des textes pour l'affichage de l'Empire
+                    df_visuel["Capitaux Propres"] = df_visuel["Capitaux_Propres_Brut"].apply(formater_monnaie_empire)
                     df_visuel["Montant à Injecter"] = df_visuel["Montant"].apply(formater_monnaie_empire)
-                    st.dataframe(df_visuel[["Filiale", "Montant à Injecter"]], use_container_width=True, hide_index=True)
+                    df_visuel["Capitaux après Injection"] = df_visuel["Capitaux après Injection Num"].apply(formater_monnaie_empire)
+                    
+                    # Affichage du tableau final réorganisé de façon scannable
+                    colonnes_affichage = ["Filiale", "Capitaux Propres", "Montant à Injecter", "Capitaux après Injection"]
+                    st.dataframe(df_visuel[colonnes_affichage], use_container_width=True, hide_index=True)
                     
                     # 📋 Génération du BLOC D'IMPORTATION direct (CRLF)
                     lignes_import = []
@@ -114,4 +126,4 @@ else:
                         st.download_button("📥 Télécharger le fichier (.txt)", data=crlf_txt, file_name="equilibrage_capitaux_empire.txt", mime="text/plain")
 
     except Exception as e: 
-        st.error(f"⚠️ Erreur lors du génération des arbitrages : {e}")
+        st.error(f"⚠️ Erreur lors de la génération des arbitrages : {e}")
