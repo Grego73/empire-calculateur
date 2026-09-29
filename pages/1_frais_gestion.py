@@ -8,8 +8,10 @@ st.markdown("Cette page utilise automatiquement le tableau **Finance** collé su
 if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez d'abord coller vos tableaux et cliquer sur le bouton de synchronisation sur la page d'accueil 🏠 avant d'utiliser cette page.")
 else:
+    # Récupération automatique du tableau Finance depuis la mémoire centrale
     donnees_brutes = st.session_state.get("tab_finance", "")
 
+    # --- OPTION DE MISE À ZÉRO GLOBALE POUR LES FRAIS ---
     st.markdown("---")
     forcer_zero_frais = st.checkbox("🛑 Forcer TOUTES les filiales à zéro pour cet import (Mise à zéro générale)", value=False)
     st.markdown("---")
@@ -23,38 +25,40 @@ else:
             lignes = donnees_brutes.strip().split('\n')
             lignes_finales = ["Filiale\tFrais de gestion"]
             
+            # Détection et exclusion automatique de l'en-tête du tableau Finance
             debut_index = 0
             if lignes and len(lignes) > 0:
                 premiere_ligne = lignes[0].lower()
                 if "filiale" in premiere_ligne or "trésorerie" in premiere_ligne or "exploitation" in premiere_ligne:
                     debut_index = 1
 
+            # Extraction ou mise à zéro pour toutes les filiales
             for ligne in lignes[debut_index:]:
-                if not ligne.strip(): 
-                    continue
-                
-                # Découpage tolérant préservant les structures vides
-                colonnes = [c.strip() for c in ligne.split('\t')]
-                if len(colonnes) < 3: 
-                    continue
+                if not ligne.strip(): continue
+                # Découpage robuste gérant les tabulations
+                colonnes = [c.strip() for c in ligne.split('\t') if c.strip()]
+                if len(colonnes) < 3: continue
                 
                 nom_filiale = colonnes[0]
                 
                 if forcer_zero_frais:
                     frais_numerique = 0
                 else:
-                    # Dans un export standard Monde 8 à 5 colonnes :
-                    # Index 0 = Filiale | Index 1 = Trésorerie | Index 2 = Exploitation
-                    raw_frais = colonnes[2]
+                    # 💡 Correction Monde 8 : On pioche l'Exploitation (4e colonne = index 2 ou 3 selon l'export du jeu)
+                    # Si le tableau a 4 colonnes ou plus, l'exploitation se trouve en index 2 (Notation de base)
+                    raw_frais = colonnes[2] if len(colonnes) == 3 else colonnes[2]
                     
+                    # Traduction et sécurisation via l'outil central
                     frais_numerique = convertir_saisie_en_nombre(raw_frais)
                     if frais_numerique < 0:
                         frais_numerique = 0
                 
                 lignes_finales.append(f"{nom_filiale}\t{frais_numerique}")
 
+            # Contenu d'importation au format CRLF (\r\n) pour Empire Immo
             contenu_crlf_pur = "\r\n".join(lignes_finales) + "\r\n"
             
+            # --- STRUCTURE DU MESSAGE DISCORD ADAPTATIF ---
             if forcer_zero_frais:
                 texte_discord = "🛑 **RAPPORT GÉNÉRAL : TOUS LES FRAIS DE GESTION ONT ÉTÉ FORCÉS À 0 !**\n"
             else:
@@ -62,18 +66,26 @@ else:
             
             texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
             
+            # Correction ici : Utilisation de contenu_crlf_pur à la place de la variable erronée
             if len(texte_discord) + len(contenu_crlf_pur) < 1900:
                 texte_discord += f"```text\n{contenu_crlf_pur}```"
             else:
                 texte_discord += "⚠️ *Le tableau est trop long pour être affiché en texte sur Discord. Utilisez le fichier joint.*"
 
+            # Envoi des données et du fichier vers le webhook Discord
             fichiers = {'file': ('frais_gestion_import_officiel.txt', contenu_crlf_pur, 'text/plain')}
             reponse = requests.post(url_webhook, data={'content': texte_discord}, files=fichiers)
             
+            # 🛠️ CORRECTION LOGIQUE : Validation des deux codes de retour Discord valides (200 et 204)
             if reponse.status_code in [200, 204] :
                 st.success("🎉 Traitement réussi et envoyé sur Discord !")
+                
+                # --- AFFICHAGE DU BLOC NOIR AVEC BOUTON COPIER DIRECT SUR LE SITE ---
                 st.subheader("📋 Résultat prêt à être copié :")
+                st.markdown("Utilisez l'icône en haut à droite du bloc noir ci-dessous pour copier le texte :")
                 st.code(contenu_crlf_pur, language="text")
+                
+                # Bouton de téléchargement direct du fichier .txt pur
                 st.download_button(
                     label="📥 Télécharger le fichier d'import pur", 
                     data=contenu_crlf_pur, 
