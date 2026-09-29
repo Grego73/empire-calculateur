@@ -24,18 +24,15 @@ else:
     st.markdown("---")
 
     st.subheader("📡 Synchronisation Manuelle de l'API vers Firebase")
-    if st.button("🔄 Lancer le script de synchronisation (Cron)", width='stretch'):
+    if st.button("🔄 Lancer le script de synchronisation (Cron)", use_container_width=True):
         if not CRON_DISPONIBLE:
             st.error("❌ Erreur : Script 'cron_update_api.py' introuvable.")
         else:
             try:
                 with st.spinner("Envoi des flux d'API vers Firebase Cloud..."):
-                    # On exécute le script et on récupère la liste de logs
                     historique_logs = executer_mise_a_jour_cron()
                 
                 st.success("🎉 Le script s'est exécuté ! Consultez le journal ci-dessous :")
-                
-                # On assemble les logs avec des retours à la ligne et on les affiche à l'écran
                 texte_journal = "\n".join(historique_logs)
                 st.code(texte_journal, language="text")
                 st.balloons()
@@ -43,22 +40,17 @@ else:
             except Exception as e: 
                 st.error(f"❌ Erreur générale d'exécution : {e}")
 
-
     st.markdown("---")
     st.subheader("🗄️ État et Diagnostic de la Base de Données Cloud")
     
     try:
         from utils import db
-        from google.cloud import firestore
-        
-        # Ajout d'usines dans le tableau d'administration
         tables = ["materiaux", "usines", "batiments", "travaux"]
-
         stats_tables = []
         
         with st.spinner("Analyse des tables Firestore..."):
             for table in tables:
-                docs_ordre = db.collection(table).order_by("date_extraction", direction=firestore.Query.DESCENDING).limit(1).stream()
+                docs_ordre = db.collection(table).order_by("date_extraction", direction="DESCENDING").limit(1).stream()
                 derniere_synchro = "Aucune"
                 for doc in docs_ordre:
                     derniere_synchro = doc.to_dict().get("date_extraction", "Aucune")
@@ -72,48 +64,32 @@ else:
         st.dataframe(pd.DataFrame(stats_tables), use_container_width=True, hide_index=True)
     except Exception as e: st.error(f"⚠️ Erreur diagnostic Firebase : {e}")
 
-    # =========================================================
-    # 🔍 NOUVEAU MODULE : EXPLORATEUR DE DONNÉES CLOUD NO-SQL
-    # =========================================================
     st.markdown("---")
     st.subheader("🔮 Explorateur de Tables Firebase (Vue brute)")
-    st.markdown("Sélectionnez une collection pour auditer l'intégralité des documents enregistrés en base.")
-
-    # Liste de vos tables du Monde 8
     tables_disponibles = ["batiments", "materiaux", "travaux", "usines", "players"]
-    
-    # Sélecteur de table
     table_selectionnee = st.selectbox("📁 Choisissez la table à inspecter :", options=tables_disponibles, index=0)
     
     if table_selectionnee:
         with st.spinner(f"Lecture de la table '{table_selectionnee}'..."):
             try:
-                # 1. Flux de streaming depuis Google Firestore
                 docs_bruts = db.collection(table_selectionnee).stream()
                 liste_documents = [doc.to_dict() for doc in docs_bruts]
                 
                 if not liste_documents:
                     st.info(f"⚪ La table '{table_selectionnee}' est actuellement vide ou n'a pas encore été synchronisée.")
                 else:
-                    # 2. Conversion en DataFrame pour l'exploitation
                     df_exploration = pd.DataFrame(liste_documents)
-                    
-                    # 3. Métriques rapides de la table
                     total_lignes = len(df_exploration)
                     total_colonnes = len(df_exploration.columns)
                     
                     m_db1, m_db2 = st.columns(2)
-                    with m_db1:
-                        st.metric(label="📊 Nombre d'entrées (Documents)", value=f"{total_lignes} lignes")
-                    with m_db2:
-                        st.metric(label="⚙️ Attributs détectés", value=f"{total_colonnes} colonnes")
+                    with m_db1: st.metric(label="📊 Nombre d'entrées (Documents)", value=f"{total_lignes} lignes")
+                    with m_db2: st.metric(label="⚙️ Attributs détectés", value=f"{total_colonnes} colonnes")
                     
-                    # 4. Moteur de recherche interne à la table
                     st.markdown("##### 🔍 Recherche rapide dans la table")
                     terme_recherche = st.text_input("Filtrer par mot-clé (Nom, Date, ID...) :", key=f"search_{table_selectionnee}").strip()
                     
                     if terme_recherche:
-                        # Filtre dynamique insensible à la casse sur l'ensemble du tableau
                         masque_recherche = df_exploration.astype(str).apply(
                             lambda x: x.str.contains(terme_recherche, case=False, na=False)
                         ).any(axis=1)
@@ -122,15 +98,9 @@ else:
                     else:
                         df_filtre = df_exploration
                     
-                    # 5. Affichage du tableau de données interactif
                     st.markdown("##### 📄 Table de données interactive")
-                    st.dataframe(
-                        df_filtre, 
-                        use_container_width=True, 
-                        hide_index=False # On garde l'index pour se repérer facilement
-                    )
+                    st.dataframe(df_filtre, use_container_width=True, hide_index=False)
                     
-                    # 6. Option d'export de secours pour l'Admin
                     st.download_button(
                         label=f"📥 Exporter la table {table_selectionnee} en CSV",
                         data=df_exploration.to_csv(index=False).encode('utf-8'),
@@ -138,7 +108,5 @@ else:
                         mime="text/csv",
                         key=f"dl_{table_selectionnee}"
                     )
-                    
             except Exception as e:
                 st.error(f"💥 Impossible de charger la table '{table_selectionnee}' : {e}")
-
