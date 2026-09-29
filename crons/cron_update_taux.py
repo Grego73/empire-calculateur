@@ -7,37 +7,48 @@ def executer_mise_a_jour_taux_uniquement():
     logs = []
     logs.append(f"⏱️ Démarrage du Cron Taux Léger : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Récupération sécurisée du client Firestore actif
+    # Connexion sécurisée au client Firestore actif
     from firebase_admin import firestore
     db = firestore.client()
     
-    # 🌐 CONFIGURATION CORRECTE DU SOUS-DOMAINE MONDE 8
+    # Configuration des adresses officielles du Monde 8
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-    BASE_URL = "https://monde8.empireimmo.com"  # ◄--- FIXÉ : Ajout du sous-domaine 'monde8.'
+    BASE_URL = "https://monde8.empireimmo.com"
     
-    url_cible = f"{BASE_URL}/api/materials.json?key={API_KEY}"
-    logs.append(f"[TRACE] Requête HTTP lancée sur : {url_cible}")
+    url_materials = f"{BASE_URL}/api/materials.json?key={API_KEY}"
+    url_buildings = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
     
+    taux_batiments = 0
+    taux_materiaux = 0
+    
+    # 🛒 1. EXTRACTION DU TAUX MATÉRIAUX
+    logs.append(f"[TRACE] Interrogation Taux Matériaux sur : {url_materials}")
     try:
-        reponse = requests.get(url_cible, timeout=15)
-        
-        # Gestion alternative si l'API du jeu bascule au singulier
-        if reponse.status_code == 404:
-            logs.append("⚠️ Endpoint 'materials.json' non trouvé (404). Essai sur 'material.json'...")
-            url_cible = f"{BASE_URL}/api/material.json?key={API_KEY}"
-            reponse = requests.get(url_cible, timeout=15)
-            
-        if reponse.status_code != 200:
-            logs.append(f"❌ Échec de la connexion à l'API Monde 8 (Code HTTP {reponse.status_code})")
-            return logs
-            
-        data = reponse.json()
-        logs.append("[✅] Réponse JSON reçue du serveur.")
-        
-        # Extraction des deux taux du promoteur
-        taux_batiments = int(data.get("taux_promoteur_batiments", data.get("taux_promoteur_batiment", 0)))
-        taux_materiaux = int(data.get("taux_promoteur_materials", data.get("taux_promoteur_materiaux", 0)))
-        
+        rep_mat = requests.get(url_materials, timeout=15)
+        if rep_mat.status_code == 200:
+            data_mat = rep_mat.json()
+            taux_materiaux = int(data_mat.get("taux_promoteur_materials", data_mat.get("taux_promoteur_materiaux", 0)))
+            logs.append(f"[✅] Taux Matériaux récupéré : {taux_materiaux}%")
+        else:
+            logs.append(f"❌ Erreur API Materials (Code HTTP {rep_mat.status_code})")
+    except Exception as e_mat:
+        logs.append(f"❌ Échec de la requête Materials : {e_mat}")
+
+    # 🏢 2. EXTRACTION DU TAUX BÂTIMENTS
+    logs.append(f"[TRACE] Interrogation Taux Bâtiments sur : {url_buildings}")
+    try:
+        rep_bld = requests.get(url_buildings, timeout=15)
+        if rep_bld.status_code == 200:
+            data_bld = rep_bld.json()
+            taux_batiments = int(data_bld.get("taux_promoteur_batiments", data_bld.get("taux_promoteur_batiment", 0)))
+            logs.append(f"[✅] Taux Bâtiments récupéré : {taux_batiments}%")
+        else:
+            logs.append(f"❌ Erreur API Buildings (Code HTTP {rep_bld.status_code})")
+    except Exception as e_bld:
+        logs.append(f"❌ Échec de la requête Buildings : {e_bld}")
+
+    # 3. ENREGISTREMENT DANS FIREBASE CLOUD FIRESTORE
+    try:
         date_liaison = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Structuration de l'objet NoSQL
@@ -48,18 +59,18 @@ def executer_mise_a_jour_taux_uniquement():
             "taux_promoteur_materiaux": taux_materiaux
         }
         
-        # 🏛️ ÉCRITURE 1 : Enregistrement dans le document FIXE lu par Streamlit
+        # Écriture 1 : Document FIXE pour l'affichage de votre page Streamlit
         db.collection("configuration").document("config_actuelle").set(payload_taux)
-        logs.append("✅ Document fixe 'configuration/config_actuelle' créé ou mis à jour dans Firestore.")
+        logs.append("✅ Document maître 'configuration/config_actuelle' mis à jour.")
         
-        # 📈 ÉCRITURE 2 : Sauvegarde dans l'historique NoSQL
+        # Écriture 2 : Sauvegarde dans l'historique temporel
         id_doc_historique = f"config_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         db.collection("configuration").document(id_doc_historique).set(payload_taux)
-        logs.append(f"📈 Copie d'historique sauvegardée sous l'ID : '{id_doc_historique}'")
+        logs.append(f"📈 Copie d'historique enregistrée sous l'ID : '{id_doc_historique}'")
         
-        logs.append(f"🎯 Traitement finalisé avec succès ! [Bâtiments : {taux_batiments}% | Matériaux : {taux_materiaux}%]")
+        logs.append(f"🎯 Fin du traitement ! Valeurs écrites en base -> Bâtiments : {taux_batiments}% | Matériaux : {taux_materiaux}%")
         
-    except Exception as e:
-        logs.append(f"💥 Incident critique durant le traitement du Cron Taux : {str(e)}")
+    except Exception as e_db:
+        logs.append(f"💥 Erreur lors de l'écriture sur votre base Firestore : {str(e_db)}")
         
     return logs
