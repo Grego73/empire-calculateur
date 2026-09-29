@@ -113,7 +113,7 @@ def executer_mise_a_jour_cron():
         if req.status_code == 200:
             data_json = req.json()
             
-            # 🎯 Extraction optionnelle du taux promoteur global si disponible dans l'API
+            # Extraction du taux promoteur global si disponible dans l'API
             if "taux_promoteur" in data_json:
                 taux_p = securiser_entier(data_json.get("taux_promoteur", 0))
                 db.collection("configuration").document(f"config_{timestamp_id}").set({
@@ -129,7 +129,6 @@ def executer_mise_a_jour_cron():
             
             notifier(f"🏢 Détection JSON : {len(liste_perso)} personnels, {len(liste_entreprise)} entreprises, {len(liste_terrain)} terrains.")
             
-            # Structuration par sous-groupes pour injecter la catégorie d'origine
             categories_batiments = [
                 ("perso", liste_perso),
                 ("entreprise", liste_entreprise),
@@ -154,7 +153,7 @@ def executer_mise_a_jour_cron():
                         "loyer": securiser_entier(b.get("loyer", 0)), 
                         "charge": securiser_entier(b.get("charge", 0)), 
                         "impot": securiser_entier(b.get("impot", 0)), 
-                        "categorie": categorie,  # 💡 AJOUT CLÉ : 'perso', 'entreprise' ou 'terrain'
+                        "categorie": categorie,
                         "date_extraction": date_now
                     })
                     
@@ -186,7 +185,6 @@ def executer_mise_a_jour_cron():
             
             notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
             
-            # Structuration par sous-groupes pour injecter la catégorie d'origine
             categories_travaux = [
                 ("perso", liste_t_perso),
                 ("entreprise", liste_t_entreprise)
@@ -212,16 +210,16 @@ def executer_mise_a_jour_cron():
                         "terrain_requis": w.get("terrain", "Aucun"),
                         "cout_estime": securiser_entier(w.get("cout", 0)), 
                         "duree_mois": securiser_entier(w.get("duree", 0)), 
-                        "categorie": categorie,  # 💡 AJOUT CLÉ : 'perso' ou 'entreprise'
+                        "categorie": categorie,
                         "date_extraction": date_now
                     })
                     
                     c_batch += 1
                     total_travaux_enregistre += 1
                     if c_batch >= 500:
-                    batch.commit()
-                    batch = db.batch()
-                    c_batch = 0
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
                     
             if c_batch > 0:
                 batch.commit()
