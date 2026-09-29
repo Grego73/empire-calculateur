@@ -258,21 +258,26 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
 
 def recuperer_derniers_taux_configuration():
     try:
-        # Trie l'ensemble des configurations par ordre décroissant de la date d'extraction
-        docs = db.collection("configuration").order_by("date_extraction", direction="DESCENDING").limit(1).stream()
+        # Lecture directe du document fixe mis à jour par GitHub Actions
+        doc = db.collection("configuration").document("config_actuelle").get()
         
-        for doc in docs:
+        if doc.exists:
             d = doc.to_dict()
-            # Diagnostic en console locale Streamlit pour validation
-            print(f"📊 [PROMO] Lecture de la configuration Cloud : Document ID = {doc.id}")
             return {
                 "batiments": int(d.get("taux_promoteur_batiments", 0)),
                 "materiaux": int(d.get("taux_promoteur_materiaux", 0))
             }
             
-        # Si aucun document n'est trouvé, retour des valeurs par défaut (0)
+        # Si le document fixe n'existe pas encore, repli sur le tri historique décroissant
+        docs_secours = db.collection("configuration").order_by("date_extraction", direction="DESCENDING").limit(1).stream()
+        for doc_s in docs_secours:
+            d_s = doc_s.to_dict()
+            return {
+                "batiments": int(d_s.get("taux_promoteur_batiments", 0)),
+                "materiaux": int(d_s.get("taux_promoteur_materiaux", 0))
+            }
+            
         return {"batiments": 0, "materiaux": 0}
     except Exception as e:
-        print(f"❌ Erreur lors de la récupération des taux de configuration : {e}")
+        print(f"❌ Erreur récupération configuration : {e}")
         return {"batiments": 0, "materiaux": 0}
-
