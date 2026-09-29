@@ -255,16 +255,19 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
     """
     Calcule le montant total théorique requis ainsi que les 3 modèles 
     de répartition (Strict, Égalitaire, Proportionnel) pour le Monde 8.
+    Sécurisé avec Decimal pour éviter les pertes de précision sur les grands nombres.
     """
     try:
+        from decimal import Decimal
         import pandas as pd
         
         df_calcul = df_filiales.copy()
         
-        # 🔒 Conversion forcée en float pour absorber les puissances géantes du M8
-        df_calcul["Montant_Num"] = pd.to_numeric(df_calcul["Montant_RAW"], errors='coerce').fillna(0).astype(float)
+        # 🔒 Conversion ultra-précise en Decimal pour absorber les puissances géantes du M8
+        df_calcul["Montant_Num"] = df_calcul["Montant_RAW"].apply(lambda x: Decimal(str(x)))
         
-        total_requis = float(df_calcul["Montant_Num"].sum())
+        total_requis = df_calcul["Montant_Num"].sum()
+        montant_holding = Decimal(str(montant_total_dispo))
         
         # --- RÉPARTITION 1 : STRICTE ---
         rep_strict = df_calcul[["Filiale", "Montant_Num"]].copy()
@@ -273,16 +276,22 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
         # --- RÉPARTITION 2 : ÉGALITAIRE ---
         rep_egal = df_calcul[["Filiale"]].copy()
         nb_filiales = max(len(rep_egal), 1)
-        rep_egal["Montant"] = float(montant_total_dispo) / nb_filiales
+        rep_egal["Montant"] = montant_holding / Decimal(nb_filiales)
         
         # --- RÉPARTITION 3 : PROPORTIONNELLE ---
         rep_prop = df_calcul[["Filiale", "Montant_Num"]].copy()
         if total_requis > 0:
-            rep_prop["Montant"] = (rep_prop["Montant_Num"] / total_requis) * float(montant_total_dispo)
+            # Calcul précis par quote-part en Decimal
+            rep_prop["Montant"] = rep_prop["Montant_Num"].apply(lambda x: (x / total_requis) * montant_holding)
         else:
-            rep_prop["Montant"] = 0.0
+            rep_prop["Montant"] = Decimal('0')
             
-        return total_requis, rep_strict[["Filiale", "Montant"]], rep_egal[["Filiale", "Montant"]], rep_prop[["Filiale", "Montant"]]
+        # Reconversion finale propre pour l'affichage de Streamlit
+        rep_strict["Montant"] = rep_strict["Montant"].astype(float)
+        rep_egal["Montant"] = rep_egal["Montant"].astype(float)
+        rep_prop["Montant"] = rep_prop["Montant"].astype(float)
+        
+        return float(total_requis), rep_strict[["Filiale", "Montant"]], rep_egal[["Filiale", "Montant"]], rep_prop[["Filiale", "Montant"]]
         
     except Exception as e:
         print(f"Erreur calcul répartition arbitrage : {e}")
