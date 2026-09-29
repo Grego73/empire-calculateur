@@ -62,7 +62,7 @@ else:
             
             texte_discord += "Cliquez sur l'icône de copie en haut à droite du bloc gris ci-dessous :\n"
             
-            if len(texte_discord) + len(contents_crlf_pur) < 1900:
+            if len(texte_discord) + len(contenu_crlf_pur) < 1900:
                 texte_discord += f"```text\n{contenu_crlf_pur}```"
             else:
                 texte_discord += "⚠️ *Le tableau est trop long pour être affiché en texte sur Discord. Utilisez le fichier joint.*"
