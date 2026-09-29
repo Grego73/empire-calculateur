@@ -44,19 +44,20 @@ if force_run or (heure_locale == 3 and 25 <= minute_locale <= 55):
             sys.exit(1)
 
     # 4. Chargement et exécution de votre script d'origine
-    try:
+try:
         sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-        # Appel de votre fonction d'origine située dans crons/cron_update_api.py
         from crons.cron_update_api import executer_mise_a_jour_cron
 
-        print("[TRACE] Déclenchement du traitement lourd des 529 bâtiments...")
-        journaux_execution = executer_mise_a_jour_cron()
+        print("[TRACE] Déclenchement du traitement quotidien (sans la table 'players')...")
+        
+        # 🔥 MODIFICATION : On passe le paramètre à True ici
+        journaux_execution = executer_mise_a_jour_cron(exclure_players=True)
         
         print("\n------------------- JOURNAUX DU ROBOT GLOBAL -------------------")
         print("\n".join(journaux_execution) if isinstance(journaux_execution, list) else str(journaux_execution))
         print("-----------------------------------------------------------------\n")
         
-        print("✅ Base NoSQL entièrement synchronisée avec succès.")
+        print("✅ Base NoSQL entièrement synchronisée (hors players) avec succès.")
         sys.exit(0)
     except Exception as err_cron:
         print(f"💥 Échec critique durant l'exécution du cron global : {err_cron}")
