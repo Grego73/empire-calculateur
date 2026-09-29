@@ -106,56 +106,75 @@ def executer_mise_a_jour_cron():
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS ---
+    # --- 2. BÂTIMENTS (AVEC SÉPARATION DES 3 CATÉGORIES ET TAUX PROMOTEUR) ---
     try:
         req = requests.get(f"{BASE_URL}/api/buildings.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         if req.status_code == 200:
             data_json = req.json()
             
+            # 🎯 Extraction optionnelle du taux promoteur global si disponible dans l'API
+            if "taux_promoteur" in data_json:
+                taux_p = securiser_entier(data_json.get("taux_promoteur", 0))
+                db.collection("configuration").document(f"config_{timestamp_id}").set({
+                    "taux_promoteur": taux_p,
+                    "date_mise_a_jour": data_json.get("mise a jour", date_now),
+                    "date_extraction": date_now
+                })
+                notifier(f"⚙️ Métadonnées : Taux Promoteur à {taux_p}% enregistré dans 'configuration'.")
+
             liste_perso = data_json.get("batiments_perso", [])
             liste_entreprise = data_json.get("batiments_entreprise", [])
             liste_terrain = data_json.get("batiments_terrain", [])
-            buildings_list = liste_perso + liste_entreprise + liste_terrain
             
             notifier(f"🏢 Détection JSON : {len(liste_perso)} personnels, {len(liste_entreprise)} entreprises, {len(liste_terrain)} terrains.")
-            notifier(f"🚀 Traitement global de {len(buildings_list)} infrastructures...")
+            
+            # Structuration par sous-groupes pour injecter la catégorie d'origine
+            categories_batiments = [
+                ("perso", liste_perso),
+                ("entreprise", liste_entreprise),
+                ("terrain", liste_terrain)
+            ]
             
             batch = db.batch()
             c_batch = 0
+            total_enregistre = 0
             
-            for b in buildings_list:
-                id_j = b.get('id', 0)
-                doc_id = f"{id_j}_{timestamp_id}"
-                doc_ref = db.collection("batiments").document(doc_id)
-                
-                batch.set(doc_ref, {
-                    "id_jeu": id_j, 
-                    "nom": b.get("nom", "Inconnu"), 
-                    "type": b.get("type", "Standard"), 
-                    "valeur": securiser_entier(b.get("valeur", 0)),
-                    "loyer": securiser_entier(b.get("loyer", 0)), 
-                    "charge": securiser_entier(b.get("charge", 0)), 
-                    "impot": securiser_entier(b.get("impot", 0)), 
-                    "date_extraction": date_now
-                })
-                
-                c_batch += 1
-                if c_batch >= 500:
-                    batch.commit()
-                    batch = db.batch()
-                    c_batch = 0
+            for categorie, liste in categories_batiments:
+                for b in liste:
+                    id_j = b.get('id', 0)
+                    doc_id = f"{id_j}_{timestamp_id}"
+                    doc_ref = db.collection("batiments").document(doc_id)
                     
+                    batch.set(doc_ref, {
+                        "id_jeu": id_j, 
+                        "nom": b.get("nom", "Inconnu"), 
+                        "type": b.get("type", "Standard"), 
+                        "valeur": securiser_entier(b.get("valeur", 0)),
+                        "loyer": securiser_entier(b.get("loyer", 0)), 
+                        "charge": securiser_entier(b.get("charge", 0)), 
+                        "impot": securiser_entier(b.get("impot", 0)), 
+                        "categorie": categorie,  # 💡 AJOUT CLÉ : 'perso', 'entreprise' ou 'terrain'
+                        "date_extraction": date_now
+                    })
+                    
+                    c_batch += 1
+                    total_enregistre += 1
+                    if c_batch >= 500:
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
+                        
             if c_batch > 0:
                 batch.commit()
                 
-            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({len(buildings_list)} lignes enregistrées).")
+            notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes enregistrées avec tags).")
         else:
             notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (ALIGNEMENT DES CLÉS DU MONDE 8) ---
+    # --- 3. TRAVAUX (SÉPARATION DES 2 CATÉGORIES MONDE 8) ---
     try:
         req = requests.get(f"{BASE_URL}/api/works.json?key={API_KEY}", timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
@@ -164,36 +183,42 @@ def executer_mise_a_jour_cron():
             
             liste_t_perso = data_json.get("travaux_perso", [])
             liste_t_entreprise = data_json.get("travaux_entreprise", [])
-            works_list = liste_t_perso + liste_t_entreprise
             
             notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
-            notifier(f"🚀 Traitement global de {len(works_list)} types de chantiers...")
+            
+            # Structuration par sous-groupes pour injecter la catégorie d'origine
+            categories_travaux = [
+                ("perso", liste_t_perso),
+                ("entreprise", liste_t_entreprise)
+            ]
             
             batch = db.batch()
             c_batch = 0
+            total_travaux_enregistre = 0
             
-            for w in works_list:
-                id_w = w.get('id', 0)
-                t_type = w.get('type', 'Construction')
-                
-                # Correction de la clé d'extraction : on lit 'nom' depuis l'API du Monde 8
-                b_name = w.get('nom', 'Inconnu')
-                
-                doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
-                doc_ref = db.collection("travaux").document(doc_id)
-                
-                batch.set(doc_ref, {
-                    "id_jeu": id_w,
-                    "type_travaux": t_type, 
-                    "building_name": b_name,  # Stocké sous 'building_name' pour la compatibilité de vos pages
-                    "terrain_requis": w.get("terrain", "Aucun"),
-                    "cout_estime": securiser_entier(w.get("cout", 0)), 
-                    "duree_mois": securiser_entier(w.get("duree", 0)), 
-                    "date_extraction": date_now
-                })
-                
-                c_batch += 1
-                if c_batch >= 500:
+            for categorie, liste in categories_travaux:
+                for w in liste:
+                    id_w = w.get('id', 0)
+                    t_type = w.get('type', 'Construction')
+                    b_name = w.get('nom', 'Inconnu')
+                    
+                    doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
+                    doc_ref = db.collection("travaux").document(doc_id)
+                    
+                    batch.set(doc_ref, {
+                        "id_jeu": id_w,
+                        "type_travaux": t_type, 
+                        "building_name": b_name, 
+                        "terrain_requis": w.get("terrain", "Aucun"),
+                        "cout_estime": securiser_entier(w.get("cout", 0)), 
+                        "duree_mois": securiser_entier(w.get("duree", 0)), 
+                        "categorie": categorie,  # 💡 AJOUT CLÉ : 'perso' ou 'entreprise'
+                        "date_extraction": date_now
+                    })
+                    
+                    c_batch += 1
+                    total_travaux_enregistre += 1
+                    if c_batch >= 500:
                     batch.commit()
                     batch = db.batch()
                     c_batch = 0
@@ -201,16 +226,14 @@ def executer_mise_a_jour_cron():
             if c_batch > 0:
                 batch.commit()
                 
-            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({len(works_list)} lignes enregistrées).")
+            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes enregistrées avec tags).")
         else:
             notifier(f"❌ Erreur API Travaux : {req.text[:200]}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
 
-
     notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
     return logs_session
-
 
 if __name__ == "__main__":
     executer_mise_a_jour_cron()
