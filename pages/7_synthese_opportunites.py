@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 from utils import (
     formater_monnaie_empire, 
-    recuperer_derniere_donnee_table, 
-    recuperer_derniers_taux_configuration  # Utilisation de votre fonction existante
+    recuperer_derniere_donnee_table
 )
 
 st.title("✨ Le Podium des Opportunités de l'Empire")
@@ -13,9 +12,6 @@ st.markdown("Analyse des projets les plus rentables basée sur les dernières do
 with st.spinner("Analyse des tables Firebase et de la configuration..."):
     df_travaux = recuperer_derniere_donnee_table("travaux")
     df_materiaux = recuperer_derniere_donnee_table("materiaux")
-    
-    # 🔍 RELEVÉ DE LA CONFIGURATION DU PROMOTEUR ET DES PROMOS
-    # Récupération du document le plus récent de la table 'configuration'
     df_config = recuperer_derniere_donnee_table("configuration")
 
 # Initialisation des variables de configuration par défaut
@@ -25,14 +21,13 @@ promos_perso = []
 promos_entreprise = []
 
 if df_config is not None and not df_config.empty:
-    # Lecture sécurisée de la ligne la plus récente
     ligne_config = df_config.iloc[0]
     
     # Relevé des taux du promoteur
     taux_batiments = int(ligne_config.get("taux_promoteur_batiments", 0))
     taux_materiaux = int(ligne_config.get("taux_promoteur_materiaux", 0))
     
-    # Relevé des listes de biens en promotion (nettoyage et passage en majuscules)
+    # Relevé des listes de biens en promotion
     if "promos_perso" in ligne_config:
         promos_perso = [str(x).strip().upper() for x in ligne_config["promos_perso"] if x]
     if "promos_entreprise" in ligne_config:
@@ -85,17 +80,15 @@ else:
                 cout_main_oeuvre = int(r.get("cout_estime", r.get("estimated_cost", 0)))
                 prix_du_terrain = int(dict_materiaux.get(terrain_clean, 0))
                 
-                # 🔥 APPLICATION DES RÉDUCTIONS DU PROMOTEUR SI LE BIEN EST EN PROMO
-                # Application de la réduction sur les matériaux (Terrain) si applicable
-                if taux_materials > 0:
+                # 🔥 APPLICATION DES RÉDUCTIONS DU PROMOTEUR (CORRIGÉE)
+                if taux_materiaux > 0:
                     prix_du_terrain = int(prix_du_terrain * (1 - (taux_materiaux / 100)))
                 
-                # Application de la réduction sur le bâtiment s'il est listé dans les promos
                 if nom_batiment_clean in promos_perso or nom_batiment_clean in promos_entreprise:
                     if taux_batiments > 0:
                         cout_main_oeuvre = int(cout_main_oeuvre * (1 - (taux_batiments / 100)))
                 
-                # Calcul final sécurisé (Empêche les valeurs négatives dues à un mauvais calcul)
+                # Calcul final sécurisé contre les valeurs négatives
                 cout_total = max(0, cout_main_oeuvre + prix_du_terrain)
 
                 rows_opportunites.append({
