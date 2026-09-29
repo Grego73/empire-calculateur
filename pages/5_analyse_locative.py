@@ -4,10 +4,8 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre, recuperer
 
 st.title("📊 Analyse Locative & Rendements (Données Firebase Cloud)")
 
-# 1. Récupération des données brutes
 df_batiments = recuperer_derniere_donnee_table("batiments")
 
-# REPLI DE SÉCURITÉ : Si le DataFrame est None ou vide, on tente une lecture brute pour éviter le crash
 if df_batiments is None or df_batiments.empty:
     try:
         from utils import db
@@ -23,23 +21,19 @@ if df_batiments is None or df_batiments.empty:
 else:
     st.caption(f"☁️ Source : Google Cloud Firestore | Éléments détectés : `{len(df_batiments)} bâtiments`")
 
-    # Zone de saisie du budget
     saisie_capital = st.text_input("Budget disponible :", value="10G")
     capital_disponible = convertir_saisie_en_nombre(saisie_capital)
 
     try:
-        # 2. Harmonisation et nettoyage forcé des colonnes d'argent (Casse NoSQL)
         for col in ["valeur", "loyer", "charge", "impot"]:
             if col in df_batiments.columns:
                 df_batiments[col] = pd.to_numeric(df_batiments[col], errors='coerce').fillna(0).astype(int)
             else:
                 df_batiments[col] = 0
 
-        # Vérification de la présence de la colonne catégorie (sécurisation pour vos 8 colonnes actuelles)
         if "categorie" not in df_batiments.columns:
             df_batiments["categorie"] = "Non classé"
 
-        # 3. Filtrage global tolérant (Exclusion des terrains par le nom)
         df_biens = df_batiments[
             (~df_batiments["nom"].astype(str).str.contains("TERRAIN|PARC", case=False, na=False)) &
             (df_batiments["valeur"] > 0)
@@ -48,13 +42,11 @@ else:
         if df_biens.empty:
             st.warning("⚠️ Aucun bâtiment locatif n'a été trouvé après filtrage des terrains.")
         else:
-            # 4. Calculs financiers du Monde 8
             df_biens["rev_net_annuel"] = (df_biens["loyer"] - df_biens["charge"] - df_biens["impot"]) * 12
             df_biens["Rendement Net (%)"] = (df_biens["rev_net_annuel"] / df_biens["valeur"] * 100).fillna(0)
             df_biens["Quantité Max Achetée"] = capital_disponible // df_biens["valeur"]
             df_biens["Gain Mensuel Cumulé"] = (df_biens["loyer"] - df_biens["charge"] - df_biens["impot"]) * df_biens["Quantité Max Achetée"]
 
-            # 5. Affichage par Onglets Adaptatifs
             tab_tous, tab_ent, tab_perso = st.tabs(["🌐 Vue Globale (Monde 8)", "🏢 Bâtiments d'Entreprises", "📦 Bâtiments Personnels"])
 
             with tab_tous:
@@ -72,7 +64,7 @@ else:
             with tab_ent:
                 df_ent = df_biens[df_biens["categorie"].astype(str).str.lower() == "entreprise"].copy()
                 if df_ent.empty:
-                    st.info("⚪ Aucun bâtiment marqué 'entreprise'. Ils apparaîtront ici lors du prochain run du Cron.")
+                    st.info("⚪ Aucun bâtiment marqué 'entreprise'.")
                 else:
                     df_ent_visuel = pd.DataFrame({
                         "Description": df_ent["nom"],
@@ -87,7 +79,7 @@ else:
             with tab_perso:
                 df_perso = df_biens[df_biens["categorie"].astype(str).str.lower() == "perso"].copy()
                 if df_perso.empty:
-                    st.info("⚪ Aucun bâtiment marqué 'perso'. Ils apparaîtront ici lors du prochain run du Cron.")
+                    st.info("⚪ Aucun bâtiment marqué 'perso'.")
                 else:
                     df_perso_visuel = pd.DataFrame({
                         "Description": df_perso["nom"],
