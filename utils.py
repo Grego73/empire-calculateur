@@ -6,13 +6,18 @@ import pandas as pd
 import streamlit as st  
 from datetime import datetime
 
-# 🌐 CONFIGURATION CENTRALE DU MONDE 8 (SÉCURISÉE)
-# Cherche d'abord dans st.secrets, sinon utilise la valeur par défaut
-API_KEY = st.secrets.get("GAME_API_KEY", "eiK8_110b18473efc48e9c63f76b5494ea18f")
-BASE_URL = "https://empireimmo.com"
+# 🌐 CONFIGURATION CENTRALE DU MONDE 8 (CORRIGÉE POUR GITHUB ACTIONS)
+try:
+    # On essaie d'abord la méthode classique Streamlit
+    API_KEY = st.secrets.get("GAME_API_KEY", "eiK8_110b18473efc48e9c63f76b5494ea18f")
+except Exception:
+    # Si on est sur GitHub Actions, Streamlit lève une erreur : on intercepte et on applique la clé de secours
+    API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
 
+BASE_URL = "https://empireimmo.com"
 URL_WORKS = f"{BASE_URL}/api/works.json?key={API_KEY}"
 URL_MATERIALS = f"{BASE_URL}/api/materials.json?key={API_KEY}"
+
 
 # 🏛️ ÉCHELLE MATHÉMATIQUE DE L'EMPIRE
 DICTIONNAIRE_PALIERS = {
