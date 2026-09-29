@@ -2,9 +2,8 @@ name: ⏱️ Synchro Taux Promoteur Automatique (4H)
 
 on:
   schedule:
-    # Déclenche à la minute 01 pour couvrir TOUTES les heures charnières d'été et d'hiver UTC
     - cron: '1 22,23,2,3,6,7,10,11,14,15,18,19 * * *'
-  workflow_dispatch: # Permet toujours le déclenchement manuel
+  workflow_dispatch:
 
 jobs:
   execution_cron:
@@ -22,6 +21,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install requests firebase-admin pandas google-cloud-firestore streamlit tzdata
+
+    # 👀 DIAGNOSTIC SYSTÈME DIRECT (Pour voir pourquoi Python coupe)
+    - name: 🔍 Inspection des Fichiers Disponibles
+      run: |
+        echo "=== Emplacement actuel ==="
+        pwd
+        echo "=== Liste des fichiers à la racine ==="
+        ls -la
+        echo "=== Vérification de la version Python ==="
+        python --version
 
     - name: 🚀 Lancement de la synchronisation des Taux
       env:
