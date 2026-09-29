@@ -44,7 +44,7 @@ def home_page():
         df_pivot = df_historique_mat.pivot_table(
             index="Date", 
             columns="Matériau", 
-            values="Prix (\$)", 
+            values="Prix", 
             sort=False 
         )
         st.line_chart(df_pivot, width='stretch')
