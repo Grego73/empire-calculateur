@@ -1,33 +1,28 @@
-name: ⏱️ Synchro Taux Promoteur (4H)
+name: ⏱️ Synchro Taux Promoteur Automatique (4H)
 
 on:
   schedule:
-    # Déclenchement automatique toutes les 4 heures (Syntaxe Cron POSIX)
-    - cron: '0 */4 * * *'
-  workflow_dispatch: # Permet de lancer le script manuellement depuis GitHub si besoin
+    # Déclenche à la minute 01 pour couvrir TOUTES les heures charnières d'été et d'hiver UTC
+    - cron: '1 22,23,2,3,6,7,10,11,14,15,18,19 * * *'
+  workflow_dispatch: # Permet toujours le déclenchement manuel
 
 jobs:
   execution_cron:
     runs-on: ubuntu-latest
-
     steps:
-    # 1. Copie du code de votre dépôt sur le serveur virtuel GitHub
     - name: 📥 Récupération du code
       uses: actions/checkout@v4
 
-    # 2. Installation de Python
     - name: 🐍 Installation de Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 3. Installation des dépendances minimales nécessaires
     - name: 📦 Installation des dépendances
       run: |
         python -m pip install --upgrade pip
-        pip install requests firebase-admin pandas google-cloud-firestore streamlit
+        pip install requests firebase-admin pandas google-cloud-firestore streamlit tzdata
 
-    # 4. Exécution du script avec injection de la clé Firebase cachée
     - name: 🚀 Lancement de la synchronisation des Taux
       env:
         FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
