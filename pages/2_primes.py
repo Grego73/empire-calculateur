@@ -47,7 +47,13 @@ else:
                 
                 if forcer_zero:
                     import_primes.append(f"{nom}\t0")
-                    lignes_tab.append({"Filiale": nom, "Prime": "0", "Statut": "Zéro Forcé"})
+                    lignes_tab.append({
+                        "Filiale": nom, 
+                        "Prime Calculée": "0", 
+                        "Prime Plafond": "0", 
+                        "Prime Finale": "0", 
+                        "Statut": "Zéro Forcé"
+                    })
                 else:
                     if nom not in plafonds_extraits: continue
                     val_exp = convertir_saisie_en_nombre(cols[2].strip())
@@ -58,15 +64,25 @@ else:
                     statut = "🚨 Plafonné" if val_prime > p_max else "✅ Conforme"
                     
                     import_primes.append(f"{nom}\t{final_p}")
-                    lignes_tab.append({"Filiale": nom, "Prime": formater_monnaie_empire(final_p), "Statut": statut})
+                    
+                    # 📊 ENREGISTREMENT DES TROIS MONTANTS POUR L'AFFICHAGE DU TABLEAU
+                    lignes_tab.append({
+                        "Filiale": nom, 
+                        "Prime Calculée": formater_monnaie_empire(val_prime), 
+                        "Prime Plafond": formater_monnaie_empire(p_max), 
+                        "Prime Finale": formater_monnaie_empire(final_p), 
+                        "Statut": statut
+                    })
 
             crlf_pur = "\r\n".join(import_primes) + "\r\n"
             msg = f"📊 **Rapport Primes ({pct_prime}%)**\n```text\n{crlf_pur}```"
             
             reponse = requests.post(url_webhook, data={'content': msg}, files={'file': ('primes.txt', crlf_pur, 'text/plain')})
             
-            if reponse.status_code in [200, 204]:
+            if reponse.status_code in [200, 204] :
                 st.success("🎉 Rapport Primes envoyé avec succès sur Discord !")
+                
+                # Affichage du tableau détaillé avec les nouvelles colonnes
                 st.dataframe(pd.DataFrame(lignes_tab), use_container_width=True, hide_index=True)
                 st.code(crlf_pur, language="text")
             else:
