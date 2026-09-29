@@ -40,10 +40,11 @@ def home_page():
         df_historique = recuperer_historique_materiaux()
     
     if df_historique is not None and not df_historique.empty:
+        # 🔄 Pivot des données (Correction du nom de la colonne Prix)
         df_pivot = df_historique.pivot_table(
             index="Date", 
             columns="Matériau", 
-            values="Prix (\$)",
+            values="Prix ($)", # ◄--- CORRECTION : Utilisation de la clé exacte sans l'anti-slash
             sort=False 
         )
         st.line_chart(df_pivot, width='stretch')
