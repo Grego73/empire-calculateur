@@ -306,14 +306,19 @@ def calculer_repartitions_equilibrage(df_filiales, montant_total_dispo=0):
     except Exception as e:
         print(f"Erreur calcul répartition cascade : {e}")
         return 0.0, None, None, None
-def recuperer_dernier_taux_promoteur():
-    """Récupère le taux promoteur le plus récent depuis la table de configuration."""
+
+def recuperer_derniers_taux_configuration():
+    """Récupère le dictionnaire des taux les plus récents depuis la table configuration."""
     try:
         from google.cloud.firestore_v1.base_query import Query
-        docs = db.collection("configuration").order_by("date_mise_a_jour", direction=Query.DESCENDING).limit(1).stream()
+        docs = db.collection("configuration").order_by("date_extraction", direction=Query.DESCENDING).limit(1).stream()
         for doc in docs:
-            return doc.to_dict().get("taux_promoteur", 0)
-        return 0
+            d = doc.to_dict()
+            return {
+                "batiments": d.get("taux_promoteur_batiments", 0),
+                "materiaux": d.get("taux_promoteur_materiaux", 0)
+            }
+        return {"batiments": 0, "materiaux": 0}
     except:
-        return 0
+        return {"batiments": 0, "materiaux": 0}
 
