@@ -87,21 +87,26 @@ else:
         st.error(f"⚠️ Erreur lors du traitement comptable : {e}")
 
 # =========================================================
-# 📈 EXTRACTEUR NO SQL & SUIVI DES COURBES (DESSUS / DESSOUS)
+# 📈 EXTRACTEUR NO SQL & SUIVI DES COURBES PROMOTEURS
 # =========================================================
 st.markdown("---")
 st.subheader("🏛️ Suivi Temporel de l'Évolution des Taux")
 
 @st.cache_data(ttl=600)  # Mise en cache 10 minutes pour économiser vos quotas Firestore
 def extraire_historique_taux_cloud():
+    import zoneinfo  # Ajout pour la gestion stricte du fuseau horaire de l'Empire
     try:
         # Récupération de l'ensemble des configurations historisées
         docs = db.collection("configuration").stream()
         points_historiques = []
         
+        # Définition des fuseaux horaires pour la conversion
+        tz_utc = zoneinfo.ZoneInfo("UTC")
+        tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
+        
         for doc in docs:
             d = doc.to_dict()
-            # Ignorer le document maître statique pour ne pas fausser l'historique temporel
+            # Ignorer le document maître statique
             if doc.id == "config_actuelle": 
                 continue
                 
@@ -111,9 +116,17 @@ def extraire_historique_taux_cloud():
             
             if extraction_brute and t_bat is not None and t_mat is not None:
                 try:
+                    # 1. On lit la date brute (stockée en format standard)
                     dt = datetime.strptime(extraction_brute, "%Y-%m-%d %H:%M:%S")
-                    label_date = dt.strftime("%d/%m %H:%M")
+                    
+                    # 2. Si le serveur ou le script l'a enregistrée en UTC, on lui donne son fuseau d'origine
+                    dt = dt.replace(tzinfo=tz_utc)
+                    
+                    # 3. CONVERSION STRICTE VERS L'HEURE DE PARIS (Gère l'heure d'été/hiver automatiquement)
+                    dt_paris = dt.astimezone(tz_paris)
+                    label_date = dt_paris.strftime("%d/%m %H:%M")
                 except:
+                    # En cas de structure de date alternative
                     label_date = extraction_brute
                     
                 points_historiques.append({
