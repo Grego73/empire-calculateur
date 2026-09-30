@@ -105,14 +105,10 @@ else:
 st.markdown("---")
 st.subheader("🏛️ État des Taux du Promoteur")
 
-col_g1, col_g2 = st.columns(2)
+st.markdown(f"**Taux Promoteur Bâtiment : `{taux_batiments}%`**")
+df_jauge_bat = pd.DataFrame({"Taux (%)": [taux_batiments]}, index=["Bâtiment"])
+st.bar_chart(df_jauge_bat, y_label="Pourcentage", color="#FF4B4B", use_container_width=True)
 
-with col_g1:
-    st.markdown(f"**Taux Promoteur Bâtiment : `{taux_batiments}%`**")
-    df_jauge_bat = pd.DataFrame({"Taux (%)": [taux_batiments]}, index=["Bâtiment"])
-    st.bar_chart(df_jauge_bat, y_label="Pourcentage", color="#FF4B4B", use_container_width=True)
-
-with col_g2:
-    st.markdown(f"**Taux Promoteur Matériau (Terrains) : `{taux_materiaux}%`**")
-    df_jauge_mat = pd.DataFrame({"Taux (%)": [taux_materiaux]}, index=["Matériau"])
-    st.bar_chart(df_jauge_mat, y_label="Pourcentage", color="#00C49F", use_container_width=True)
+st.markdown(f"**Taux Promoteur Matériau (Terrains) : `{taux_materiaux}%`**")
+df_jauge_mat = pd.DataFrame({"Taux (%)": [taux_materiaux]}, index=["Matériau"])
+st.bar_chart(df_jauge_mat, y_label="Pourcentage", color="#00C49F", use_container_width=True)
