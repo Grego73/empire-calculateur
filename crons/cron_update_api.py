@@ -37,7 +37,7 @@ def executer_mise_a_jour_cron(exclure_players=False):
 
     # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (ISOLÉE EN DUR)
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-    BASE_URL = "https://empireimmo.com"
+    BASE_URL = "https://monde8.empireimmo.com"
 
     # Limites des entiers signés 64-bits pour Firestore Google Cloud
     MAX_INT64 = 9223372036854775807
