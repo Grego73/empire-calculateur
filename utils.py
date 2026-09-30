@@ -190,15 +190,28 @@ def recuperer_historique_joueur(pseudo="Grego73"):
         return None
 
 def recuperer_historique_materiaux():
+    import zoneinfo  # Force la gestion stricte du fuseau horaire de l'Empire
     try:
         docs = db.collection("materiaux").stream()
         donnees = []
+        
+        # Définition des fuseaux horaires pour la conversion
+        tz_utc = zoneinfo.ZoneInfo("UTC")
+        tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
+        
         for doc in docs:
             d = doc.to_dict()
             if "nom" in d and "prix" in d and "date_extraction" in d:
                 try:
+                    # 1. On lit la date brute enregistrée par GitHub Actions
                     dt = datetime.strptime(d["date_extraction"], "%Y-%m-%d %H:%M:%S")
-                    date_formatee = dt.strftime("%d/%m %H:%M")
+                    
+                    # 2. On lui donne son fuseau UTC d'origine
+                    dt = dt.replace(tzinfo=tz_utc)
+                    
+                    # 3. CONVERSION STRICTE VERS L'HEURE DE PARIS
+                    dt_paris = dt.astimezone(tz_paris)
+                    date_formatee = dt_paris.strftime("%d/%m %H:%M")
                 except:
                     date_formatee = d["date_extraction"]
                     
