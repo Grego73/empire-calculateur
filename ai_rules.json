@@ -1,0 +1,20 @@
+{
+  "project_name": "empire-calculateur",
+  "target_world": "Monde 8 / Adaptatif via utils.py",
+  "mandatory_rules": {
+    "api_key_casing": "STRICTEMENT MAJUSCULE 'eiK8_'. Ne jamais modifier la casse sous peine de code 401.",
+    "url_architecture": "Utiliser impérativement 'BASE_URL' depuis utils.py. Ne jamais mettre d'URL en dur.",
+    "endpoints_format": "Toujours utiliser le PLURIEL pour les requêtes globales : buildings.json, works.json, materials.json, players.json. Ne jamais basculer au singulier sous peine de code 404.",
+    "headers_required": "Toujours passer la variable 'headers_navigation' avec le User-Agent Mozilla dans les requêtes requests.get().",
+    "cron_3h30_filter": "Le script global de 3h30 doit impérativement exécuter 'executer_mise_a_jour_cron(exclure_players=True)' pour économiser les quotas NoSQL.",
+    "page_7_layout": "Tableaux Entreprises et Perso affichés DIRECTEMENT tout en haut de la page (sans onglets). Graphiques des taux affichés tout en bas."
+  },
+  "file_mapping": {
+    "utils.py": "Contient BASE_URL, API_KEY et l'instance db de Firebase",
+    "crons/cron_update_api.py": "Script d'extraction lourd avec paramètre exclure_players",
+    "crons/cron_update_taux.py": "Script léger des taux promoteur utilisant les headers",
+    "run_cron_global.py": "Lanceur GitHub pour la synchro de 3h30",
+    "run_cron_taux.py": "Lanceur GitHub pour la synchro 4H",
+    "pages/7_synthese_opportunites.py": "Page Opportunités du jour (Biens en promo)"
+  }
+}
