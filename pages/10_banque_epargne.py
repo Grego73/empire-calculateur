@@ -1,101 +1,177 @@
 import streamlit as st
 import pandas as pd
-from utils import formater_monnaie_empire, convertir_saisie_en_nombre
+from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNAIRE_PALIERS
 
 # Configuration de la page
-st.set_page_config(page_title="Banque & Épargne - Empire", layout="wide")
+st.set_page_config(page_title="Banque Fédérale - Monde 8", layout="wide")
 
-st.title("🏛️ Simulateur d'Épargne & Échelle Temporelle Monde 8")
-st.info("🕒 Règle temporelle : **1 jour réel = 1 mois de jeu**. Un livret complet (12 mois de jeu) dure donc **12 jours réels**.")
+st.title("🏛️ Système Bancaire Central — Monde 8")
+st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet de livret/épargne (12 mois de jeu) dure **12 jours réels**.")
 
-# --- SECTION DES ENTREES (INPUTS) ---
-col_input1, col_input2 = st.columns(2)
+# =========================================================================
+# 📊 ARCHITECTURE DES GRILLES TARIFAIRES OFFICIELLES (ENTIERS TRÈS GRANDS)
+# =========================================================================
 
-with col_input1:
-    saisie_somme = st.text_input("Somme à épargner (Ex: 1.74Y, 500G, 10T) :", value="1.74 Y")
-    capital_brut = convertir_saisie_en_nombre(saisie_somme)
-    st.caption(f"💰 Somme interprétée : **{formater_monnaie_empire(capital_brut)} Ø**")
+# Ajustement exact des plafonds selon tes données (6R et 4R)
+PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)  # 6 000 000 000 000 000 000 000 000 000 Ø
+PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)   # 4 000 000 000 000 000 000 000 000 000 Ø
 
-with col_input2:
-    # Le taux affiché en jeu est pour le terme (12 mois de jeu = 12 jours réels)
-    taux_terme = st.number_input("Taux d'intérêt au terme du livret (12 mois de jeu / 12j réels) (%) :", min_value=0.0, max_value=500.0, value=100.0, step=5.0)
-    st.caption(f"📈 Taux configuré : **{taux_terme:.2f}% à l'échéance du livret**")
+# Grille de l'épargne (Livrets I & Comptes Épargnes)
+GRILLE_EPARGNE = [
+    {"seuil": 0, "taux": 100.0},
+    {"seuil": 300_000_010 * 10**18, "taux": 80.0},        # 300_000_010 E
+    {"seuil": 600_000_010 * 10**18, "taux": 60.0},        # 600_000_010 E
+    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},      # 2_000_000_100 E
+    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},      # 5_000_000_100 E
+    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},     # 10_000_001_000 E
+    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}       # 15_000_001_000 E
+]
+
+# Grille des emprunts
+GRILLE_EMPRUNTS = [
+    {"seuil": 0, "taux": 2.0},
+    {"seuil": 5_000_000_100 * 10**18, "taux": 10.0},
+    {"seuil": 6_000_000_100 * 10**18, "taux": 20.0},
+    {"seuil": 10_000_001_000 * 10**18, "taux": 35.0},
+    {"seuil": 15_000_001_000 * 10**18, "taux": 60.0},
+    {"seuil": 20_000_001_000 * 10**18, "taux": 80.0},
+    {"seuil": 30_000_001_000 * 10**18, "taux": 100.0}
+]
+
+def determiner_taux(capital, grille):
+    taux_trouve = grille[0]["taux"]
+    for tranche in grille:
+        if capital >= tranche["seuil"]:
+            taux_trouve = tranche["taux"]
+    return taux_trouve
+
+# =========================================================================
+# 📥 MODULE DE CONFIGURATION DU CAPITAL
+# =========================================================================
+
+saisie_somme = st.text_input("Capital total déposé ou emprunté à la banque (Ex: 1.74Y, 16.61Y, 500G, 4R) :", value="1.74 Y")
+capital_brut = convertir_saisie_en_nombre(saisie_somme)
+
+st.caption(f"💰 Volume financier analysé : **{formater_monnaie_empire(capital_brut)} Ø**")
 
 st.markdown("---")
 
 if capital_brut <= 0:
-    st.warning("⚠️ Veuillez saisir une somme supérieure à 0 pour lancer la simulation bancaire.")
+    st.warning("⚠️ Veuillez entrer une somme valide pour analyser la grille des taux.")
 else:
-    # --- CALCULS FINANCIERS BASÉS SUR L'ÉCHELLE DU JEU ---
-    # Taux pour 1 mois de jeu (donc 1 jour réel)
-    taux_decimal_terme = taux_terme / 100.0
-    taux_journalier_reel = taux_decimal_terme / 12.0  # 12 mois de jeu = 12 jours réels
-    
-    # 🎯 1. Cas Linéaire (Sans y toucher pendant les 12 mois de jeu / 12 jours réels)
-    interets_terme_lineaire = int(capital_brut * taux_decimal_terme)
-    capital_final_lineaire = capital_brut + interets_terme_lineaire
-    
-    # 🔄 2. Cas Composé Quotidien (Retrait et replacement chaque jour réel / chaque mois de jeu)
-    # Formule : Capital * (1 + taux_mensuel_jeu)^(12 mois)
-    facteur_compose = (1.0 + taux_journalier_reel) ** 12
-    capital_final_compose = int(capital_brut * facteur_compose)
-    interets_terme_compose = capital_final_compose - capital_brut
+    taux_epargne_auto = determiner_taux(capital_brut, GRILLE_EPARGNE)
+    taux_emprunt_auto = determiner_taux(capital_brut, GRILLE_EMPRUNTS)
 
-    # Gains instantanés par paliers temporels réels
-    gain_par_jour_reel = int(capital_brut * taux_journalier_reel)
+    # --- AFFICHAGE DES RÉSULTATS PAR PRODUIT ---
+    tab_compte, tab_livret_i, tab_emprunt = st.tabs([
+        "📈 1. Compte Épargne (Plafond 4 R)", 
+        "🔒 2. Livret I (Plafond 6 R)", 
+        "🏦 3. Crédits (Emprunts)"
+    ])
 
-    # --- AFFICHAGE DES INDICATEURS CLÉS (KPIs) ---
-    st.subheader("📊 Rendement Immédiat (Prorata Temporis)")
-    m1, m2 = st.columns(2)
-    with m1:
-        st.metric(label="⚡ Gain par Jour Réel (1 mois de jeu)", value=f"{formater_monnaie_empire(gain_par_jour_reel)} Ø")
-        st.caption("Intérêts crédités toutes les 24 heures réelles")
-    with m2:
-        st.metric(label="🏆 Gain au Terme Réel (12 jours réels / 12 mois de jeu)", value=f"{formater_monnaie_empire(interets_terme_lineaire)} Ø")
-        st.caption("Intérêts totaux à échéance fixe sans cassage")
-
-    st.markdown("---")
-
-    # --- TABLEAU COMPARATIF STRATÉGIQUE ---
-    st.subheader("⚖️ Matrice Comparative au Terme (Échéance de 12 Jours Réels)")
-    
-    donnees_comparatives = [
-        {
-            "Stratégie d'Épargne": "🎯 1. Blocage complet (12 jours réels)",
-            "Capital Initial": formater_monnaie_empire(capital_brut),
-            "Intérêts Générés": formater_monnaie_empire(interets_terme_lineaire),
-            "Trésorerie à J+12 Réels": formater_monnaie_empire(capital_final_lineaire),
-            "Multiplicateur": f"x {(capital_final_lineaire / capital_brut):.2f}" if capital_brut > 0 else "x 0"
-        },
-        {
-            "Stratégie d'Épargne": "🔄 2. Retrait/Replacement chaque jour réel (Intérêts Composés)",
-            "Capital Initial": formater_monnaie_empire(capital_brut),
-            "Intérêts Générés": formater_monnaie_empire(interets_terme_compose),
-            "Trésorerie à J+12 Réels": formater_monnaie_empire(capital_final_compose),
-            "Multiplicateur": f"x {(capital_final_compose / capital_brut):.2f}" if capital_brut > 0 else "x 0"
-        }
-    ]
-    
-    df_comparatif = pd.DataFrame(donnees_comparatives)
-    st.dataframe(df_comparatif, use_container_width=True, hide_index=True)
-
-    # --- GRAPHISME VISUEL SUR LES 12 JOURS REELS ---
-    st.markdown("### 📈 Trajectoire de croissance sur un cycle de Livret (12 Jours Réels)")
-    
-    points_courbe = []
-    for jour_reel in range(0, 13):
-        # Évolution Linéaire au prorata des jours réels
-        val_lineaire = capital_brut + int(capital_brut * (taux_decimal_terme * (jour_reel / 12.0)))
-        # Évolution Composée à chaque jour réel
-        val_composee = int(capital_brut * ((1.0 + taux_journalier_reel) ** jour_reel))
+    # ---------------------------------------------------------------------
+    # 📈 ONGLET COMPTE ÉPARGNE DYNAMIQUE (MIS À JOUR SELON CAPTURE)
+    # ---------------------------------------------------------------------
+    with tab_compte:
+        st.subheader("📦 Configuration du Nouveau Compte Épargne")
         
-        points_courbe.append({
-            "Jour Réel (Mois Jeu)": f"J+{jour_reel} (Mois {jour_reel})",
-            "Tri_Index": jour_reel,
-            "Option Simple (Bloqué)": float(val_lineaire),
-            "Option Composée (Quotidien)": float(val_composee)
-        })
+        # Sélecteur de durée conforme à ta capture d'écran
+        choix_duree_jeu = st.selectbox(
+            "Sélectionnez la durée de blocage souhaitée :",
+            options=[6, 8, 12, 18, 24, 36, 48],
+            format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)",
+            index=2 # Positionné par défaut sur 12 mois
+        )
         
-    df_graphique = pd.DataFrame(points_courbe).sort_values(by="Tri_Index").set_index("Jour Réel (Mois Jeu)").drop(columns=["Tri_Index"])
-    st.line_chart(df_graphique, use_container_width=True)
-    st.caption("💡 Astuce : En cassant et replaçant votre argent à chaque mise à jour quotidienne (24h réelles), votre courbe de richesse suit la trajectoire verte exponentielle.")
+        dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
+        if capital_brut > PLAFOND_EPARGNE:
+            st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
+        else:
+            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø**")
+
+        st.write(f"Taux d'intérêt de base (annuel) : **{taux_epargne_auto:.2f}%**")
+        
+        taux_decimal = taux_epargne_auto / 100.0
+        taux_mensuel_jeu = taux_decimal / 12.0  # Taux pour 1 jour réel
+        
+        # --- CALCULS ADAPTÉS À LA DURÉE SÉLECTIONNÉE ---
+        # Gain en mode bloqué classique au prorata de la durée
+        interets_terme = int(capital_brut * (taux_mensuel_jeu * choix_duree_jeu))
+        capital_final_lineaire = capital_brut + interets_terme
+        
+        # Gain en mode intérêt composé (si tu retires et remets chaque jour réel)
+        facteur_compose = (1.0 + taux_mensuel_jeu) ** choix_duree_jeu
+        capital_final_compose = int(capital_brut * facteur_compose)
+        interets_compose = capital_final_compose - capital_brut
+
+        m1, m2 = st.columns(2)
+        with m1: 
+            st.metric(label=f"⚡ Intérêts au terme ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
+        with m2: 
+            st.metric(label="🔄 Gain si Pivot Quotidien (Intérêts Composés)", value=f"{formater_monnaie_empire(interets_compose)} Ø")
+
+        st.markdown("##### 📈 Courbe d'évolution du capital sur la période")
+        points_c = []
+        for j in range(0, choix_duree_jeu + 1):
+            points_c.append({
+                "Jour Réel": f"J+{j}",
+                "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_mensuel_jeu * j))),
+                "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_mensuel_jeu) ** j)))
+            })
+        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel"), use_container_width=True)
+
+    # ---------------------------------------------------------------------
+    # 🔒 ONGLET LIVRET I
+    # ---------------------------------------------------------------------
+    with tab_livret_i:
+        st.subheader("🏛️ Situation de vos Livrets I")
+        
+        dispo_livret = max(0, PLAFOND_LIVRET_I - capital_brut)
+        if capital_brut > PLAFOND_LIVRET_I:
+            st.error(f"🛑 Plafond de 6 R dépassé ! Tout retrait est définitif : le jeu bloquera toute réouverture. Limite : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
+        else:
+            st.success(f"✅ Statut conforme. Capacité de dépôt restante : **{formater_monnaie_empire(dispo_livret)} Ø** sur le maximum de {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
+        
+        st.write(f"Taux théorique sur cette tranche : **{taux_epargne_auto:.2f}%**")
+        
+        points_c = []
+        for j in range(0, 13):
+            points_c.append({
+                "Jour Réel": f"J+{j}",
+                "Option Bloquée": float(capital_brut + int(capital_brut * (taux_decimal * (j / 12.0)))),
+                "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
+            })
+        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel"), use_container_width=True)
+
+    # ---------------------------------------------------------------------
+    # 🏦 ONGLET EMPRUNTS
+    # ---------------------------------------------------------------------
+    with tab_emprunt:
+        st.subheader("📉 Coût de l'Endettement & Emprunts")
+        st.write(f"Taux d'intérêt de l'emprunt pour cette tranche : **{taux_emprunt_auto:.2f}%**")
+        
+        cout_total_credit = int(capital_brut * (taux_emprunt_auto / 100.0))
+        remboursement_total = capital_brut + cout_total_credit
+        mensualite_jeu = int(remboursement_total / 12)
+
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric(label="💸 Coût Brut du Crédit", value=f"{formater_monnaie_empire(cout_total_credit)} Ø", delta="Intérêts Banques", delta_color="inverse")
+        with c2: st.metric(label="🏛️ Somme Totale à Rendre", value=f"{formater_monnaie_empire(remboursement_total)}")
+        with c3: st.metric(label="📅 Échéance par Jour Réel", value=f"{formater_monnaie_empire(mensualite_jeu)}")
+
+# =========================================================================
+# 🏛️ AFFICHAGE GLOBAL DES BAREMES BANCAIRES DU MONDE 8
+# =========================================================================
+st.markdown("---")
+st.subheader("📜 Grilles de Référence du Serveur")
+
+col_t1, col_t2 = st.columns(2)
+with col_t1:
+    st.markdown("**Tranches Épargne (Livrets & Comptes)**")
+    df_ge = pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Accordé": f"{t['taux']:.1f}%"} for t in GRILLE_EPARGNE])
+    st.dataframe(df_ge, use_container_width=True, hide_index=True)
+
+with col_t2:
+    st.markdown("**Tranches Emprunts (Crédits)**")
+    df_gc = pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Facturé": f"{t['taux']:.1f}%"} for t in GRILLE_EMPRUNTS])
+    st.dataframe(df_gc, use_container_width=True, hide_index=True)
