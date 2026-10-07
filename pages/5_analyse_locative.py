@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre, recuperer_derniere_donnee_table
-LIMITE_MAX_BIENS = 500000000
+
 st.set_page_config(page_title="Analyse Locative - Monde 8", layout="wide")
 
 st.title("📊 Analyse Locative & Rendements Avancés")
@@ -29,15 +29,17 @@ else:
         (df_batiments["valeur"] > 0)
     ].copy()
 
-    # --- CALCULS COMPTABLES AVANCÉS ---
+    # =========================================================================
+    # 🧮 MOTEUR DE CALCUL STRATÉGIQUE (COMPATIBLE TRÈS GRANDS NOMBRES & PLAFOND)
+    # =========================================================================
+    
+    # 1. Calcul du rendement net pour 1 seul bâtiment
     df_biens["rev_net_mensuel"] = df_biens["loyer"] - df_biens["charge"] - df_biens["impot"]
     df_biens["rev_net_annuel"] = df_biens["rev_net_mensuel"] * 12
     df_biens["Rendement Net (%)"] = (df_biens["rev_net_annuel"] / df_biens["valeur"] * 100).fillna(0)
-    
-    # Temps de retour sur investissement (Payback Period) en années
     df_biens["ROI_Annees"] = (df_biens["valeur"] / df_biens["rev_net_annuel"]).fillna(float('inf'))
 
-    # --- SECTION DRIVERS / INPUTS ---
+    # 2. Paramètres de la barre latérale (Sidebar)
     with st.sidebar:
         st.header("⚙️ Paramètres du Budget")
         saisie_capital = st.text_input("Budget disponible (€) :", value="10 G")
@@ -47,15 +49,39 @@ else:
         st.header("🎯 Filtres de performance")
         rendement_min = st.slider("Rendement Net Minimum (%)", 0.0, 30.0, 5.0, 0.5)
 
-    df_biens["Quantité Max Achetée"] = df_biens["valeur"].apply(
-        lambda v: min(LIMITE_MAX_BIENS, int(capital_disponible) // int(v)) if int(v) > 0 else 0
-    )
-    df_biens["Gain Mensuel Cumulé"] = df_biens.apply(
-        lambda row: int(row["rev_net_mensuel"]) * int(row["Quantité Max Achetée"]), axis=1
-    )
+    # 3. Calcul de la Quantité Max avec la limite stricte de 500 000 000 de biens
+    PLAFOND_JEU = 500_000_000
+    
+    # Explication : Pour chaque ligne, on transforme les chiffres en entiers standards Python (int)
+    # pour éviter les plantages (overflows) liés aux budgets gigantesques (R, Q, D...)
+    quantites_achetables = []
+    gains_mensuels_cumules = []
 
-    # Filtrage dynamique
+    for _, ligne in df_biens.iterrows():
+        prix_unitaire = int(ligne["valeur"])
+        loyer_net_unitaire = int(ligne["rev_net_mensuel"])
+        
+        # Combien on peut en acheter au maximum avec notre budget ?
+        if prix_unitaire > 0:
+            quantite_theorique = int(capital_disponible) // prix_unitaire
+            # Application de la règle du jeu : max 500 millions
+            quantite_finale = min(PLAFOND_JEU, quantite_theorique)
+        else:
+            quantite_finale = 0
+            
+        # Combien ces biens achetés nous rapportent au total par mois ?
+        gain_cumule = loyer_net_unitaire * quantite_finale
+        
+        quantites_achetables.append(quantite_finale)
+        gains_mensuels_cumules.append(gain_cumule)
+
+    # Injection des deux colonnes propres dans notre tableau de données
+    df_biens["Quantité Max Achetée"] = quantites_achetables
+    df_biens["Gain Mensuel Cumulé"] = gains_mensuels_cumules
+
+    # Filtrage selon le rendement minimum choisi dans la sidebar
     df_filtre = df_biens[df_biens["Rendement Net (%)"] >= rendement_min].copy()
+
 
     # --- METRICS EN HAUT DE PAGE (KPIs) ---
     if not df_filtre.empty:
