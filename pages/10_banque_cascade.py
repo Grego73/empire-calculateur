@@ -100,16 +100,42 @@ if capital_brut > 0:
             }
         )
 
-        # Analyse d'impact (Bascule à 10 000)
-        unite_y, unite_r = 10**24, 10**27
-        val_en_y = float(total_interets_optimises) / unite_y
-        div = unite_y if val_en_y < 10000.0 else unite_r
-        lettre = "Y" if val_en_y < 10000.0 else "R"
+        # 🧮 CALCUL ANALYSE D'IMPACT (BRUT VS COMPOSÉ ET CASCADE)
+        taux_base_brut = determiner_taux(min(capital_brut, plafond_produit), GRILLE_EPARGNE)
+        interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_base_brut / 100.0))
+        argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
+
+        # Règle universelle de bascule à 10 000 pour toutes les lettres
+        paliers_ordonnes = [
+            ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
+            ("E", 10**18), ("P", 10**15), ("T", 10**12), ("G", 10**9), ("M", 10**6)
+        ]
+        
+        valeur_repere = max(total_interets_optimises, capital_brut)
+        lettre_choisie = "Ø"
+        diviseur_choisi = 1
+        
+        for lettre, valeur_palier in paliers_ordonnes:
+            if valeur_repere >= valeur_palier:
+                if (float(valeur_repere) / valeur_palier) < 10000.0:
+                    lettre_choisie = lettre
+                    diviseur_choisi = valeur_palier
+                    break
+                else:
+                    continue
+
+        txt_optimise = f"{float(total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
         st.markdown("### 📊 Impact Financier (Ajusté)")
-        c1, c2 = st.columns(2)
-        with c1: st.metric("🎯 Total Intérêts Cascade Optimisée", f"{float(total_interets_optimises)/div:,.2f} {lettre} Ø".replace(",", " "))
-        with c2: st.metric("⚡ Intérêts Générés par Jour Réel", f"{float(total_interets_optimises // 12)/div:,.2f} {lettre} Ø".replace(",", " "))
+        c_op1, c_op2, c_op3 = st.columns(3)
+        with c_op1: 
+            st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+        with c_op2: 
+            st.metric("🛑 Gain BRUT (1 dépôt unique / 12m)", txt_brut, f"Taux écrasé à {taux_base_brut}%", delta_color="inverse")
+        with c_op3: 
+            st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice préservé")
 
         # Plan de Tir Journalier (Suivi sur 12 jours)
         st.markdown("---")
