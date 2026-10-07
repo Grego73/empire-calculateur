@@ -37,7 +37,7 @@ else:
 heures_cibles_jeu = [0, 4, 8, 12, 16, 20]
 
 # 3. VALIDATION DU CRÉNEAU HORAIRE
-if force_run or (heure_locale in heures_cibles_jeu and 0 <= minute_locale <= 25):
+if force_run or (heure_locale in heures_cibles_jeu):
     print("🚀 Autorisation accordée. Initialisation du processus de synchronisation...")
     
     # 4. VÉRIFICATION DU SECRET SECURE
