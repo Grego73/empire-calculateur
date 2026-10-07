@@ -22,6 +22,24 @@ seuils_officiels = [
     {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
+# Grille de référence pour le taux global unifié
+GRILLE_EPARGNE = [
+    {"seuil": 0, "taux": 100.0},
+    {"seuil": 300_000_010 * 10**18, "taux": 80.0},
+    {"seuil": 600_000_010 * 10**18, "taux": 60.0},
+    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},
+    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},
+    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},
+    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}
+]
+
+def determiner_taux(capital, grille):
+    taux_trouve = grille[0]["taux"]
+    for tranche in grille:
+        if capital >= tranche["seuil"]:
+            taux_trouve = tranche["taux"]
+    return taux_trouve
+
 saisie_somme = st.text_input("Capital global à fragmenter (Ex: 6R, 4R, 600Y) :", value="6 R", key="somme_cascade")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
 st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**")
@@ -70,7 +88,17 @@ if capital_brut > 0:
             })
             total_interets_optimises += gain_residu
 
-        st.dataframe(pd.DataFrame(repartition_livrets), use_container_width=True, hide_index=True, column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")})
+        st.dataframe(
+            pd.DataFrame(repartition_livrets), 
+            use_container_width=True, 
+            hide_index=True, 
+            column_config={
+                "Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn(
+                    "Valeur Brute (À COPIER EN JEU)",
+                    help="Passez la souris et cliquez sur copier !"
+                )
+            }
+        )
 
         # Analyse d'impact (Bascule à 10 000)
         unite_y, unite_r = 10**24, 10**27
@@ -103,7 +131,7 @@ if capital_brut > 0:
             cap_sim = cap_fin
         st.dataframe(pd.DataFrame(suivi_jours), use_container_width=True, hide_index=True)
 
-        with sub_tab_livret: 
-            generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
-        with sub_tab_compte: 
-            generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
+    with sub_tab_livret: 
+        generer_rendu_cascade(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
+    with sub_tab_compte: 
+        generer_rendu_cascade(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
