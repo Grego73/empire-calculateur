@@ -195,7 +195,6 @@ else:
         st.subheader("🏛️ Situation de vos Livrets I")
         dispo_livret = max(0, PLAFOND_LIVRET_I - capital_brut)
         if capital_brut > PLAFOND_LIVRET_I:
-        if capital_brut > PLAFOND_LIVRET_I:
             st.error(f"🛑 Plafond de 6 R dépassé ! Tout retrait est définitif : le jeu bloquera toute réouverture. Limite : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
         else:
             st.success(f"✅ Statut conforme. Capacité restante : **{formater_monnaie_empire(dispo_livret)} Ø** sur {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
