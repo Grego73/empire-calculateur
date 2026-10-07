@@ -240,103 +240,117 @@ else:
             generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
-    # 📈 2. COMPTE ÉPARGNE (ROULEMENTS COMPLETS — ÉCHELLE : 1 MOIS REEL = 1 JOUR JEU)
+    # 📈 2. COMPTE ÉPARGNE (MOTEUR CONFORME À LA CONSTITUTION D'IMMOSTATE)
     # ---------------------------------------------------------------------
     with tab_compte_brut:
-        st.subheader("📦 Configuration du Nouveau Compte Épargne (Dépôt Progressif)")
-        st.info("🕒 Règle temporelle validée : **1 mois réel = 1 jour de jeu**. Les cycles s'enchaînent à vitesse accélérée.")
+        st.subheader("📦 Configuration du Nouveau Compte Épargne (Règles Officielles)")
+        st.info("🕒 Échelle validée : **1 jour de jeu = 1 mois réel de jeu**. Un cycle de livret annuel correspond à **12 jours de jeu**.")
         
-        # 1. Configuration des montants et injections
+        # 1. Configuration des montants et versements mensuels (injections)
         col_ce1, col_ce2 = st.columns(2)
         with col_ce1:
             choix_duree_jeu = st.selectbox(
-                "Sélectionnez la durée de blocage souhaitée pour votre simulation de base :", 
+                "Sélectionnez la durée de blocage théorique pour votre simulation de base :", 
                 options=[6, 8, 12, 18, 24, 36, 48], 
-                format_func=lambda x: f"{x} mois (jeu) / {x} jours (jeu)", 
+                format_func=lambda x: f"{x} mois de jeu ({x} jours de jeu)", 
                 index=2,
                 key="duree_compte_unique"
             )
         with col_ce2:
             saisie_injection = st.text_input(
-                "Montant à injecter en PLUS à chaque nouveau jour de jeu (Ex: 500M, 1G, 10T) :", 
+                "Versement complémentaire à ajouter à chaque nouveau jour de jeu (Mois Jeu) :", 
                 value="0 Ø",
                 key="injection_compte_unique"
             )
             injection_quotidienne = convertir_saisie_en_nombre(saisie_injection)
             if injection_quotidienne > 0:
-                st.caption(f"➕ Versement programmé : **+{formater_monnaie_empire(injection_quotidienne)} Ø / jour de jeu**")
+                st.caption(f"➕ Versement mensuel programmé : **+{formater_monnaie_empire(injection_quotidienne)} Ø / mois jeu**")
 
-        # Déduction des limites du plafond de l'épargne
+        # Déduction des limites du plafond de l'épargne (4 R)
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
         if capital_brut > PLAFOND_EPARGNE:
             st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
         else:
-            st.success(f"✅ Capacité de dépôt initiale disponible : **{formater_monnaie_empire(dispo_epargne)} Ø** sur {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
+            st.success(f"✅ Capacité d'apport initial restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
 
         st.write(f"Taux d'intérêt de base détecté pour votre tranche (annuel) : **{taux_epargne_auto:.2f}%**")
         
         taux_decimal = taux_epargne_auto / 100.0
-        # Calcul du taux pour 1 seul jour de jeu (1 mois réel)
-        taux_par_jour_jeu = taux_decimal / 12.0
+        taux_mensuel_calcul = taux_decimal / 12.0  # Base mensuelle constitutionnelle (Section 6.6)
         
-        # Calcul linéaire pour la durée de base sélectionnée
-        interets_terme = int(capital_brut * (taux_par_jour_jeu * choix_duree_jeu))
-        st.metric(label=f"🏆 Intérêts générés au terme choisi ({choix_duree_jeu} jours de jeu)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
+        # --- CALCUL CONFORME TABLEAU CONSTITUTION (Section 6.5) ---
+        # Simulation du livret de base choisi pour l'affichage de l'indicateur
+        interets_cumules_base = 0
+        capital_cumule_base = int(capital_brut)
+        for mois in range(1, choix_duree_jeu + 1):
+            # Les intérêts se calculent sur le capital épargné à date
+            interets_cumules_base += int(capital_cumule_base * taux_mensuel_calcul)
+            capital_cumule_base += int(injection_quotidienne)
+            
+        st.metric(label=f"🏆 Intérêts nets générés au terme ({choix_duree_jeu} mois de jeu)", value=f"{formater_monnaie_empire(interets_cumules_base)} Ø")
 
         # ---------------------------------------------------------------------
-        # 📊 SIMULATION DE TOUTES LES DURÉES SUR 48 JOURS DE JEU
+        # 📊 SIMULATION DE TOUTES LES DURÉES SUR L'HORIZON DE 48 JOURS DE JEU
         # ---------------------------------------------------------------------
         st.markdown("---")
-        st.markdown("##### 📈 Courbes de richesse cumulée (Horizon : Horizon maximal de 48 jours de jeu)")
-        st.caption("Le graphique retrace l'accumulation réelle de vos versements quotidiens capitalisés à chaque échéance de livret.")
+        st.markdown("##### 📈 Courbes comparatives des stratégies de roulement (Horizon 48 jours de jeu)")
+        st.caption("Ce graphique simule l'accumulation exacte de vos versements mensuels et de vos intérêts selon les règles de la charte bancaire.")
 
         durées_officielles = [6, 8, 12, 18, 24, 36, 48]
         points_strategies = []
 
-        # Tableaux de suivi pour chaque stratégie sur la chronologie du jeu
-        historique_capital = {d: int(capital_brut) for d in durées_officielles}
-        base_cycle_capital = {d: int(capital_brut) for d in durées_officielles}
+        # Tableaux de suivi pour chaque stratégie sur la chronologie du jeu (0 à 48 jours de jeu)
+        solde_total_compte = {d: int(capital_brut) for d in durées_officielles}
+        interets_en_attente_compte = {d: 0 for d in durées_officielles}
+        dernier_terme_valide = {d: 0 for d in durées_officielles}
 
-        # Déroulement de la simulation jour de jeu par jour de jeu (de 0 à 48)
         for j in range(0, 49):
-            donnee_jour = {"Jour de Jeu": j}
+            donnee_jour = {"Jour de Jeu (Mois Jeu)": j}
             
             for d in durées_officielles:
                 if j == 0:
                     donnee_jour[f"Roulement {d} mois"] = float(capital_brut)
                 else:
-                    # Récupération du solde de la veille
-                    cap_courant = historique_capital[d]
+                    # 1. Récupération des états
+                    solde_courant = solde_total_compte[d]
+                    int_attente = interets_en_attente_compte[d]
                     
-                    # Accumulation stricte de ton versement à chaque nouveau jour de jeu
-                    cap_courant += int(injection_quotidienne)
+                    # 2. Ajout de ton versement mensuel de jeu (chaque jour de jeu)
+                    solde_courant += int(injection_quotidienne)
                     
-                    # Application des intérêts de la banque dès qu'un livret arrive à terme
+                    # 3. Calcul de l'intérêt mensuel de ce jour sur le solde réel à date (Section 6.5)
+                    # Les intérêts courent mais ne rejoignent le solde disponible qu'à l'échéance du livret
+                    int_attente += int(solde_courant * taux_mensuel_calcul)
+                    
+                    # 4. RÈGLE DE FIN DE CYCLE : Si on atteint l'échéance du terme
                     if j % d == 0:
-                        interets_gagnes = int(base_cycle_capital[d] * (taux_par_jour_jeu * d))
-                        cap_courant += interets_gagnes
-                        # Ouverture du nouveau livret avec le capital total disponible réinvesti
-                        base_cycle_capital[d] = cap_courant
-                        
-                    historique_capital[d] = cap_courant
-                    donnee_jour[f"Roulement {d} mois"] = float(cap_courant)
+                        # Libération du capital et de l'ensemble des intérêts calculés
+                        solde_courant += int_attente
+                        int_attente = 0  # Remise à zéro du compteur d'attente pour le prochain livret
+                    
+                    # Sauvegarde des états
+                    solde_total_compte[d] = solde_courant
+                    interets_en_attente_compte[d] = int_attente
+                    
+                    # La valeur affichée à l'écran correspond au solde disponible + les intérêts acquis latents
+                    donnee_jour[f"Roulement {d} mois"] = float(solde_courant + int_attente)
             
             points_strategies.append(donnee_jour)
 
         # Affichage du graphique de courbes Streamlit
-        df_strategie_graphique = pd.DataFrame(points_strategies).set_index("Jour de Jeu")
+        df_strategie_graphique = pd.DataFrame(points_strategies).set_index("Jour de Jeu (Mois Jeu)")
         st.line_chart(df_strategie_graphique, use_container_width=True)
         
-        # --- TABLEAU DE SYNTHÈSE ET CLASSEMENT AUTOMATIQUE DES GAINS ---
+        # --- TABLEAU DE SYNTHÈSE DU CLASSEMENT DE RENTABILITÉ ---
         st.markdown("##### 🏆 Bilan et classement des gains nets cumulés au Jour 48 de jeu")
         
         bilan_final = []
-        ligne_finale = df_strategie_graphique.iloc[-1]  # Point à J+48 de jeu
-        total_fonds_propres_investis = int(capital_brut) + (int(injection_quotidienne) * 48)
+        ligne_finale = df_strategie_graphique.iloc[-1]  # Point d'extraction à J+48 de jeu
+        total_apport_perso_investi = int(capital_brut) + (int(injection_quotidienne) * 48)
         
         for col_name in df_strategie_graphique.columns:
             val_finale = int(ligne_finale[col_name])
-            gain_net_pur = val_finale - total_fonds_propres_investis
+            gain_net_pur = val_finale - total_apport_perso_investi
             
             bilan_final.append({
                 "Stratégie de Placement": col_name,
@@ -345,11 +359,11 @@ else:
                 "_tri_valeur": gain_net_pur
             })
             
-        # Tri automatique du plus rentable au moins rentable
+        # Tri automatique du plus rentable au moins rentable selon ta grille
         df_bilan = pd.DataFrame(bilan_final).sort_values(by="_tri_valeur", ascending=False)
         st.dataframe(df_bilan.drop(columns=["_tri_valeur"]), use_container_width=True, hide_index=True)
         
-        st.caption(f"💡 **Note d'analyse** : Total de vos fonds injectés de votre poche (Dépôt initial + 48 versements de jeu) : **{formater_monnaie_empire(total_fonds_propres_investis)} Ø**. Le bénéfice n'affiche que la richesse créée par la banque.")
+        st.caption(f"💡 **Note comptable de l'Empire** : Total de vos fonds injectés (Apport initial + 48 versements) : **{formater_monnaie_empire(total_apport_perso_investi)} Ø**. Le bénéfice intègre uniquement les intérêts bruts générés selon les formules de la Constitution.")
 
     # ---------------------------------------------------------------------
     # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
