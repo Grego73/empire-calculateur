@@ -240,38 +240,6 @@ else:
             generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
-    # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE & SIMULATEUR DE ROULEMENTS À TERME)
-    # ---------------------------------------------------------------------
-    with tab_compte_brut:
-        st.subheader("📦 Configuration du Nouveau Compte Épargne (Dépôt Unique)")
-        
-        # 1. Sélection de la durée pour le calcul de base
-        choix_duree_jeu = st.selectbox(
-            "Sélectionnez la durée de blocage souhaitée pour votre simulation de base :", 
-            options=[6, 8, 12, 18, 24, 36, 48], 
-            format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", 
-            index=2
-        )
-        
-        # Déduction des limites du plafond de l'épargne
-        dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
-        if capital_brut > PLAFOND_EPARGNE:
-            st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
-        else:
-            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
-
-        st.write(f"Taux d'intérêt de base détecté pour votre tranche (annuel) : **{taux_epargne_auto:.2f}%**")
-        
-        taux_decimal = taux_epargne_auto / 100.0
-        taux_journalier = taux_decimal / 12.0  # 1 jour réel = 1 mois de jeu
-        
-        # Calcul linéaire pour la durée de base sélectionnée
-        interets_terme = int(capital_brut * (taux_journalier * choix_duree_jeu))
-        capital_final_lineaire = capital_brut + interets_terme
-
-        st.metric(label=f"🏆 Intérêts générés au terme choisi ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
-
-    # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE, INJECTIONS DAILY & ROULEMENTS À TERME)
     # ---------------------------------------------------------------------
     with tab_compte_brut:
