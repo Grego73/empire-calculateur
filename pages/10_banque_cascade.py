@@ -129,13 +129,33 @@ if capital_brut > 0:
         txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
         st.markdown("### 📊 Impact Financier (Ajusté)")
+        # --- CALCUL DES TAUX DE RENDEMENT RÉELS GLOBAUX ---
+        rendement_reel_cascade = (float(total_interets_optimises) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
+        rendement_reel_brut = (float(interets_gros_bloc) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
+        surplus_rendement = rendement_reel_cascade - rendement_reel_brut
+
+        st.markdown("### 📊 Impact Financier (Ajusté)")
         c_op1, c_op2, c_op3 = st.columns(3)
         with c_op1: 
-            st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+            st.metric(
+                label=f"🎯 Gain OPTIMISÉ {label_produit}", 
+                value=txt_optimise, 
+                delta=f"📈 Rendement : {rendement_reel_cascade:.2f}%"
+            )
         with c_op2: 
-            st.metric("🛑 Gain BRUT (1 dépôt unique / 12m)", txt_brut, f"Taux écrasé à {taux_base_brut}%", delta_color="inverse")
+            st.metric(
+                label="🛑 Gain BRUT (1 dépôt unique / 12m)", 
+                value=txt_brut, 
+                delta=f"📉 Rendement : {rendement_reel_brut:.2f}%", 
+                delta_color="inverse"
+            )
         with c_op3: 
-            st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice préservé")
+            st.metric(
+                label="👑 Surplus Net Sauvé", 
+                value=txt_sauve, 
+                delta=f"🔥 Gain de Taux : +{surplus_rendement:.2f}%"
+            )
+
 
         # --- 🔥 NOUVEAU BLOC : COMPARAISON DES GAINS MOYENS PAR JOUR RÉEL ---
         st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
