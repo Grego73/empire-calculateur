@@ -121,7 +121,7 @@ if capital_brut > 0:
     with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
 
     # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX EMPILÉS SANS DÉFILEMENT (SCROLL)
+    # 📅 PLAN DE TIR JOURNALIER : DEUX TABLEAUX EMPILÉS AVEC LIGNE TOTAL
     # =========================================================================
     st.markdown("---")
     st.subheader("📅 Plan de Tir Journalier : Comparatif du Pivot sur 12 Jours")
@@ -135,12 +135,17 @@ if capital_brut > 0:
 
     suivi_cascade = []
     suivi_unique = []
+    
+    total_interets_cascade_pivot = 0
+    total_interets_unique_pivot = 0
 
     for jour in range(1, 13):
         # 1. Cascade Fractionnée
         cap_dep_cas = capital_courant_cascade
         int_j_cas = int(cap_dep_cas * taux_j_cascade)
         cap_fin_cas = cap_dep_cas + int_j_cas
+        total_interets_cascade_pivot += int_j_cas
+        
         suivi_cascade.append({
             "Jour Réel": f"Jour {jour:02d}",
             "Solde Départ (Ø)": f"{cap_dep_cas:,}".replace(",", " "),
@@ -153,6 +158,8 @@ if capital_brut > 0:
         cap_dep_uni = capital_courant_unique
         int_j_uni = int(cap_dep_uni * taux_j_unique)
         cap_fin_uni = cap_dep_uni + int_j_uni
+        total_interets_unique_pivot += int_j_uni
+        
         suivi_unique.append({
             "Jour Réel": f"Jour {jour:02d}",
             "Solde Départ (Ø)": f"{cap_dep_uni:,}".replace(",", " "),
@@ -161,11 +168,27 @@ if capital_brut > 0:
         })
         capital_courant_unique = cap_fin_uni
 
-    # Affichage vertical (l'un sur l'autre) et forçage de la hauteur à 500px pour dérouler les 12 lignes
+    # 🔥 AJOUT DE LA 13e LIGNE DE TOTAL POUR LA CASCADE
+    suivi_cascade.append({
+        "Jour Réel": "📊 TOTAL CUMULÉ",
+        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
+        "Intérêts (24h) (Ø)": f"∑ + {total_interets_cascade_pivot:,}".replace(",", " "),
+        "Solde Final (Ø)": f"{capital_courant_cascade:,}".replace(",", " ")
+    })
+
+    # 🔥 AJOUT DE LA 13e LIGNE DE TOTAL POUR LE BLOC UNIQUE
+    suivi_unique.append({
+        "Jour Réel": "📊 TOTAL CUMULÉ",
+        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
+        "Intérêts (24h) (Ø)": f"∑ + {total_interets_unique_pivot:,}".replace(",", " "),
+        "Solde Final (Ø)": f"{capital_courant_unique:,}".replace(",", " ")
+    })
+
+    # Affichage vertical (l'un sur l'autre) et forçage de la hauteur à 500px pour dérouler les 13 lignes d'un coup
     st.markdown("#### **🔒 Méthode 1 : Pivot Quotidien en Cascade (Fractionné)**")
-    st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=460)
+    st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=500)
     
-    st.markdown("<br>", unsafe_allow_html=True) # Petit espace
+    st.markdown("<br>", unsafe_allow_html=True) # Petit espace de séparation
     
     st.markdown("#### **🛑 Méthode 2 : Pivot Quotidien Unique (Un seul gros bloc)**")
-    st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=460)
+    st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=500)
