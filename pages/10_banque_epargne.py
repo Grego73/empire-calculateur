@@ -2,27 +2,28 @@ import streamlit as st
 import pandas as pd
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNAIRE_PALIERS
 
-# Configuration de la page
+# 🔒 VERROUILLAGE ABSOLU DE LA MISE EN PAGE LARGE
 st.set_page_config(
     page_title="Banque Fédérale - Monde 8", 
-    layout="wide", # Force l'affichage sur 100% de la largeur de l'écran
-    initial_sidebar_state="expanded" # Garde le menu de gauche bien ouvert
+    layout="wide", 
+    initial_sidebar_state="expanded"
 )
 
 st.title("🏛️ Système Bancaire Central & Cascade Cumulative — Monde 8")
 st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet d'épargne (12 mois de jeu) dure **12 jours réels**.")
-# Force le layout à rester en mode LARGE à 100% de l'écran, sans jamais rétrécir
+
+# Injection CSS corrigée (unsafe_allow_html=True) pour bloquer définitivement le mode LARGE
 st.markdown(
     """
     <style>
         .block-container {
             max-width: 100% !important;
-            padding-left: 5rem !important;
-            padding-right: 5rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
         }
     </style>
     """,
-    unsafe_html=True
+    unsafe_allow_html=True
 )
 
 # =========================================================================
