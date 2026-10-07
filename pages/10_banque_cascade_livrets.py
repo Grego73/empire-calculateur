@@ -121,74 +121,63 @@ if capital_brut > 0:
     with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
 
     # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER : DEUX TABLEAUX EMPILÉS AVEC LIGNE TOTAL
+    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX EN PROGRESSION LINÉAIRE STRICTE
     # =========================================================================
     st.markdown("---")
-    st.subheader("📅 Plan de Tir Journalier : Comparatif du Pivot sur 12 Jours")
-    st.caption("Ces tableaux simulent l'évolution de votre capital jour après jour avec récupération et replacement quotidien des intérêts.")
+    st.subheader("📅 Plan de Tir Journalier : Comparatif des Gains sur 12 Jours")
+    st.caption("Ces tableaux simulent l'évolution linéaire et réelle de votre trésorerie, mois par mois (jour après jour), jusqu'au terme des livrets.")
 
-    capital_courant_cascade = int(capital_base_calcul)
-    taux_j_cascade = float(gain_jour_optimise) / capital_courant_cascade if capital_courant_cascade > 0 else 0.0
-
-    capital_courant_unique = int(capital_base_calcul)
-    taux_j_unique = (taux_base_brut / 100.0) / 12.0
+    # Calcul des gains quotidiens fixes et stricts (Aucun pivot composé)
+    gain_jour_fixe_cascade = total_interets_optimises // 12
+    gain_jour_fixe_unique = interets_gros_bloc // 12
 
     suivi_cascade = []
     suivi_unique = []
-    
-    total_interets_cascade_pivot = 0
-    total_interets_unique_pivot = 0
 
+    # Simulation de l'accumulation passive jour après jour
     for jour in range(1, 13):
-        # 1. Cascade Fractionnée
-        cap_dep_cas = capital_courant_cascade
-        int_j_cas = int(cap_dep_cas * taux_j_cascade)
-        cap_fin_cas = cap_dep_cas + int_j_cas
-        total_interets_cascade_pivot += int_j_cas
+        # 1. Tableau Cascade Fractionnée (Linéaire)
+        solde_dep_cas = capital_base_calcul + (gain_jour_fixe_cascade * (jour - 1))
+        solde_fin_cas = capital_base_calcul + (gain_jour_fixe_cascade * jour)
         
         suivi_cascade.append({
-            "Jour Réel": f"Jour {jour:02d}",
-            "Solde Départ (Ø)": f"{cap_dep_cas:,}".replace(",", " "),
-            "Intérêts (24h) (Ø)": f"+ {int_j_cas:,}".replace(",", " "),
-            "Solde Final (Ø)": f"{cap_fin_cas:,}".replace(",", " ")
+            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
+            "Solde Départ (Ø)": f"{int(solde_dep_cas):,}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {int(gain_jour_fixe_cascade):,}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{int(solde_fin_cas):,}".replace(",", " ")
         })
-        capital_courant_cascade = cap_fin_cas
 
-        # 2. Dépôt Unique Direct
-        cap_dep_uni = capital_courant_unique
-        int_j_uni = int(cap_dep_uni * taux_j_unique)
-        cap_fin_uni = cap_dep_uni + int_j_uni
-        total_interets_unique_pivot += int_j_uni
+        # 2. Tableau Placement Direct Unique (Linéaire)
+        solde_dep_uni = capital_base_calcul + (gain_jour_fixe_unique * (jour - 1))
+        solde_fin_uni = capital_base_calcul + (gain_jour_fixe_unique * jour)
         
         suivi_unique.append({
-            "Jour Réel": f"Jour {jour:02d}",
-            "Solde Départ (Ø)": f"{cap_dep_uni:,}".replace(",", " "),
-            "Intérêts (24h) (Ø)": f"+ {int_j_uni:,}".replace(",", " "),
-            "Solde Final (Ø)": f"{cap_fin_uni:,}".replace(",", " ")
+            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
+            "Solde Départ (Ø)": f"{int(solde_dep_uni):,}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {int(gain_jour_fixe_unique):,}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{int(solde_fin_uni):,}".replace(",", " ")
         })
-        capital_courant_unique = cap_fin_uni
 
-    # 🔥 AJOUT DE LA 13e LIGNE DE TOTAL POUR LA CASCADE
+    # Ajout de la ligne de Total strict en fin de tableau
     suivi_cascade.append({
-        "Jour Réel": "📊 TOTAL CUMULÉ",
+        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts (24h) (Ø)": f"∑ + {total_interets_cascade_pivot:,}".replace(",", " "),
-        "Solde Final (Ø)": f"{capital_courant_cascade:,}".replace(",", " ")
+        "Intérêts acquis (Ø)": f"∑ + {int(total_interets_optimises):,}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + total_interets_optimises):,}".replace(",", " ")
     })
 
-    # 🔥 AJOUT DE LA 13e LIGNE DE TOTAL POUR LE BLOC UNIQUE
     suivi_unique.append({
-        "Jour Réel": "📊 TOTAL CUMULÉ",
+        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts (24h) (Ø)": f"∑ + {total_interets_unique_pivot:,}".replace(",", " "),
-        "Solde Final (Ø)": f"{capital_courant_unique:,}".replace(",", " ")
+        "Intérêts acquis (Ø)": f"∑ + {int(interets_gros_bloc):,}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + interets_gros_bloc):,}".replace(",", " ")
     })
 
-    # Affichage vertical (l'un sur l'autre) et forçage de la hauteur à 500px pour dérouler les 13 lignes d'un coup
-    st.markdown("#### **🔒 Méthode 1 : Pivot Quotidien en Cascade (Fractionné)**")
+    # Affichage empilé verticalement avec hauteur fixe pour dérouler les 13 lignes d'un coup
+    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (Livrets Bloqués à Terme)**")
     st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=500)
     
-    st.markdown("<br>", unsafe_allow_html=True) # Petit espace de séparation
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    st.markdown("#### **🛑 Méthode 2 : Pivot Quotidien Unique (Un seul gros bloc)**")
+    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Un seul gros bloc Bloqué à Terme)**")
     st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=500)
