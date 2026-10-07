@@ -90,7 +90,8 @@ else:
 
         # On parcourt chaque palier pour extraire des blocs optimisés
         for palier in seuils_stricts:
-            montant_parfait_livret = int(palier["limite"]) - 1
+            limite_seuil_brute = int(palier["limite"])
+            montant_parfait_livret = limite_seuil_brute - 1
             taux_palier = palier["taux"]
             
             # Combien de livrets de cette taille peut-on ouvrir ?
@@ -100,18 +101,19 @@ else:
                 for _ in range(nb_livrets):
                     gain_livret = int(montant_parfait_livret * (taux_palier / 100.0))
                     
-                    # 🔥 FORMATAGE FORCÉ EN "E" POUR LE COMPAGNONS DE JEU
-                    val_e = montant_parfait_livret / 10**18
-                    gain_e = gain_livret / 10**18
+                    # FORMATAGE SANS VIRGULE EN COMPTANT EN UNITÉS ENTIÈRES "E"
+                    val_e = limite_seuil_brute // 10**18
+                    gain_e = gain_livret // 10**18
                     
                     repartition_livrets.append({
                         "Type de Bloc": f"Livret optimisé ({palier['nom']})",
-                        "Montant à ouvrir": f"{val_e:,.2f} E".replace(",", " "),
+                        "Montant à ouvrir": f"{val_e:,} E - 1 Ø".replace(",", " "),
                         "Taux Garanti": f"{taux_palier:.1f}%",
-                        "Gain au Terme (12 mois)": f"{gain_e:,.2f} E".replace(",", " ")
+                        "Gain au Terme (12 mois)": f"~ {gain_e:,} E".replace(",", " ")
                     })
                     total_interets_optimises += gain_livret
                     capital_restant -= montant_parfait_livret
+
 
         # Si après avoir fait les gros paquets il reste un reliquat
         if capital_restant > 0:
