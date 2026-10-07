@@ -135,7 +135,8 @@ if capital_brut > 0:
         # --- CALCULS DES RENDEMENTS GLOBAUX ---
         rendement_reel_cascade = (float(total_interets_optimises) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
         rendement_reel_brut = (float(interets_gros_bloc) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
-        surplus_rendement = rendimiento_reel_cascade - rendement_reel_brut
+        surplus_rendement = rendement_reel_cascade - rendement_reel_brut
+
 
         # 1️⃣ LIGNE 1 : LES INTÉRÊTS SUR LE TERME (12 MOIS)
         st.markdown("### 📊 Impact Financier (Ajusté)")
