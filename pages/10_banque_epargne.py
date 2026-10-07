@@ -5,7 +5,7 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNA
 # Configuration de la page
 st.set_page_config(page_title="Banque Fédérale - Monde 8", layout="wide")
 
-st.title("🏛️ Système Bancaire Central — Monde 8")
+st.title("🏛️ Système Bancaire Central & Optimiseur — Monde 8")
 st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet de livret/épargne (12 mois de jeu) dure **12 jours réels**.")
 
 # =========================================================================
@@ -15,7 +15,7 @@ st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle compl
 PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)  # 6 R
 PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)   # 4 R
 
-# Grille de l'épargne (Livrets I & Comptes Épargnes)
+# Grille de référence pour l'affichage et la recherche de taux brut
 GRILLE_EPARGNE = [
     {"seuil": 0, "taux": 100.0},
     {"seuil": 300_000_010 * 10**18, "taux": 80.0},        # 300_000_010 E
@@ -26,7 +26,6 @@ GRILLE_EPARGNE = [
     {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}       # 15_000_001_000 E
 ]
 
-# Grille des emprunts
 GRILLE_EMPRUNTS = [
     {"seuil": 0, "taux": 2.0},
     {"seuil": 5_000_000_100 * 10**18, "taux": 10.0},
@@ -48,11 +47,10 @@ def determiner_taux(capital, grille):
 # 📥 MODULE DE CONFIGURATION DU CAPITAL
 # =========================================================================
 
-saisie_somme = st.text_input("Capital total déposé ou emprunté à la banque (Ex: 1.74Y, 16.61Y, 500G, 4R) :", value="1.74 Y")
+saisie_somme = st.text_input("Capital total à placer ou emprunter (Ex: 6R, 4R, 1.74Y) :", value="6 R")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
 
 st.caption(f"💰 Volume financier analysé : **{formater_monnaie_empire(capital_brut)} Ø**")
-
 st.markdown("---")
 
 if capital_brut <= 0:
@@ -61,39 +59,109 @@ else:
     taux_epargne_auto = determiner_taux(capital_brut, GRILLE_EPARGNE)
     taux_emprunt_auto = determiner_taux(capital_brut, GRILLE_EMPRUNTS)
 
-    # --- AFFICHAGE DES RÉSULTATS PAR PRODUIT ---
-    tab_compte, tab_livret_i, tab_emprunt = st.tabs([
-        "📈 1. Compte Épargne", 
-        "🔒 2. Livret I (Plafond 6 R)", 
-        "🏦 3. Crédits (Emprunts)"
+    # --- TABS DES PRODUITS BANCAIRES ---
+    tab_opti, tab_compte, tab_livret_i, tab_emprunt = st.tabs([
+        "🔥 1. Découpage Optimisé (Cascade)",
+        "📈 2. Compte Épargne (Dépôt Unique)", 
+        "🔒 3. Livret I (Dépôt Unique)", 
+        "🏦 4. Crédits (Emprunts)"
     ])
 
     # ---------------------------------------------------------------------
-    # 📈 ONGLET COMPTE ÉPARGNE
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (STRATÉGIE SEUIL - 1)
+    # ---------------------------------------------------------------------
+    with tab_opti:
+        st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
+        st.info("Cette matrice découpe automatiquement vos fonds pour saturer chaque palier à sa limite maximale (`Seuil - 1 Ø`) afin de préserver les meilleurs taux.")
+        
+        capital_restant = int(capital_brut)
+        repartition_livrets = []
+        total_interets_optimises = 0
+        
+        # Parcours des paliers pour fractionner la somme
+        for idx in range(len(GRILLE_EPARGNE)):
+            if capital_restant <= 0:
+                break
+                
+            # Détermination de la borne supérieure du palier actuel
+            if idx + 1 < len(GRILLE_EPARGNE):
+                limite_haute_palier = GRILLE_EPARGNE[idx + 1]["seuil"]
+                montant_ideal_livret = int(limite_haute_palier) - 1
+            else:
+                montant_ideal_livret = capital_restant
+                
+            taux_palier = GRILLE_EPARGNE[idx]["taux"]
+            
+            # Calcul du nombre de livrets de taille maximale ouvrables
+            nb_livrets = capital_restant // montant_ideal_livret
+            
+            if nb_livrets > 0:
+                for _ in range(nb_livrets):
+                    gain_livret = int(montant_ideal_livret * (taux_palier / 100.0))
+                    repartition_livrets.append({
+                        "Type de Bloc": f"Livret optimisé (Tranche {taux_palier}%)",
+                        "Montant unitaire à ouvrir": montant_ideal_livret,
+                        "Taux Garanti": f"{taux_palier:.1f}%",
+                        "Gain au Terme (12 mois)": gain_livret
+                    })
+                    total_interets_optimises += gain_livret
+                    capital_restant -= montant_ideal_livret
+
+        # Traitement du résidu restant s'il y a lieu
+        if capital_restant > 0:
+            taux_residu = determiner_taux(capital_restant, GRILLE_EPARGNE)
+            gain_residu = int(capital_restant * (taux_residu / 100.0))
+            repartition_livrets.append({
+                "Type de Bloc": "Reliquat final de l'enveloppe",
+                "Montant unitaire à ouvrir": capital_restant,
+                "Taux Garanti": f"{taux_residu:.1f}%",
+                "Gain au Terme (12 mois)": gain_residu
+            })
+            total_interets_optimises += gain_residu
+
+        # Rendu du tableau d'optimisation
+        df_opti_visuel = pd.DataFrame(repartition_livrets)
+        df_opti_visuel["Montant unitaire à ouvrir"] = df_opti_visuel["Montant unitaire à ouvrir"].apply(formater_monnaie_empire)
+        df_opti_visuel["Gain au Terme (12 mois)"] = df_opti_visuel["Gain au Terme (12 mois)"].apply(formater_monnaie_empire)
+        st.dataframe(df_opti_visuel, use_container_width=True, hide_index=True)
+
+        # Calcul comparatif : Gain si tout était mis dans 1 seul gros bloc
+        interets_gros_bloc = int(capital_brut * (taux_epargne_auto / 100.0))
+        argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
+
+        st.markdown("### 📊 Analyse d'Impact Financier")
+        c_op1, c_op2, c_op3 = st.columns(3)
+        with c_op1:
+            st.metric("🎯 Gain OPTIMISÉ Fractionné", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
+        with c_op2:
+            st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
+        with c_op3:
+            st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø", "Bénéfice additionnel préservé")
+
+    # ---------------------------------------------------------------------
+    # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
     # ---------------------------------------------------------------------
     with tab_compte:
         st.subheader("📦 Configuration du Nouveau Compte Épargne")
         
-        # Sélecteur de durée conforme à l'interface du jeu
         choix_duree_jeu = st.selectbox(
             "Sélectionnez la durée de blocage souhaitée :",
             options=[6, 8, 12, 18, 24, 36, 48],
             format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)",
-            index=2  # Par défaut sur 12 mois
+            index=2
         )
         
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
         if capital_brut > PLAFOND_EPARGNE:
             st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
         else:
-            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur le maximum de {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
+            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
 
         st.write(f"Taux d'intérêt de base (annuel) : **{taux_epargne_auto:.2f}%**")
         
         taux_decimal = taux_epargne_auto / 100.0
-        taux_journalier_reel = taux_decimal / 12.0  # 1 jour réel = 1 mois de jeu
+        taux_journalier_reel = taux_decimal / 12.0
         
-        # Calculs selon la durée choisie
         interets_terme = int(capital_brut * (taux_journalier_reel * choix_duree_jeu))
         capital_final_lineaire = capital_brut + interets_terme
         
@@ -105,7 +173,7 @@ else:
         with m1: st.metric(label=f"⚡ Intérêts au terme ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
         with m2: st.metric(label="🔄 Gain si Pivot Quotidien (Intérêts Composés)", value=f"{formater_monnaie_empire(interets_compose)} Ø")
 
-        st.markdown("##### ⚖️ Arbitrage Épargne (Cycle choisi)")
+        st.markdown("##### ⚖ Royautés d'Épargne (Cycle choisi)")
         donnees_comp_ce = [
             {"Méthode": "🎯 Mode Classique (Échéance Fixe)", "Bénéfice Net": formater_monnaie_empire(interets_terme), "Solde Final": formater_monnaie_empire(capital_final_lineaire), "Performance": f"+{(interets_terme/capital_brut*100):.1f}%" if capital_brut > 0 else "0%"},
             {"Méthode": "🔄 Mode Pivot Quotidien (Composé)", "Bénéfice Net": formater_monnaie_empire(interets_compose), "Solde Final": formater_monnaie_empire(capital_final_compose), "Performance": f"+{((capital_final_compose/capital_brut - 1)*100):.1f}%" if capital_brut > 0 else "0%"}
@@ -116,15 +184,14 @@ else:
         points_c = []
         for j in range(0, choix_duree_jeu + 1):
             points_c.append({
-                "Jour Réel (Mois Jeu)": j,  # Utilisation d'un entier pur pour bloquer le tri alphabétique
+                "Jour Réel (Mois Jeu)": j,
                 "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
                 "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
-        
-        df_graphique_ce = pd.DataFrame(points_c).set_index("Jour Réel (Mois Jeu)")
-        st.line_chart(df_graphique_ce, use_container_width=True)
+        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel (Mois Jeu)"), use_container_width=True)
+
     # ---------------------------------------------------------------------
-    # 🔒 ONGLET LIVRET I
+    # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
     # ---------------------------------------------------------------------
     with tab_livret_i:
         st.subheader("🏛️ Situation de vos Livrets I")
@@ -133,14 +200,14 @@ else:
         if capital_brut > PLAFOND_LIVRET_I:
             st.error(f"🛑 Plafond de 6 R dépassé ! Tout retrait est définitif : le jeu bloquera toute réouverture. Limite : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
         else:
-            st.success(f"✅ Statut conforme. Capacité de dépôt restante : **{formater_monnaie_empire(dispo_livret)} Ø** sur le maximum de {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
+            st.success(f"✅ Statut conforme. Capacité restante : **{formater_monnaie_empire(dispo_livret)} Ø** sur {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
         
-        st.write(f"Taux théorique sur cette tranche : **{taux_epargne_auto:.2f}%**")
+        st.write(f"Taux théorique brut (Dépôt unifié) : **{taux_epargne_auto:.2f}%**")
         
         taux_decimal = taux_epargne_auto / 100.0
         taux_journalier_reel = taux_decimal / 12.0
         
-        # Remplacement de la courbe du Livret I
+        # Courbe lissée du Livret I (Axe X en entiers pour bloquer le bug de tri)
         points_l = []
         for j in range(0, 13):
             points_l.append({
@@ -148,12 +215,10 @@ else:
                 "Option Bloquée": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
                 "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
-        
-        df_graphique_l = pd.DataFrame(points_l).set_index("Jour Réel (Mois Jeu)")
-        st.line_chart(df_graphique_l, use_container_width=True)
+        st.line_chart(pd.DataFrame(points_l).set_index("Jour Réel (Mois Jeu)"), use_container_width=True)
 
     # ---------------------------------------------------------------------
-    # 🏦 ONGLET EMPRUNTS
+    # 🏦 4. CRÉDITS (EMPRUNTS)
     # ---------------------------------------------------------------------
     with tab_emprunt:
         st.subheader("📉 Coût de l'Endettement & Emprunts")
@@ -169,7 +234,7 @@ else:
         with c3: st.metric(label="📅 Échéance par Jour Réel", value=f"{formater_monnaie_empire(mensualite_jeu)}")
 
 # =========================================================================
-# 🏛️ AFFICHAGE GLOBAL DES BAREMES BANCAIRES DU MONDE 8
+# 🏛 Royautés & Barèmes de Référence du Serveur
 # =========================================================================
 st.markdown("---")
 st.subheader("📜 Grilles de Référence du Serveur")
