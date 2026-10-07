@@ -47,7 +47,7 @@ else:
         st.header("🎯 Filtres de performance")
         rendement_min = st.slider("Rendement Net Minimum (%)", 0.0, 30.0, 5.0, 0.5)
 
-    df_biens["Quantité Max Achetée"] = capital_disponible // df_biens["valeur"]
+    df_biens["Quantité Max Achetée"] = (float(capital_disponible) // df_biens["valeur"].astype(float)).fillna(0).astype(int)
     df_biens["Gain Mensuel Cumulé"] = df_biens["rev_net_mensuel"] * df_biens["Quantité Max Achetée"]
 
     # Filtrage dynamique
