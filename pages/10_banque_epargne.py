@@ -240,44 +240,96 @@ else:
             generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
-    # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
+    # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE & SIMULATEUR DE ROULEMENTS À TERME)
     # ---------------------------------------------------------------------
     with tab_compte_brut:
-        st.subheader("📦 Configuration du Nouveau Compte Épargne (Unique)")
+        st.subheader("📦 Configuration du Nouveau Compte Épargne (Dépôt Unique)")
+        
+        # 1. Sélection de la durée pour le calcul de base
         choix_duree_jeu = st.selectbox(
-            "Sélectionnez la durée de blocage souhaitée :", 
+            "Sélectionnez la durée de blocage souhaitée pour votre simulation de base :", 
             options=[6, 8, 12, 18, 24, 36, 48], 
             format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", 
             index=2
         )
         
+        # Déduction des limites du plafond de l'épargne
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
         if capital_brut > PLAFOND_EPARGNE:
             st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
         else:
             st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
 
-        taux_decimal = taux_epargne_auto / 100.0
-        taux_journalier_reel = taux_decimal / 12.0
+        st.write(f"Taux d'intérêt de base détecté pour votre tranche (annuel) : **{taux_epargne_auto:.2f}%**")
         
-        interets_terme = int(capital_brut * (taux_journalier_reel * choix_duree_jeu))
+        taux_decimal = taux_epargne_auto / 100.0
+        taux_journalier = taux_decimal / 12.0  # 1 jour réel = 1 mois de jeu
+        
+        # Calcul linéaire pour la durée de base sélectionnée
+        interets_terme = int(capital_brut * (taux_journalier * choix_duree_jeu))
         capital_final_lineaire = capital_brut + interets_terme
-        facteur_compose = (1.0 + taux_journalier_reel) ** choix_duree_jeu
-        capital_final_compose = int(capital_brut * facteur_compose)
-        interets_compose = capital_final_compose - capital_brut
 
-        m1, m2 = st.columns(2)
-        with m1: st.metric(label=f"⚡ Intérêts au terme ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
-        with m2: st.metric(label="🔄 Gain si Pivot Quotidien", value=f"{formater_monnaie_empire(interets_compose)} Ø")
+        st.metric(label=f"🏆 Intérêts générés au terme choisi ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
 
-        points_c = []
-        for j in range(0, choix_duree_jeu + 1):
-            points_c.append({
-                "Jour Réel (Mois Jeu)": j,
-                "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
-                "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
+        # ---------------------------------------------------------------------
+        # 📊 ANALYSE COMPARATIVE DES 7 DURÉES DE ROULEMENT SANS FRAIS DE CASSAGE
+        # ---------------------------------------------------------------------
+        st.markdown("---")
+        st.markdown("##### 📈 Comparatif des 7 durées de roulement à terme (Horizon 48 Jours Réels)")
+        st.caption("⚠️ Ce graphique simule uniquement des livrets menés jusqu'à leur terme légal pour éviter les frais de cassage anticipé.")
+
+        durées_officielles = [6, 8, 12, 18, 24, 36, 48]
+        points_strategies = []
+
+        # Simulation jour par jour sur l'horizon maximal de 48 jours réels
+        for j in range(0, 49):
+            donnee_jour = {"Jour Réel (Mois Jeu)": j}
+            
+            # Référence : Blocage unique direct en 1 fois sur 48 mois (Linéaire)
+            donnee_jour["Bloqué 48m Direct"] = float(capital_brut + int(capital_brut * (taux_journalier * j)))
+            
+            # Génération des trajectoires pour TOUTES les durées officielles menées à terme
+            for duree in durées_officielles:
+                nb_cycles = j // duree
+                reste_jours = j % duree
+                capital_temporaire = capital_brut
+                
+                # On applique la capitalisation (réinvestissement) uniquement aux fins de cycles complets
+                for _ in range(nb_cycles):
+                    capital_temporaire += int(capital_temporaire * (taux_journalier * duree))
+                
+                # Ajout du prorata linéaire en cours pour le cycle incomplet
+                capital_final_roulement = capital_temporaire + int(capital_temporaire * (taux_journalier * reste_jours))
+                
+                donnee_jour[f"Roulement {duree} mois"] = float(capital_final_roulement)
+            
+            points_strategies.append(donnee_jour)
+
+        # Affichage du graphique de courbes Streamlit
+        df_strategie_graphique = pd.DataFrame(points_strategies).set_index("Jour Réel (Mois Jeu)")
+        st.line_chart(df_strategie_graphique, use_container_width=True)
+        
+        # --- TABLEAU DE SYNTHÈSE ET CLASSEMENT AUTOMATIQUE DES GAINS ---
+        st.markdown("##### 🏆 Bilan et classement des gains nets cumulés au Jour 48")
+        
+        bilan_final = []
+        ligne_finale = df_strategie_graphique.iloc[-1]  # Extraction du point exact à J+48
+        
+        for col_name in df_strategie_graphique.columns:
+            val_finale = int(ligne_finale[col_name])
+            gain_net = val_finale - capital_brut
+            
+            bilan_final.append({
+                "Stratégie de Placement": col_name,
+                "Trésorerie Finale (J+48)": formater_monnaie_empire(val_finale) + " Ø",
+                "Bénéfice Net Généré": formater_monnaie_empire(gain_net) + " Ø",
+                "_tri_valeur": gain_net  # Clé technique invisible pour le tri numérique précis
             })
-        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel (Mois Jeu)"), use_container_width=True)
+            
+        # Tri automatique du plus rentable au moins rentable
+        df_bilan = pd.DataFrame(bilan_final).sort_values(by="_tri_valeur", ascending=False)
+        st.dataframe(df_bilan.drop(columns=["_tri_valeur"]), use_container_width=True, hide_index=True)
+        st.caption("💡 **Verdict Comptable** : Le tableau est automatiquement trié du meilleur au moins bon rendement. Tu peux voir d'un coup d'œil si enchaîner les livrets courts est plus rentable sur le Monde 8 que de tout bloquer d'un coup.")
 
     # ---------------------------------------------------------------------
     # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
