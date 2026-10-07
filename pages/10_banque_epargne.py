@@ -160,34 +160,50 @@ else:
             else:
                 st.info("Aucun livret généré.")
             
-            # --- BLOC D'ANALYSE FINANCIÈRE HARMONISÉ (REGLE DES 10 000 Y) ---
+            # --- BLOC D'ANALYSE FINANCIÈRE UNIVERSEL (S'ADAPTE À TOUTES LES LETTRES) ---
             interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
             argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
             st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
             
-            unite_y = 10**24
-            unite_r = 10**27
-            valeur_en_y = float(total_interets_optimises) / unite_y
+            # Liste officielle des paliers de l'Empire pour détecter automatiquement la bonne lettre
+            paliers_ordonnes = [
+                ("Q", 10**30),
+                ("R", 10**27),
+                ("Y", 10**24),
+                ("Z", 10**21),
+                ("E", 10**18),
+                ("P", 10**15),
+                ("T", 10**12),
+                ("G", 10**9),
+                ("M", 10**6)
+            ]
             
-            if valeur_en_y < 10000.0:
-                txt_optimise = f"{valeur_en_y:,.2f} Y Ø".replace(",", " ")
-                txt_brut = f"{(float(interets_gros_bloc) / unite_y):,.2f} Y Ø".replace(",", " ")
-                txt_sauve = f"{(float(argent_sauve) / unite_y):,.2f} Y Ø".replace(",", " ")
-            else:
-                txt_optimise = f"{(float(total_interets_optimises) / unite_r):,.2f} R Ø".replace(",", " ")
-                txt_brut = f"{(float(interets_gros_bloc) / unite_r):,.2f} R Ø".replace(",", " ")
-                txt_sauve = f"{(float(argent_sauve) / unite_r):,.2f} R Ø".replace(",", " ")
+            # Recherche de la lettre idéale basée sur la valeur la plus grande (Capital ou Gain)
+            valeur_repere = max(total_interets_optimises, capital_brut)
+            lettre_choisie = "Ø"
+            diviseur_choisi = 1
+            
+            for lettre, valeur_palier in paliers_ordonnes:
+                if valeur_repere >= valeur_palier:
+                    lettre_choisie = lettre
+                    diviseur_choisi = valeur_palier
+                    break
+            
+            # Formatage propre des trois compteurs avec la lettre détectée
+            txt_optimise = f"{float(total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+            txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+            txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
+            # Affichage des métriques alignées
             c_op1, c_op2, c_op3 = st.columns(3)
-            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
-            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
-            with c_op3: st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
+            with c_op1: 
+                st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+            with c_op2: 
+                st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux équrasé à {taux_epargne_auto}%", delta_color="inverse")
+            with c_op3: 
+                st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
 
-        with sub_tab_livret:
-            generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
-        with sub_tab_compte:
-            generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
