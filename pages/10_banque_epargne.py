@@ -78,7 +78,7 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (AVEC COPIER-COLLER DIRECT)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (VALEUR BRUTE EN PREMIER)
     # ---------------------------------------------------------------------
     with tab_opti:
         st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
@@ -99,12 +99,14 @@ else:
                 for _ in range(nb_livrets):
                     gain_livret = int(montant_parfait_livret * (taux_palier / 100.0))
                     
-                    val_e = limite_seuil_brute // 10**18
                     gain_e = gain_livret // 10**18
+                    
+                    # Séparateur par milliers (espaces) pour la valeur brute lisible
+                    valeur_brute_lisible = f"{montant_parfait_livret:,}".replace(",", " ")
                     
                     repartition_livrets.append({
                         "Type de Bloc": f"Livret optimisé ({palier['nom']})",
-                        "Affichage Empire": f"{val_e:,} E - 1 Ø".replace(",", " "),
+                        "Valeur Brute (Lisible)": valeur_brute_lisible,
                         "Taux Garanti": f"{taux_palier:.1f}%",
                         "Gain au Terme (12 mois)": f"~ {gain_e:,} E".replace(",", " "),
                         "Valeur Brute (À COPIER EN JEU)": str(montant_parfait_livret)
@@ -116,14 +118,14 @@ else:
             taux_residu = determiner_taux(capital_restant, GRILLE_EPARGNE)
             gain_residu = int(capital_restant * (taux_residu / 100.0))
             
-            residu_e = capital_restant / 10**18
-            gain_residu_e = gain_residu / 10**18
+            gain_residu_e = gain_residu // 10**18
+            valeur_residu_lisible = f"{capital_restant:,}".replace(",", " ")
             
             repartition_livrets.append({
                 "Type de Bloc": "Reliquat final de l'enveloppe",
-                "Affichage Empire": f"{residu_e:,.2f} E".replace(",", " "),
+                "Valeur Brute (Lisible)": valeur_residu_lisible,
                 "Taux Garanti": f"{taux_residu:.1f}%",
-                "Gain au Terme (12 mois)": f"{gain_residu_e:,.2f} E".replace(",", " "),
+                "Gain au Terme (12 mois)": f"{gain_residu_e:,} E".replace(",", " "),
                 "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
             })
             total_interets_optimises += gain_residu
@@ -152,6 +154,7 @@ else:
         with c_op1: st.metric("🎯 Gain OPTIMISÉ Fractionné", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
         with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
         with c_op3: st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø")
+
 
     # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
