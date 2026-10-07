@@ -78,7 +78,7 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (SOUS-ONGLETS PRODUITS)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE UNIVERSEL (CORRIGÉ ET SÉCURISÉ)
     # ---------------------------------------------------------------------
     with tab_opti:
         sub_tab_livret, sub_tab_compte = st.tabs(["🔒 Cascade Livrets I (Max 6 R)", "📈 Cascade Comptes Épargnes (Max 4 R)"])
@@ -93,6 +93,7 @@ else:
             total_interets_optimises = 0
             capital_deja_place = 0
             
+            # 1. Calcul du découpage ligne par ligne
             for palier in seuils_officiels:
                 if capital_restant <= 0:
                     break
@@ -100,7 +101,7 @@ else:
                 taux_palier = palier["taux"]
                 seuil_max_strict = int(palier["seuil_max"])
                 
-                # Formule cumulative Grego73 : (Seuil Max - 1) - Déjà placé avant
+                # Formule cumulative : (Seuil Max - 1) - Déjà placé avant
                 montant_parfait_livret = (seuil_max_strict - 1) - capital_deja_place
                 montant_a_placer = min(capital_restant, montant_parfait_livret)
                 
@@ -125,6 +126,7 @@ else:
                     capital_restant -= montant_a_placer
                     capital_deja_place += montant_a_placer
 
+            # Si reliquat massif restant
             if capital_restant > 0:
                 taux_minimum_banque = 2.0
                 gain_terme_residu = int(capital_restant * (taux_minimum_banque / 100.0))
@@ -144,6 +146,7 @@ else:
                 })
                 total_interets_optimises += gain_terme_residu
 
+            # Affichage du tableau de bord
             if repartition_livrets:
                 df_opti_visuel = pd.DataFrame(repartition_livrets)
                 st.dataframe(
@@ -160,50 +163,52 @@ else:
             else:
                 st.info("Aucun livret généré.")
             
-            # --- BLOC D'ANALYSE FINANCIÈRE UNIVERSEL (S'ADAPTE À TOUTES LES LETTRES) ---
-            interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
+            # 2. Calcul autonome du Taux Brut sans dépendance extérieure
+            capital_base_calcul = min(capital_brut, plafond_produit)
+            taux_brut_local = 100.0
+            for tranche in GRILLE_EPARGNE:
+                if capital_base_calcul >= tranche["seuil"]:
+                    taux_brut_local = tranche["taux"]
+            
+            interets_gros_bloc = int(capital_base_calcul * (taux_brut_local / 100.0))
             argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
+            # 3. Moteur d'affichage avec règle de bascule à 10 000 pour toutes les lettres
             st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
             
-            # Liste officielle des paliers de l'Empire pour détecter automatiquement la bonne lettre
             paliers_ordonnes = [
-                ("Q", 10**30),
-                ("R", 10**27),
-                ("Y", 10**24),
-                ("Z", 10**21),
-                ("E", 10**18),
-                ("P", 10**15),
-                ("T", 10**12),
-                ("G", 10**9),
-                ("M", 10**6)
+                ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
+                ("E", 10**18), ("P", 10**15), ("T", 10**12), ("G", 10**9), ("M", 10**6)
             ]
             
-            # Recherche de la lettre idéale basée sur la valeur la plus grande (Capital ou Gain)
             valeur_repere = max(total_interets_optimises, capital_brut)
             lettre_choisie = "Ø"
             diviseur_choisi = 1
             
             for lettre, valeur_palier in paliers_ordonnes:
                 if valeur_repere >= valeur_palier:
-                    lettre_choisie = lettre
-                    diviseur_choisi = valeur_palier
-                    break
-            
-            # Formatage propre des trois compteurs avec la lettre détectée
+                    # RÈGLE DE BASCULE À 10 000 : On vérifie si la valeur dans cette unité reste < 10 000
+                    if (float(valeur_repere) / valeur_palier) < 10000.0:
+                        lettre_choisie = lettre
+                        diviseur_choisi = valeur_palier
+                        break
+                    else:
+                        # Si ça dépasse 10 000, on laissera la boucle chercher l'unité supérieure suivante
+                        continue
+
             txt_optimise = f"{float(total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
             txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
             txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
-            # Affichage des métriques alignées
             c_op1, c_op2, c_op3 = st.columns(3)
-            with c_op1: 
-                st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
-            with c_op2: 
-                st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux équrasé à {taux_epargne_auto}%", delta_color="inverse")
-            with c_op3: 
-                st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
+            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_brut_local}%", delta_color="inverse")
+            with c_op3: st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
 
+        with sub_tab_livret:
+            generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
+        with sub_tab_compte:
+            generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
