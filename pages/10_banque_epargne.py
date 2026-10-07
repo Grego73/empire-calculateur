@@ -116,12 +116,13 @@ else:
         points_c = []
         for j in range(0, choix_duree_jeu + 1):
             points_c.append({
-                "Jour Réel": f"J+{j}",
+                "Jour Réel (Mois Jeu)": j,  # Utilisation d'un entier pur pour bloquer le tri alphabétique
                 "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
                 "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
-        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel"), use_container_width=True)
-
+        
+        df_graphique_ce = pd.DataFrame(points_c).set_index("Jour Réel (Mois Jeu)")
+        st.line_chart(df_graphique_ce, use_container_width=True)
     # ---------------------------------------------------------------------
     # 🔒 ONGLET LIVRET I
     # ---------------------------------------------------------------------
@@ -139,14 +140,17 @@ else:
         taux_decimal = taux_epargne_auto / 100.0
         taux_journalier_reel = taux_decimal / 12.0
         
+        # Remplacement de la courbe du Livret I
         points_l = []
         for j in range(0, 13):
             points_l.append({
-                "Jour Réel": f"J+{j}",
+                "Jour Réel (Mois Jeu)": j,
                 "Option Bloquée": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
                 "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
-        st.line_chart(pd.DataFrame(points_l).set_index("Jour Réel"), use_container_width=True)
+        
+        df_graphique_l = pd.DataFrame(points_l).set_index("Jour Réel (Mois Jeu)")
+        st.line_chart(df_graphique_l, use_container_width=True)
 
     # ---------------------------------------------------------------------
     # 🏦 ONGLET EMPRUNTS
