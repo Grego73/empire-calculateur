@@ -21,12 +21,30 @@ seuils_officiels = [
     {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
+# Grille de référence officielle pour l'écrasement du bloc unique direct
+GRILLE_EPARGNE = [
+    {"seuil": 0, "taux": 100.0},
+    {"seuil": 300_000_010 * 10**18, "taux": 80.0},
+    {"seuil": 600_000_010 * 10**18, "taux": 60.0},
+    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},
+    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},
+    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},
+    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}
+]
+
+def determiner_taux(capital, grille):
+    taux_trouve = grille[0]["taux"]
+    for tranche in grille:
+        if capital >= tranche["seuil"]:
+            taux_trouve = tranche["taux"]
+    return taux_trouve
+
 saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
 st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**")
 
 if capital_brut > 0:
-    capital_restant = min(int(capital_brut), int(PLAFOND_LIVRET_I))
+    capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
     if int(capital_brut) > int(PLAFOND_LIVRET_I):
         st.error(f"🛑 Enveloppe bridée au plafond maximum légal des livrets : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
     
@@ -36,10 +54,10 @@ if capital_brut > 0:
     
     # 🎯 Calcul de la Cascade Cumulative
     for palier in seuils_officiels:
-        if capital_restant <= 0:
+        if capital_base_calcul <= capital_deja_place:
             break
         montant_parfait = (int(palier["seuil_max"]) - 1) - capital_deja_place
-        montant_a_placer = min(capital_restant, montant_parfait)
+        montant_a_placer = min(capital_base_calcul - capital_deja_place, montant_parfait)
         
         if montant_a_placer > 0:
             gain_terme = int(montant_a_placer * (palier["taux"] / 100.0))
@@ -54,19 +72,19 @@ if capital_brut > 0:
                 "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
             })
             total_interets_paliers_de_base += gain_terme
-            capital_restant -= montant_a_placer
             capital_deja_place += montant_a_placer
 
-    if capital_restant > 0:
-        gain_residu = int(capital_restant * 0.02)
+    capital_restant_exc = capital_base_calcul - capital_deja_place
+    if capital_restant_exc > 0:
+        gain_residu = int(capital_restant_exc * 0.02)
         gain_journalier_residu = gain_residu // 12
         repartition_livrets.append({
             "Type de Bloc": "Excédent (Tranche minimale 2.0%)",
-            "Valeur Brute (Lisible)": f"{capital_restant:,}".replace(",", " "),
+            "Valeur Brute (Lisible)": f"{capital_restant_exc:,}".replace(",", " "),
             "Taux Garanti": "2.0%",
             "Gain / Jour Réel": f"{gain_journalier_residu:,} Ø",
             "Gain au Terme (12 mois)": f"{gain_residu:,} Ø",
-            "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
+            "Valeur Brute (À COPIER EN JEU)": str(capital_restant_exc)
         })
         total_interets_paliers_de_base += gain_residu
 
@@ -75,8 +93,10 @@ if capital_brut > 0:
     # =========================================================================
     # 🧮 CALCUL DES DEUX STRATÉGIES (MÉTHODE 1 PIVOTÉE VS MÉTHODE 2 BLOQUÉE)
     # =========================================================================
-    capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
-    gain_jour_fixe_lineaire = total_interets_paliers_de_base // 12
+    taux_base_brut = determiner_taux(capital_base_calcul, GRILLE_EPARGNE)
+    interets_gros_bloc = total_interets_paliers_de_base # La méthode 2 sature comme la 1 au niveau des paliers
+    
+    gain_jour_fixe_lineaire = interets_gros_bloc // 12
     taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
 
     suivi_cascade_pivot = []
@@ -94,9 +114,9 @@ if capital_brut > 0:
         
         suivi_cascade_pivot.append({
             "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{cap_dep_cas:,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int_j_cas:,}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{cap_fin_cas:,}".replace(",", " ")
+            "Solde Départ": cap_dep_cas,
+            "Intérêts acquis": int_j_cas,
+            "Solde Cumulé": cap_fin_cas
         })
         capital_courant_cascade = cap_fin_cas
 
@@ -106,29 +126,15 @@ if capital_brut > 0:
         
         suivi_unique_bloque.append({
             "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{int(solde_dep_uni):,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int(gain_jour_fixe_lineaire):,}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{int(solde_fin_uni):,}".replace(",", " ")
+            "Solde Départ": solde_dep_uni,
+            "Intérêts acquis": gain_jour_fixe_lineaire,
+            "Solde Cumulé": solde_fin_uni
         })
 
-    # Lignes de Totaux
-    suivi_cascade_pivot.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
-        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {int(total_interets_cascade_compose):,}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + total_interets_cascade_compose):,}".replace(",", " ")
-    })
-    suivi_unique_bloque.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
-        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {int(total_interets_paliers_de_base):,}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + total_interets_paliers_de_base):,}".replace(",", " ")
-    })
-
     # =========================================================================
-    # 📊 BLOC COMPTABLE DE L'IMPACT FINANCIER (RÈGLE BASCULE DE 10 À 9999)
+    # 📊 BLOC COMPTABLE DE L'IMPACT FINANCIER (RÈGLE BASCULE À 10 000.00)
     # =========================================================================
-    argent_sauve = max(0, total_interets_cascade_compose - total_interets_paliers_de_base)
+    argent_sauve = max(0, total_interets_cascade_compose - interets_gros_bloc)
 
     paliers_ordonnes = [
         ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
@@ -139,7 +145,6 @@ if capital_brut > 0:
     lettre_choisie = "Ø"
     diviseur_choisi = 1
     
-    # 🔥 APPLICATION DE TA RÈGLE : On parcourt pour trouver la lettre où la valeur est d'au moins 10.00
     for lettre, valeur_palier in paliers_ordonnes:
         if valeur_repere >= valeur_palier:
             valeur_exprimee = float(valeur_repere) / valeur_palier
@@ -147,100 +152,74 @@ if capital_brut > 0:
                 lettre_choisie = lettre
                 diviseur_choisi = valeur_palier
                 break
-            else:
-                continue
 
     txt_optimise = f"{float(total_interets_cascade_compose) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
-    txt_brut = f"{float(total_interets_paliers_de_base) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+    txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
     txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
     st.markdown("### 📊 Impact Financier (Ajusté)")
     rendement_reel_cascade = (float(total_interets_cascade_compose) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
-    rendement_reel_brut = (float(total_interets_paliers_de_base) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
+    rendement_reel_brut = (float(interets_gros_bloc) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
     
     c_op1, c_op2, c_op3 = st.columns(3)
     with c_op1: st.metric(label="🎯 Gain OPTIMISÉ (Méthode 1 : Cascade Pivotée)", value=txt_optimise, delta=f"📈 Rendement : {rendement_reel_cascade:.2f}%")
     with c_op2: st.metric(label="🛑 Gain BRUT (Méthode 2 : Unique Bloqué)", value=txt_brut, delta=f"📉 Rendement : {rendement_reel_brut:.2f}%", delta_color="inverse")
-    with c_op3: st.metric(label="👑 Surplus Net Sauvé par le Pivot", value=txt_sauve, delta=f"🔥 Écart Composé : +{rendement_reel_cascade - rendimiento_reel_brut if 'rendimiento_reel_brut' in locals() else rendement_reel_cascade - rendement_reel_brut:.2f}%")
+    with c_op3: st.metric(label="👑 Surplus Net Sauvé par le Pivot", value=txt_sauve, delta=f"🔥 Écart Composé : +{rendement_reel_cascade - rendement_reel_brut:.2f}%")
 
     st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
     cj1, cj2, cj3 = st.columns(3)
     with cj1: st.metric("✨ Intérêts / Jour (Cascade Pivotée)", f"{float(total_interets_cascade_compose // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
     with cj2: st.metric("⏳ Intérêts / Jour (Unique Bloqué)", f"{float(gain_jour_fixe_lineaire) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float((total_interets_cascade_compose - total_interets_paliers_de_base) // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float((total_interets_cascade_compose - interets_gros_bloc) // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
 
     st.markdown("##### 💰 Solde Total Cumulé (Capital + Intérêts)")
-    # =========================================================================
-    # 🧮 CALCULS PRÉALABLES DES MASSES FINANCIÈRES GLOBALES
-    # =========================================================================
-    if 'total_interets_optimises' not in locals() and 'total_interets_paliers_de_base' in locals():
-        total_interets_optimises = total_interets_paliers_de_base
-
-    solde_final_cascade = capital_base_calcul + total_interets_optimises
+    solde_final_cascade = capital_base_calcul + total_interets_cascade_compose
     solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
 
-    gain_jour_optimise = total_interets_optimises // 12
-    gain_jour_brut_unique = interets_gros_bloc // 12
-
-    # =========================================================================
-    # 💰 AFFICHAGE DE LA RANGÉE 3 : SOLDE CUMULÉ (FORTUNE FINALE)
-    # =========================================================================
     ct1, ct2, ct3 = st.columns(3)
-    with ct1: 
-        st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-        st.caption("Capital + Intérêts découpés")
-    with ct2: 
-        st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-        st.caption("Capital + Intérêts unifiés")
-    with ct3: 
-        st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
+    with ct1: st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts découpés")
+    with ct2: st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts unifiés")
+    with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
 
-    # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER LINEAIRE (EMPILÉ SANS SCROLL — HAUTEUR 500PX)
-    # =========================================================================
+    # Formatage des dictionnaires de tableaux pour appliquer ta règle d'affichage large de 10 à 9999.99
+    suivi_cascade_formate = []
+    suivi_unique_formate = []
+
+    for r in suivi_cascade_pivot:
+        suivi_cascade_formate.append({
+            "Jour de Jeu (Mois)": r["Jour de Jeu (Mois)"],
+            "Solde Départ (Ø)": f"{float(r['Solde Départ']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {float(r['Intérêts acquis']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{float(r['Solde Cumulé']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+        })
+
+    for r in suivi_unique_bloque:
+        suivi_unique_formate.append({
+            "Jour de Jeu (Mois)": r["Jour de Jeu (Mois)"],
+            "Solde Départ (Ø)": f"{float(r['Solde Départ']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {float(r['Intérêts acquis']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{float(r['Solde Cumulé']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+        })
+
+    # Ajout des lignes de Totaux formatées
+    suivi_cascade_formate.append({
+        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
+        "Solde Départ (Ø)": f"{float(capital_base_calcul) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Intérêts acquis (Ø)": f"∑ + {float(total_interets_cascade_compose) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + total_interets_cascade_compose) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+    })
+    suivi_unique_formate.append({
+        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
+        "Solde Départ (Ø)": f"{float(capital_base_calcul) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Intérêts acquis (Ø)": f"∑ + {float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+    })
+
     st.markdown("---")
     st.subheader("📅 Plan de Tir Journalier : Comparatif des Gains sur 12 Jours")
-
-    suivi_cascade = []
-    suivi_unique = []
-
-    for jour in range(1, 13):
-        # 1. Cascade Fractionnée
-        solde_dep_cas = capital_base_calcul + (gain_jour_optimise * (jour - 1))
-        solde_fin_cas = capital_base_calcul + (gain_jour_optimise * jour)
-        suivi_cascade.append({
-            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{int(solde_dep_cas):,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int(gain_jour_optimise):,}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{int(solde_fin_cas):,}".replace(",", " ")
-        })
-
-        # 2. Unique Direct (Taux écrasé)
-        solde_dep_uni = capital_base_calcul + (gain_jour_brut_unique * (jour - 1))
-        solde_fin_uni = capital_base_calcul + (gain_jour_brut_unique * jour)
-        suivi_unique.append({
-            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{int(solde_dep_uni):,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int(gain_jour_brut_unique):,}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{int(solde_fin_uni):,}".replace(",", " ")
-        })
-
-    # Lignes de Totaux strictes et alignées avec l'Impact
-    suivi_cascade.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
-        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {int(total_interets_optimises):,}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + total_interets_optimises):,}".replace(",", " ")
-    })
-    suivi_unique.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
-        "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {int(interets_gros_bloc):,}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{int(capital_base_calcul + interets_gros_bloc):,}".replace(",", " ")
-    })
-
-    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (Gain Protégé par Tranches)**")
-    st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=500)
+    
+    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (Pivot Quotidien Composé)**")
+    st.dataframe(pd.DataFrame(suivi_cascade_formate), use_container_width=True, hide_index=True, height=500)
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Gain Écrasé par le Barème)**")
-    st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=500)
+    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Bleuté 12 mois avec saturation)**")
+    st.dataframe(pd.DataFrame(suivi_unique_formate), use_container_width=True, hide_index=True, height=500)
