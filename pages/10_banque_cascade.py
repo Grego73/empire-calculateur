@@ -169,15 +169,28 @@ if capital_brut > 0:
         txt_j_brut = f"{float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_j_surplus = f"{float(surplus_jour) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         
-        cj1, cj2, cj3 = st.columns(3)
-        with cj1:
-            st.metric("✨ Intérêts / Jour (Cascade)", txt_j_opti)
-            st.caption("Gain moyen toutes les 24h avec fractionnement")
-        with cj2:
-            st.metric("⏳ Intérêts / Jour (Unique)", txt_j_brut)
-            st.caption("Gain moyen toutes les 24h sans fractionnement")
-        with cj3:
-            st.metric("👑 Surplus Moyen / Jour", txt_j_surplus, "Gagné en plus chaque jour")
+        # --- 🔥 NOUVEAU BLOC : COMPARAISON DES TOTAUX CUMULÉS (CAPITAL + INTÉRÊTS) ---
+        st.markdown("##### 💰 Solde Total Cumulé au terme des 12 Jours (Capital + Intérêts)")
+        
+        # Calcul des masses financières globales (Entiers infinis)
+        solde_final_cascade = capital_brut + total_interets_optimises
+        solde_final_brut_unique = capital_brut + interets_gros_bloc
+        surplus_solde_final = solde_final_cascade - solde_final_brut_unique
+        
+        # Formatage avec la même lettre de palier (règle des 10 000)
+        txt_total_cascade = f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_total_brut = f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_total_surplus = f"{float(surplus_solde_final) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        
+        ct1, ct2, ct3 = st.columns(3)
+        with ct1:
+            st.metric("🧱 Fortune Finale (Cascade)", txt_total_cascade)
+            st.caption("Capital de départ + Intérêts de vos livrets découpés")
+        with ct2:
+            st.metric("📦 Fortune Finale (Unique)", txt_total_brut)
+            st.caption("Capital de départ + Intérêts du bloc unifié")
+        with ct3:
+            st.metric("👑 Surplus Net sur la Fortune", txt_total_surplus, "Trésorerie bonus créée")
 
 
         # Plan de Tir Journalier (Suivi sur 12 jours)
