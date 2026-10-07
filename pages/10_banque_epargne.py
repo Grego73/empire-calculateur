@@ -282,54 +282,55 @@ else:
         st.metric(label=f"🏆 Intérêts générés au terme choisi ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
 
         # ---------------------------------------------------------------------
-        # 📊 ANALYSE COMPARATIVE DES 7 DURÉES DE ROULEMENT SANS BLOCAGE DIRECT
+        # 📊 ANALYSE COMPARATIVE DES 7 DURÉES AVEC VRAIE ÉPARGNE PROGRESSIVE
         # ---------------------------------------------------------------------
-        st.markdown("---")
-        st.markdown("##### 📈 Comparatif de toutes les durées de roulement avec injections quotidiennes")
-        st.caption("⚠️ Ce graphique simule uniquement les stratégies de roulement à terme. Les fonds injectés quotidiennement intègrent les livrets lors des renouvellements automatiques.")
-
         durées_officielles = [6, 8, 12, 18, 24, 36, 48]
         points_strategies = []
 
-        # Simulation précise jour par jour réel (0 à 48 jours)
+        # Pour chaque stratégie, on crée un dictionnaire pour suivre son capital jour après jour
+        historique_capital = {d: int(capital_brut) for d in durées_officielles}
+        # Dictionnaires techniques pour suivre le début du cycle en cours pour chaque durée
+        base_cycle_capital = {d: int(capital_brut) for d in durées_officielles}
+
+        # Simulation chronologique stricte du Jour 0 au Jour 48
         for j in range(0, 49):
             donnee_jour = {"Jour Réel (Mois Jeu)": j}
             
-            # Génération dynamique des trajectoires pour TOUTES les durées officielles menées à terme
             for duree in durées_officielles:
-                capital_temporaire = capital_brut
-                
-                # On re-déroule l'historique du jour 0 jusqu'au jour actuel j pour injecter et capitaliser au bon moment
-                for jour_passe in range(1, j + 1):
-                    # Chaque jour, l'injection s'accumule sur le solde disponible
-                    capital_temporaire += injection_quotidienne
-                    
-                    # À chaque fin de cycle complet de la durée choisie, les intérêts sont validés et capitalisés
-                    if jour_passe % duree == 0:
-                        gain_cycle = int(capital_temporaire * (taux_journalier * duree))
-                        capital_temporaire += gain_cycle
-                
-                # Ajout du prorata linéaire en cours pour le cycle incomplet en fin de course
-                reste_jours = j % duree
-                if reste_jours > 0:
-                    capital_final_roulement = capital_temporaire + int(capital_temporaire * (taux_journalier * reste_jours))
+                if j == 0:
+                    donnee_jour[f"Roulement {duree} mois"] = float(capital_brut)
                 else:
-                    capital_final_roulement = capital_temporaire
+                    # 1. On récupère le capital de la veille pour cette stratégie
+                    cap_courant = historique_capital[duree]
                     
-                donnee_jour[f"Roulement {duree} mois"] = float(capital_final_roulement)
+                    # 2. RÈGLE : Chaque jour réel, le joueur ajoute son versement dans la tirelire
+                    cap_courant += int(injection_quotidienne)
+                    
+                    # 3. RÈGLE DES INTÉRÊTS À TERME :
+                    # Si on arrive à la fin d'un livret, la banque calcule les intérêts 
+                    # sur la base du capital qui était présent au DEBUT du cycle (règle du livret bloqué)
+                    if j % duree == 0:
+                        interets_gagnes = int(base_cycle_capital[duree] * (taux_journalier * duree))
+                        cap_courant += interets_gagnes
+                        # Le livret expire, on ouvre un nouveau livret : la nouvelle base inclut tout le capital accumulé
+                        base_cycle_capital[duree] = cap_courant
+                    
+                    # Sauvegarde pour le jour suivant
+                    historique_capital[duree] = cap_courant
+                    donnee_jour[f"Roulement {duree} mois"] = float(cap_courant)
             
             points_strategies.append(donnee_jour)
 
-        # Affichage du graphique épuré
+        # Affichage du graphique corrigé
         df_strategie_graphique = pd.DataFrame(points_strategies).set_index("Jour Réel (Mois Jeu)")
         st.line_chart(df_strategie_graphique, use_container_width=True)
         
-        # --- TABLEAU DE SYNTHÈSE DU CLASSEMENT ---
+        # --- TABLEAU DE SYNTHÈSE ET CLASSEMENT AUTOMATIQUE DES GAINS ---
         st.markdown("##### 🏆 Bilan et classement des gains nets cumulés au Jour 48")
         
         bilan_final = []
         ligne_finale = df_strategie_graphique.iloc[-1]  # Extraction du point exact à J+48
-        total_fonds_propres_investis = capital_brut + (injection_quotidienne * 48)
+        total_fonds_propres_investis = int(capital_brut) + (int(injection_quotidienne) * 48)
         
         for col_name in df_strategie_graphique.columns:
             val_finale = int(ligne_finale[col_name])
@@ -345,7 +346,8 @@ else:
         # Tri automatique du plus rentable au moins rentable
         df_bilan = pd.DataFrame(bilan_final).sort_values(by="_tri_valeur", ascending=False)
         st.dataframe(df_bilan.drop(columns=["_tri_valeur"]), use_container_width=True, hide_index=True)
-        st.caption(f"💡 **Note d'analyse** : Total de vos fonds injectés (Dépôt initial + injections daily) : **{formater_monnaie_empire(total_fonds_propres_investis)} Ø**. Le bénéfice n'affiche que la richesse créée par la banque.")
+        
+        st.caption(f"💡 **Note d'analyse** : Total de vos fonds injectés de votre poche (Dépôt initial + 48 versements) : **{formater_monnaie_empire(total_fonds_propres_investis)} Ø**. Le bénéfice n'affiche que la richesse nette créée par la banque.")
 
     # ---------------------------------------------------------------------
     # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
