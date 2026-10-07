@@ -176,11 +176,31 @@ if capital_brut > 0:
     solde_final_cascade = capital_base_calcul + total_interets_cascade_compose
     solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
 
+     # =========================================================================
+    # 💰 AFFICHAGE DE LA RANGÉE 3 : SOLDE CUMULÉ (FORTUNE FINALE CORRIGÉE)
+    # =========================================================================
     ct1, ct2, ct3 = st.columns(3)
-    with ct1: st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts découpés")
-    with ct2: st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts unifiés")
-    with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
-
+    
+    with ct1: 
+        st.metric(
+            label="🧱 Fortune Finale (Cascade)", 
+            value=f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        )
+        st.caption("Capital + Intérêts découpés")
+        
+    with ct2: 
+        st.metric(
+            label="📦 Fortune Finale (Unique)", 
+            value=f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        )
+        st.caption("Capital + Intérêts unifiés")
+        
+    with ct3: 
+        st.metric(
+            label="👑 Surplus Net sur la Fortune", 
+            value=txt_sauve
+        )
+        st.caption("Trésorerie bonus créée")
     # Formatage des dictionnaires de tableaux pour appliquer ta règle d'affichage large de 10 à 9999.99
     suivi_cascade_formate = []
     suivi_unique_formate = []
