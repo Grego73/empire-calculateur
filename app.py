@@ -119,26 +119,59 @@ def home_page():
                 with col2_aud: st.write(f"• Total Actif/Passif : `{formater_monnaie_empire(data.get('actif', 0))}`")
 
 
-# DÉCLARATION DES PAGES NATIVES (Système de navigation Streamlit >= 1.30)
-page_home = st.Page(lambda: home_page(), title="📥 Accueil & Saisie Unique", icon="🏠")
-page_frais = st.Page("pages/01_frais_gestion.py", title="Frais de Gestion", icon="📉")
-page_primes = st.Page("pages/02_primes.py", title="Gestion des Primes", icon="💰")
-page_perf = st.Page("pages/03_performance.py", title="Analyse de Performance", icon="📊")
-page_equilibre = st.Page("pages/04_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
-page_renta_const = st.Page("pages/05_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📊")
-page_renta_reno = st.Page("pages/06_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
-page_synthese = st.Page("pages/07_synthese_opportunites.py", title="🏆 Top Opportunités", icon="✨")
-page_admin = st.Page("pages/08_admin.py", title="⚙️ Espace Administration", icon="🛠️")
+# =========================================================================
+# 🗂️ DÉCLARATION ABSOLUE DES PAGES DE L'EMPIRE (MONDE 8)
+# =========================================================================
 
+# 1. Accueil & Saisie
+page_home = st.Page("pages/0_home.py", title="Accueil & Saisie Unique", icon="🏠")
+
+# 2. Pôle Holding & Comptabilité
+page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📊")
+page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
+page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", icon="📈")
+page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
+
+# 3. Pôle Bancaire Fédéral (Le nouveau découpage indépendant)
 page_cascade = st.Page("pages/10_banque_cascade.py", title="🔥 Cascade Optimisée", icon="⚔️")
 page_epargne = st.Page("pages/11_banque_epargne.py", title="📈 Simulateur Épargne", icon="💵")
 page_credits = st.Page("pages/12_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉")
 
+# 4. Pôle Calculs de Rentabilité & Marché
+page_analyse = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📋")
+page_chantiers = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
+page_opportunites = st.Page("pages/7_synthese_opportunites.py", title="🌟 Top Opportunités", icon="✨")
+
+# 5. Pôle Administration & Crons
+page_admin = st.Page("pages/8_admin.py", title="Espace Administration", icon="🛠️")
+page_cron = st.Page("pages/9_cron_trigger_taux.py", title="Déclencheur Crons", icon="⚙️")
+
+# =========================================================================
+# 🧭 MOTEUR DE NAVIGATION STRATÉGIQUE STREAMLIT
+# =========================================================================
 pg = st.navigation({
     "Accueil": [page_home],
-    "🏛️ Gestion Holding": [page_frais, page_primes, page_perf, page_equilibre],
-    "🏦 Pôle Bancaire Municipal": [page_cascade, page_epargne, page_credits], # Vos sous-pages séparées
-    "Calculs de Rentabilité": [page_analyse, page_chantiers, page_opportunites],
-    "Administration": [page_admin, page_cron]
+    "🏛️ Gestion Holding": [
+        page_frais, 
+        page_primes, 
+        page_perf, 
+        page_equilibre
+    ],
+    "🏦 Pôle Bancaire Fédéral": [
+        page_cascade, 
+        page_epargne, 
+        page_credits
+    ],
+    "Calculs de Rentabilité": [
+        page_analyse, 
+        page_chantiers, 
+        page_opportunites
+    ],
+    "Administration": [
+        page_admin, 
+        page_cron
+    ]
 })
+
+# Lancement officiel de l'application sécurisée
 pg.run()
