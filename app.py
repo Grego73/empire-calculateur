@@ -124,7 +124,7 @@ def home_page():
 # =========================================================================
 
 # 1. Accueil & Saisie
-page_home = st.Page("pages/0_home.py", title="Accueil & Saisie Unique", icon="🏠")
+page_home = st.Page("app.py", title="Accueil & Saisie Unique", icon="🏠")
 
 # 2. Pôle Holding & Comptabilité
 page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📊")
