@@ -158,14 +158,33 @@ else:
                     }
                 )
             
+            # --- CORRECTION DE L'HARMONISATION DES UNITÉS ---
             interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
             argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
-            st.markdown("### 📊 Analyse d'Impact Financier")
+            st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
+            
+            # On choisit l'unité la plus adaptée pour comparer les trois valeurs sans mélanger
+            # Si le gain optimisé atteint le niveau des Rons (R), on affiche tout en R
+            unite_r = 10**27
+            unite_y = 10**24
+            
+            if total_interets_optimises >= unite_r:
+                txt_optimise = f"{float(total_interets_optimises) / unite_r:.2f} R Ø"
+                txt_brut = f"{float(interets_gros_bloc) / unite_r:.2f} R Ø"
+                txt_sauve = f"{float(argent_sauve) / unite_r:.2f} R Ø"
+            else:
+                txt_optimise = f"{float(total_interets_optimises) / unite_y:.2f} Y Ø"
+                txt_brut = f"{float(interets_gros_bloc) / unite_y:.2f} Y Ø"
+                txt_sauve = f"{float(argent_sauve) / unite_y:.2f} Y Ø"
+
             c_op1, c_op2, c_op3 = st.columns(3)
-            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
-            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
-            with c_op3: st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø")
+            with c_op1: 
+                st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+            with c_op2: 
+                st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
+            with c_op3: 
+                st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
 
         with sub_tab_livret:
             generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
