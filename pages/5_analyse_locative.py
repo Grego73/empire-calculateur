@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre, recuperer_derniere_donnee_table
-
+LIMITE_MAX_BIENS = 500000000
 st.set_page_config(page_title="Analyse Locative - Monde 8", layout="wide")
 
 st.title("📊 Analyse Locative & Rendements Avancés")
@@ -47,8 +47,12 @@ else:
         st.header("🎯 Filtres de performance")
         rendement_min = st.slider("Rendement Net Minimum (%)", 0.0, 30.0, 5.0, 0.5)
 
-    df_biens["Quantité Max Achetée"] = (float(capital_disponible) // df_biens["valeur"].astype(float)).fillna(0).astype(int)
-    df_biens["Gain Mensuel Cumulé"] = df_biens["rev_net_mensuel"] * df_biens["Quantité Max Achetée"]
+    df_biens["Quantité Max Achetée"] = df_biens["valeur"].apply(
+        lambda v: min(LIMITE_MAX_BIENS, int(capital_disponible) // int(v)) if int(v) > 0 else 0
+    )
+    df_biens["Gain Mensuel Cumulé"] = df_biens.apply(
+        lambda row: int(row["rev_net_mensuel"]) * int(row["Quantité Max Achetée"]), axis=1
+    )
 
     # Filtrage dynamique
     df_filtre = df_biens[df_biens["Rendement Net (%)"] >= rendement_min].copy()
