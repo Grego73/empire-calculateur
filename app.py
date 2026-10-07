@@ -153,10 +153,10 @@ page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", def
 
 # Pôle Holding & Comptabilité
 list_holding = [
-    securiser_page("pages/1_frais_gestion.py", "Frais de Gestion", "📊"),
-    securiser_page("pages/2_primes.py", "Gestion des Primes", "💰"),
-    securiser_page("pages/3_performance.py", "Analyse de Performance", "📈"),
-    securiser_page("pages/4_equilibrage.py", "Équilibrage & Injection", "⚖️")
+    securiser_page("pages/01_frais_gestion.py", "Frais de Gestion", "📊"),
+    securiser_page("pages/02_primes.py", "Gestion des Primes", "💰"),
+    securiser_page("pages/03_performance.py", "Analyse de Performance", "📈"),
+    securiser_page("pages/04_equilibrage.py", "Équilibrage & Injection", "⚖️")
 ]
 menu_holding = [p for p in list_holding if p is not None]
 
@@ -170,16 +170,16 @@ menu_banque = [p for p in list_banque if p is not None]
 
 # Pôle Calculs de Rentabilité
 list_renta = [
-    securiser_page("pages/5_analyse_locative.py", "Analyse Locative & R.O.I", "📋"),
-    securiser_page("pages/6_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️"),
-    securiser_page("pages/7_synthese_opportunites.py", "🌟 Top Opportunités", "✨")
+    securiser_page("pages/05_analyse_locative.py", "Analyse Locative & R.O.I", "📋"),
+    securiser_page("pages/06_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️"),
+    securiser_page("pages/07_synthese_opportunites.py", "🌟 Top Opportunités", "✨")
 ]
 menu_renta = [p for p in list_renta if p is not None]
 
 # Administration & Crons
 list_admin = [
-    securiser_page("pages/8_admin.py", "Espace Administration", "🛠️"),
-    securiser_page("pages/9_cron_trigger_taux.py", "Déclencheur Crons", "⚙️")
+    securiser_page("pages/08_admin.py", "Espace Administration", "🛠️"),
+    securiser_page("pages/09_cron_trigger_taux.py", "Déclencheur Crons", "⚙️")
 ]
 menu_admin = [p for p in list_admin if p is not None]
 
