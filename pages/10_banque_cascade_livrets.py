@@ -11,15 +11,7 @@ st.title("🔒 Moteur de Cascade : Les Livrets I")
 st.info("🕒 Échelle : **1 jour de jeu = 1 mois réel**. Un livret annuel à terme prend **12 jours de jeu**.")
 
 PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)
-
-seuils_officiels = [
-    {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
-    {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
-    {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
-    {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
-    {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
-    {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
-]
+SEUIL_PALIER_1 = 300_000_010 * 10**18  # La taille maximale d'un livret à 100%
 
 saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
@@ -32,49 +24,48 @@ if capital_brut > 0:
     
     repartition_livrets = []
     total_interets_optimises = 0
-    capital_deja_place = 0
     
-    for palier in seuils_officiels:
-        if capital_restant <= 0:
-            break
-        montant_parfait = (int(palier["seuil_max"]) - 1) - capital_deja_place
-        montant_a_placer = min(capital_restant, montant_parfait)
+    # 🎯 TA FORMULE EXACTE : On ouvre autant de livrets max à 100% que possible pour saturer les 6 R
+    montant_parfait_livret = SEUIL_PALIER_1 - 1
+    nb_livrets_pleins = capital_restant // montant_parfait_livret
+    
+    # 1. Génération des livrets optimisés à taux plein (100%)
+    for i in range(1, nb_livrets_pleins + 1):
+        gain_terme = montant_parfait_livret  # 100% d'intérêts = le capital double
+        gain_journalier = gain_terme // 12
         
-        if montant_a_placer > 0:
-            gain_terme = int(montant_a_placer * (palier["taux"] / 100.0))
-            gain_journalier = gain_terme // 12
-            
-            repartition_livrets.append({
-                "Type de Bloc": f"Saturateur ({palier['nom']})",
-                "Valeur Brute (Lisible)": f"{montant_a_placer:,}".replace(",", " "),
-                "Taux Garanti": f"{palier['taux']:.1f}%",
-                "Gain / Jour Réel": f"~ {gain_journalier // 10**18:,} E".replace(",", " ") if gain_journalier >= 10**18 else f"{gain_journalier:,} Ø",
-                "Gain au Terme (12 mois)": f"~ {gain_terme // 10**18:,} E".replace(",", " ") if gain_terme >= 10**18 else f"{gain_terme:,} Ø",
-                "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
-            })
-            total_interets_optimises += gain_terme
-            capital_restant -= montant_a_placer
-            capital_deja_place += montant_a_placer
-
-    if capital_restant > 0:
-        gain_residu = int(capital_restant * 0.02)
-        gain_journalier_residu = gain_residu // 12
         repartition_livrets.append({
-            "Type de Bloc": "Excédent (Tranche minimale 2.0%)",
+            "Type de Bloc": f"Livret Optimisé n°{i} (Palier 1)",
+            "Valeur Brute (Lisible)": f"{montant_parfait_livret:,}".replace(",", " "),
+            "Taux Garanti": "100.0%",
+            "Gain / Jour Réel": f"~ {gain_journalier // 10**18:,} E".replace(",", " ") if gain_journalier >= 10**18 else f"{gain_journalier:,} Ø",
+            "Gain au Terme (12 mois)": f"~ {gain_terme // 10**18:,} E".replace(",", " ") if gain_terme >= 10**18 else f"{gain_terme:,} Ø",
+            "Valeur Brute (À COPIER EN JEU)": str(montant_parfait_livret)
+        })
+        total_interets_optimises += gain_terme
+        capital_restant -= montant_parfait_livret
+
+    # 2. Placement du reliquat final (toujours à 100% car inférieur au seuil critique)
+    if capital_restant > 0:
+        gain_terme_residu = capital_restant
+        gain_journalier_residu = gain_terme_residu // 12
+        
+        repartition_livrets.append({
+            "Type de Bloc": "Reliquat final de l'enveloppe",
             "Valeur Brute (Lisible)": f"{capital_restant:,}".replace(",", " "),
-            "Taux Garanti": "2.0%",
-            "Gain / Jour Réel": f"{gain_journalier_residu:,} Ø",
-            "Gain au Terme (12 mois)": f"{gain_residu:,} Ø",
+            "Taux Garanti": "100.0%",
+            "Gain / Jour Réel": f"~ {gain_journalier_residu // 10**18:,} E".replace(",", " ") if gain_journalier_residu >= 10**18 else f"{gain_journalier_residu:,} Ø",
+            "Gain au Terme (12 mois)": f"~ {gain_terme_residu // 10**18:,} E".replace(",", " ") if gain_terme_residu >= 10**18 else f"{gain_terme_residu:,} Ø",
             "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
         })
-        total_interets_optimises += gain_residu
+        total_interets_optimises += gain_terme_residu
 
     st.dataframe(pd.DataFrame(repartition_livrets), use_container_width=True, hide_index=True, column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")})
 
-    # 🧮 IMPACT FINANCIER ÉPURÉ
+    # 🧮 IMPACT FINANCIER PARFAIT
     capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
     
-    # Pour le Livret I brut unique sans cascade, la banque applique le taux minimum de la grille (2.0%) à cause de la masse totale
+    # Mode Unique Brut (Si tu mettais tout d'un coup, le jeu t'écraserait au taux minimal de 2%)
     taux_base_brut = 2.0  
     interets_gros_bloc = int(capital_base_calcul * (taux_base_brut / 100.0))
     argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
@@ -121,51 +112,42 @@ if capital_brut > 0:
     with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
 
     # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX EN PROGRESSION LINÉAIRE STRICTE
+    # 📅 PLAN DE TIR JOURNALIER DIRECT ET LINÉAIRE
     # =========================================================================
     st.markdown("---")
     st.subheader("📅 Plan de Tir Journalier : Comparatif des Gains sur 12 Jours")
-    st.caption("Ces tableaux simulent l'évolution linéaire et réelle de votre trésorerie, mois par mois (jour après jour), jusqu'au terme des livrets.")
-
-    # Calcul des gains quotidiens fixes et stricts (Aucun pivot composé)
-    gain_jour_fixe_cascade = total_interets_optimises // 12
-    gain_jour_fixe_unique = interets_gros_bloc // 12
 
     suivi_cascade = []
     suivi_unique = []
 
-    # Simulation de l'accumulation passive jour après jour
     for jour in range(1, 13):
-        # 1. Tableau Cascade Fractionnée (Linéaire)
-        solde_dep_cas = capital_base_calcul + (gain_jour_fixe_cascade * (jour - 1))
-        solde_fin_cas = capital_base_calcul + (gain_jour_fixe_cascade * jour)
-        
+        # 1. Cascade 100% Linéaire Parfaite
+        solde_dep_cas = capital_base_calcul + (gain_jour_optimise * (jour - 1))
+        solde_fin_cas = capital_base_calcul + (gain_jour_optimise * jour)
         suivi_cascade.append({
             "Jour de Jeu (Mois)": f"Mois {jour:02d}",
             "Solde Départ (Ø)": f"{int(solde_dep_cas):,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int(gain_jour_fixe_cascade):,}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {int(gain_jour_optimise):,}".replace(",", " "),
             "Solde Cumulé (Ø)": f"{int(solde_fin_cas):,}".replace(",", " ")
         })
 
-        # 2. Tableau Placement Direct Unique (Linéaire)
-        solde_dep_uni = capital_base_calcul + (gain_jour_fixe_unique * (jour - 1))
-        solde_fin_uni = capital_base_calcul + (gain_jour_fixe_unique * jour)
-        
+        # 2. Unique Direct (Taux écrasé)
+        solde_dep_uni = capital_base_calcul + (gain_jour_brut_unique * (jour - 1))
+        solde_fin_uni = capital_base_calcul + (gain_jour_brut_unique * jour)
         suivi_unique.append({
             "Jour de Jeu (Mois)": f"Mois {jour:02d}",
             "Solde Départ (Ø)": f"{int(solde_dep_uni):,}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {int(gain_jour_fixe_unique):,}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {int(gain_jour_brut_unique):,}".replace(",", " "),
             "Solde Cumulé (Ø)": f"{int(solde_fin_uni):,}".replace(",", " ")
         })
 
-    # Ajout de la ligne de Total strict en fin de tableau
+    # Lignes de Totaux parfaits en bas des deux grilles empilées
     suivi_cascade.append({
         "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
         "Intérêts acquis (Ø)": f"∑ + {int(total_interets_optimises):,}".replace(",", " "),
         "Solde Cumulé (Ø)": f"{int(capital_base_calcul + total_interets_optimises):,}".replace(",", " ")
     })
-
     suivi_unique.append({
         "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{int(capital_base_calcul):,}".replace(",", " "),
@@ -173,11 +155,8 @@ if capital_brut > 0:
         "Solde Cumulé (Ø)": f"{int(capital_base_calcul + interets_gros_bloc):,}".replace(",", " ")
     })
 
-    # Affichage empilé verticalement avec hauteur fixe pour dérouler les 13 lignes d'un coup
-    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (Livrets Bloqués à Terme)**")
+    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (100% de Taux Verrouillé)**")
     st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=500)
-    
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Un seul gros bloc Bloqué à Terme)**")
+    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Taux écrasé à 2% sans Cascade)**")
     st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=500)
