@@ -8,11 +8,25 @@ from utils import (
     recuperer_derniere_donnee_table, 
     recuperer_historique_joueur,
     recuperer_historique_materiaux,
-    verifier_concordance_rapport  # Tout est propre ici
+    verifier_concordance_rapport
 )
 
-# ⚙️ CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1)
-st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="centered")
+# 🔒 1. CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1 en mode LARGE)
+st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="wide", initial_sidebar_state="expanded")
+
+# Injection CSS pour bloquer la mise en page large permanente sans sauter
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # 📥 INITIALISATION DES VARIABLES DE SESSION (Optimisée)
 cles_session = [
@@ -29,6 +43,9 @@ if "holding_chargee" not in st.session_state: st.session_state["holding_chargee"
 if "projets_charges" not in st.session_state: st.session_state["projets_charges"] = False
 
 
+# =========================================================================
+# 🏠 2. BLOC DE LA PAGE D'ACCUEIL PRINCIPALE
+# =========================================================================
 def home_page():
     st.title("🏛️ Centre de Contrôle de l'Empire — Monde 8")
     st.write(f"Bienvenue, **Grego73** ! Votre calculateur s'exécute avec les données du Cloud.")
@@ -40,14 +57,13 @@ def home_page():
         df_historique_mat = recuperer_historique_materiaux()
     
     if df_historique_mat is not None and not df_historique_mat.empty:
-        # 🔄 Pivot des données (Correction : Échappement du caractère \$ pour éviter les conflits de rendu Markdown Streamlit)
         df_pivot = df_historique_mat.pivot_table(
             index="Date", 
             columns="Matériau", 
             values="Prix", 
             sort=False 
         )
-        st.line_chart(df_pivot, width='stretch')
+        st.line_chart(df_pivot, use_container_width=True)
         st.caption("💡 Astuce : Survolez les courbes avec votre souris pour voir les prix exacts à chaque heure d'extraction.")
     else:
         st.info("⚪ Aucun historique de prix disponible pour le moment. Le graphique apparaîtra dès que le robot aura effectué plusieurs synchronisations.")
@@ -120,62 +136,60 @@ def home_page():
 
 
 # =========================================================================
-# 🗂️ DÉCLARATION ABSOLUE DES PAGES DE L'EMPIRE (MONDE 8)
+# ⚙️ 3. FONCTION DE SÉCURITÉ DE VÉRIFICATION DES FICHIERS (ANTI-CRASH)
 # =========================================================================
+def securiser_page(chemin, title, icon):
+    if os.path.exists(chemin):
+        return st.Page(chemin, title=title, icon=icon)
+    return None
 
-# =========================================================================
-# 🗂️ DÉCLARATION SÉCURISÉE DES PAGES DE L'EMPIRE (MONDE 8)
-# =========================================================================
-
-# 1. Accueil (Lié directement au script d'entrée racine sans passer par le dossier pages)
-page_home = st.Page("app.py", title="Accueil & Saisie Unique", icon="🏠")  # 💡 Change "app.py" par "main.py" si ton fichier racine s'appelle main.py
-
-# 2. Pôle Holding & Comptabilité
-page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📊")
-page_primes = st.Page("pages/2_primes.py", title="Gestion des Primes", icon="💰")
-page_perf = st.Page("pages/3_performance.py", title="Analyse de Performance", icon="📈")
-page_equilibre = st.Page("pages/4_equilibrage.py", title="Équilibrage & Injection", icon="⚖️")
-
-# 3. Pôle Bancaire Fédéral (Le nouveau découpage indépendant)
-page_cascade = st.Page("pages/10_banque_cascade.py", title="🔥 Cascade Optimisée", icon="⚔️")
-page_epargne = st.Page("pages/11_banque_epargne.py", title="📈 Simulateur Épargne", icon="💵")
-page_credits = st.Page("pages/12_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉")
-
-# 4. Pôle Calculs de Rentabilité & Marché
-page_analyse = st.Page("pages/5_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📋")
-page_chantiers = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
-page_opportunites = st.Page("pages/7_synthese_opportunites.py", title="🌟 Top Opportunités", icon="✨")
-
-# 5. Pôle Administration & Crons
-page_admin = st.Page("pages/8_admin.py", title="Espace Administration", icon="🛠️")
-page_cron = st.Page("pages/9_cron_trigger_taux.py", title="Déclencheur Crons", icon="⚙️")
 
 # =========================================================================
-# 🧭 MOTEUR DE NAVIGATION STRATÉGIQUE STREAMLIT
+# 🧭 4. CARTOGRAPHIE DYNAMIQUE DU MOTEUR DE NAVIGATION
 # =========================================================================
-pg = st.navigation({
-    "Accueil": [page_home],
-    "🏛️ Gestion Holding": [
-        page_frais, 
-        page_primes, 
-        page_perf, 
-        page_equilibre
-    ],
-    "🏦 Pôle Bancaire Fédéral": [
-        page_cascade, 
-        page_epargne, 
-        page_credits
-    ],
-    "Calculs de Rentabilité": [
-        page_analyse, 
-        page_chantiers, 
-        page_opportunites
-    ],
-    "Administration": [
-        page_admin, 
-        page_cron
-    ]
-})
 
-# Lancement officiel de l'application sécurisée
+# Déclaration sécurisée de l'accueil
+page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", default=True)
+
+# Pôle Holding & Comptabilité
+list_holding = [
+    securiser_page("pages/1_frais_gestion.py", "Frais de Gestion", "📊"),
+    securiser_page("pages/2_primes.py", "Gestion des Primes", "💰"),
+    securiser_page("pages/3_performance.py", "Analyse de Performance", "📈"),
+    securiser_page("pages/4_equilibrage.py", "Équilibrage & Injection", "⚖️")
+]
+menu_holding = [p for p in list_holding if p is not None]
+
+# Pôle Bancaire Fédéral (Découpage autonome)
+list_banque = [
+    securiser_page("pages/10_banque_cascade.py", "🔥 Cascade Optimisée", "⚔️"),
+    securiser_page("pages/11_banque_epargne.py", "📈 Simulateur Épargne", "💵"),
+    securiser_page("pages/12_banque_credits.py", "🏦 Emprunts & Crédits", "📉")
+]
+menu_banque = [p for p in list_banque if p is not None]
+
+# Pôle Calculs de Rentabilité
+list_renta = [
+    securiser_page("pages/5_analyse_locative.py", "Analyse Locative & R.O.I", "📋"),
+    securiser_page("pages/6_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️"),
+    securiser_page("pages/7_synthese_opportunites.py", "🌟 Top Opportunités", "✨")
+]
+menu_renta = [p for p in list_renta if p is not None]
+
+# Administration & Crons
+list_admin = [
+    securiser_page("pages/8_admin.py", "Espace Administration", "🛠️"),
+    securiser_page("pages/9_cron_trigger_taux.py", "Déclencheur Crons", "⚙️")
+]
+menu_admin = [p for p in list_admin if p is not None]
+
+# Assemblage final du dictionnaire de navigation
+navigation_dict = {"Accueil": [page_home]}
+if menu_holding: navigation_dict["🏛️ Gestion Holding"] = menu_holding
+if menu_banque: navigation_dict["🏦 Pôle Bancaire Fédéral"] = menu_banque
+if menu_renta: navigation_dict["Calculs de Rentabilité"] = menu_renta
+if menu_admin: navigation_dict["Administration"] = menu_admin
+
+# Exécution officielle sans possibilité de plantage
+pg = st.navigation(navigation_dict)
 pg.run()
