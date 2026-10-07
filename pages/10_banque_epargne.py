@@ -240,7 +240,7 @@ else:
             generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
-    # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE, INJECTIONS DAILY & ROULEMENTS À TERME)
+    # 📈 2. COMPTE ÉPARGNE (ROULEMENTS À TERME & INJECTIONS DAILY UNIQUEMENT)
     # ---------------------------------------------------------------------
     with tab_compte_brut:
         st.subheader("📦 Configuration du Nouveau Compte Épargne (Dépôt Unique & Progressif)")
@@ -252,10 +252,15 @@ else:
                 "Sélectionnez la durée de blocage souhaitée pour votre simulation de base :", 
                 options=[6, 8, 12, 18, 24, 36, 48], 
                 format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", 
-                index=2
+                index=2,
+                key="duree_compte_unique"
             )
         with col_ce2:
-            saisie_injection = st.text_input("Montant à injecter en PLUS chaque jour réel (Ex: 500M, 1G, 10T) :", value="0 Ø")
+            saisie_injection = st.text_input(
+                "Montant à injecter en PLUS chaque jour réel (Ex: 500M, 1G, 10T) :", 
+                value="0 Ø",
+                key="injection_compte_unique"
+            )
             injection_quotidienne = convertir_saisie_en_nombre(saisie_injection)
             if injection_quotidienne > 0:
                 st.caption(f"➕ Injection quotidienne détectée : **+{formater_monnaie_empire(injection_quotidienne)} Ø / jour**")
@@ -272,16 +277,16 @@ else:
         taux_decimal = taux_epargne_auto / 100.0
         taux_journalier = taux_decimal / 12.0  # 1 jour réel = 1 mois de jeu
         
-        # Calcul linéaire pour la durée de base sélectionnée (avec cumul des injections simples)
+        # Calcul linéaire pour la durée de base sélectionnée
         interets_terme = int(capital_brut * (taux_journalier * choix_duree_jeu))
         st.metric(label=f"🏆 Intérêts générés au terme choisi ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
 
         # ---------------------------------------------------------------------
-        # 📊 ANALYSE COMPARATIVE DES 7 DURÉES AVEC INJECTIONS DAILY PROGRESSIVES
+        # 📊 ANALYSE COMPARATIVE DES 7 DURÉES DE ROULEMENT SANS BLOCAGE DIRECT
         # ---------------------------------------------------------------------
         st.markdown("---")
-        st.markdown("##### 📈 Comparatif des 7 durées de roulement à terme avec capitalisation des injections")
-        st.caption("⚠️ Ce graphique simule le réinvestissement à terme de vos livrets cumulé avec vos injections quotidiennes automatisées.")
+        st.markdown("##### 📈 Comparatif de toutes les durées de roulement avec injections quotidiennes")
+        st.caption("⚠️ Ce graphique simule uniquement les stratégies de roulement à terme. Les fonds injectés quotidiennement intègrent les livrets lors des renouvellements automatiques.")
 
         durées_officielles = [6, 8, 12, 18, 24, 36, 48]
         points_strategies = []
@@ -290,29 +295,21 @@ else:
         for j in range(0, 49):
             donnee_jour = {"Jour Réel (Mois Jeu)": j}
             
-            # --- 1. Stratégie de référence : Blocage Direct 48M + Injections accumulées sans intérêts intermédiaires
-            total_injecte_j = injection_quotidienne * j
-            capital_cumule_intermediaire = capital_brut + total_injecte_j
-            # Les intérêts du bloc de départ courent, les injections s'empilent simplement en liquide
-            donnee_jour["Bloqué 48m Direct"] = float(capital_brut + int(capital_brut * (taux_journalier * j)) + total_injecte_j)
-            
-            # --- 2. Stratégie de roulement dynamique pour TOUTES les durées officielles ---
+            # Génération dynamique des trajectoires pour TOUTES les durées officielles menées à terme
             for duree in durées_officielles:
                 capital_temporaire = capital_brut
-                interets_accumules_attente = 0
                 
                 # On re-déroule l'historique du jour 0 jusqu'au jour actuel j pour injecter et capitaliser au bon moment
                 for jour_passe in range(1, j + 1):
-                    # Étape A : Chaque jour, on rajoute l'injection du joueur au capital courant
+                    # Chaque jour, l'injection s'accumule sur le solde disponible
                     capital_temporaire += injection_quotidienne
                     
-                    # Étape B : Si on atteint la fin d'un cycle de livret (ex: Jour 6, 12, 18...), on valide et fusionne les intérêts
+                    # À chaque fin de cycle complet de la durée choisie, les intérêts sont validés et capitalisés
                     if jour_passe % duree == 0:
-                        # Calcul des intérêts sur la période écoulée pour le bloc
                         gain_cycle = int(capital_temporaire * (taux_journalier * duree))
                         capital_temporaire += gain_cycle
                 
-                # Traitement du prorata restant pour le morceau de cycle incomplet en fin de course
+                # Ajout du prorata linéaire en cours pour le cycle incomplet en fin de course
                 reste_jours = j % duree
                 if reste_jours > 0:
                     capital_final_roulement = capital_temporaire + int(capital_temporaire * (taux_journalier * reste_jours))
@@ -323,11 +320,11 @@ else:
             
             points_strategies.append(donnee_jour)
 
-        # Affichage du graphique de courbes Streamlit
+        # Affichage du graphique épuré
         df_strategie_graphique = pd.DataFrame(points_strategies).set_index("Jour Réel (Mois Jeu)")
         st.line_chart(df_strategie_graphique, use_container_width=True)
         
-        # --- TABLEAU DE SYNTHÈSE ET CLASSEMENT AUTOMATIQUE DES GAINS ---
+        # --- TABLEAU DE SYNTHÈSE DU CLASSEMENT ---
         st.markdown("##### 🏆 Bilan et classement des gains nets cumulés au Jour 48")
         
         bilan_final = []
@@ -348,7 +345,7 @@ else:
         # Tri automatique du plus rentable au moins rentable
         df_bilan = pd.DataFrame(bilan_final).sort_values(by="_tri_valeur", ascending=False)
         st.dataframe(df_bilan.drop(columns=["_tri_valeur"]), use_container_width=True, hide_index=True)
-        st.caption(f"💡 **Note d'analyse** : Total des fonds injectés de votre poche sur 48 jours : **{formater_monnaie_empire(total_fonds_propres_investis)} Ø** (Dépôt initial + {formater_monnaie_empire(injection_quotidienne * 48)} Ø cumulés d'injections). Le bénéfice affiche uniquement l'argent créé par la banque.")
+        st.caption(f"💡 **Note d'analyse** : Total de vos fonds injectés (Dépôt initial + injections daily) : **{formater_monnaie_empire(total_fonds_propres_investis)} Ø**. Le bénéfice n'affiche que la richesse créée par la banque.")
 
     # ---------------------------------------------------------------------
     # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
