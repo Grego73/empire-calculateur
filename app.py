@@ -162,9 +162,10 @@ menu_holding = [p for p in list_holding if p is not None]
 
 # Pôle Bancaire Fédéral (Découpage autonome)
 list_banque = [
-    securiser_page("pages/10_banque_cascade.py", "🔥 Cascade Optimisée", "⚔️"),
-    securiser_page("pages/11_banque_epargne.py", "📈 Simulateur Épargne", "💵"),
-    securiser_page("pages/12_banque_credits.py", "🏦 Emprunts & Crédits", "📉")
+    securiser_page("pages/10_banque_cascade_livrets.py", "🔒 Cascade Livrets I", "⚔️"),
+    securiser_page("pages/11_banque_cascade_comptes.py", "📈 Cascade Comptes Épargnes", "⚖️"),
+    securiser_page("pages/12_banque_epargne.py", "💵 Épargne Progressive", "📊"),
+    securiser_page("pages/13_banque_credits.py", "🏦 Emprunts & Crédits", "📉")
 ]
 menu_banque = [p for p in list_banque if p is not None]
 
