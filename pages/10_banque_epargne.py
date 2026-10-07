@@ -12,9 +12,8 @@ st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle compl
 # 📊 ARCHITECTURE DES GRILLES TARIFAIRES OFFICIELLES (ENTIERS TRÈS GRANDS)
 # =========================================================================
 
-# Ajustement exact des plafonds selon tes données (6R et 4R)
-PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)  # 6 000 000 000 000 000 000 000 000 000 Ø
-PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)   # 4 000 000 000 000 000 000 000 000 000 Ø
+PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)  # 6 R
+PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)   # 4 R
 
 # Grille de l'épargne (Livrets I & Comptes Épargnes)
 GRILLE_EPARGNE = [
@@ -64,59 +63,62 @@ else:
 
     # --- AFFICHAGE DES RÉSULTATS PAR PRODUIT ---
     tab_compte, tab_livret_i, tab_emprunt = st.tabs([
-        "📈 1. Compte Épargne (Plafond 4 R)", 
+        "📈 1. Compte Épargne", 
         "🔒 2. Livret I (Plafond 6 R)", 
         "🏦 3. Crédits (Emprunts)"
     ])
 
     # ---------------------------------------------------------------------
-    # 📈 ONGLET COMPTE ÉPARGNE DYNAMIQUE (MIS À JOUR SELON CAPTURE)
+    # 📈 ONGLET COMPTE ÉPARGNE
     # ---------------------------------------------------------------------
     with tab_compte:
         st.subheader("📦 Configuration du Nouveau Compte Épargne")
         
-        # Sélecteur de durée conforme à ta capture d'écran
+        # Sélecteur de durée conforme à l'interface du jeu
         choix_duree_jeu = st.selectbox(
             "Sélectionnez la durée de blocage souhaitée :",
             options=[6, 8, 12, 18, 24, 36, 48],
             format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)",
-            index=2 # Positionné par défaut sur 12 mois
+            index=2  # Par défaut sur 12 mois
         )
         
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
         if capital_brut > PLAFOND_EPARGNE:
             st.error(f"🛑 Plafond de 4 R dépassé ! Limite : {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
         else:
-            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø**")
+            st.success(f"✅ Capacité de dépôt restante : **{formater_monnaie_empire(dispo_epargne)} Ø** sur le maximum de {formater_monnaie_empire(PLAFOND_EPARGNE)} Ø.")
 
         st.write(f"Taux d'intérêt de base (annuel) : **{taux_epargne_auto:.2f}%**")
         
         taux_decimal = taux_epargne_auto / 100.0
-        taux_mensuel_jeu = taux_decimal / 12.0  # Taux pour 1 jour réel
+        taux_journalier_reel = taux_decimal / 12.0  # 1 jour réel = 1 mois de jeu
         
-        # --- CALCULS ADAPTÉS À LA DURÉE SÉLECTIONNÉE ---
-        # Gain en mode bloqué classique au prorata de la durée
-        interets_terme = int(capital_brut * (taux_mensuel_jeu * choix_duree_jeu))
+        # Calculs selon la durée choisie
+        interets_terme = int(capital_brut * (taux_journalier_reel * choix_duree_jeu))
         capital_final_lineaire = capital_brut + interets_terme
         
-        # Gain en mode intérêt composé (si tu retires et remets chaque jour réel)
-        facteur_compose = (1.0 + taux_mensuel_jeu) ** choix_duree_jeu
+        facteur_compose = (1.0 + taux_journalier_reel) ** choix_duree_jeu
         capital_final_compose = int(capital_brut * facteur_compose)
         interets_compose = capital_final_compose - capital_brut
 
         m1, m2 = st.columns(2)
-        with m1: 
-            st.metric(label=f"⚡ Intérêts au terme ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
-        with m2: 
-            st.metric(label="🔄 Gain si Pivot Quotidien (Intérêts Composés)", value=f"{formater_monnaie_empire(interets_compose)} Ø")
+        with m1: st.metric(label=f"⚡ Intérêts au terme ({choix_duree_jeu} jours réels)", value=f"{formater_monnaie_empire(interets_terme)} Ø")
+        with m2: st.metric(label="🔄 Gain si Pivot Quotidien (Intérêts Composés)", value=f"{formater_monnaie_empire(interets_compose)} Ø")
+
+        st.markdown("##### ⚖️ Arbitrage Épargne (Cycle choisi)")
+        donnees_comp_ce = [
+            {"Méthode": "🎯 Mode Classique (Échéance Fixe)", "Bénéfice Net": formater_monnaie_empire(interets_terme), "Solde Final": formater_monnaie_empire(capital_final_lineaire), "Performance": f"+{(interets_terme/capital_brut*100):.1f}%" if capital_brut > 0 else "0%"},
+            {"Méthode": "🔄 Mode Pivot Quotidien (Composé)", "Bénéfice Net": formater_monnaie_empire(interets_compose), "Solde Final": formater_monnaie_empire(capital_final_compose), "Performance": f"+{((capital_final_compose/capital_brut - 1)*100):.1f}%" if capital_brut > 0 else "0%"}
+        ]
+        st.dataframe(pd.DataFrame(donnees_comp_ce), use_container_width=True, hide_index=True)
 
         st.markdown("##### 📈 Courbe d'évolution du capital sur la période")
         points_c = []
         for j in range(0, choix_duree_jeu + 1):
             points_c.append({
                 "Jour Réel": f"J+{j}",
-                "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_mensuel_jeu * j))),
-                "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_mensuel_jeu) ** j)))
+                "Option Classique (Bloqué)": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
+                "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
         st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel"), use_container_width=True)
 
@@ -134,14 +136,17 @@ else:
         
         st.write(f"Taux théorique sur cette tranche : **{taux_epargne_auto:.2f}%**")
         
-        points_c = []
+        taux_decimal = taux_epargne_auto / 100.0
+        taux_journalier_reel = taux_decimal / 12.0
+        
+        points_l = []
         for j in range(0, 13):
-            points_c.append({
+            points_l.append({
                 "Jour Réel": f"J+{j}",
-                "Option Bloquée": float(capital_brut + int(capital_brut * (taux_decimal * (j / 12.0)))),
+                "Option Bloquée": float(capital_brut + int(capital_brut * (taux_journalier_reel * j))),
                 "Option Pivot Quotidien": float(int(capital_brut * ((1.0 + taux_journalier_reel) ** j)))
             })
-        st.line_chart(pd.DataFrame(points_c).set_index("Jour Réel"), use_container_width=True)
+        st.line_chart(pd.DataFrame(points_l).set_index("Jour Réel"), use_container_width=True)
 
     # ---------------------------------------------------------------------
     # 🏦 ONGLET EMPRUNTS
