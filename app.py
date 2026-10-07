@@ -129,7 +129,7 @@ page_renta_const = st.Page("pages/05_analyse_locative.py", title="Analyse Locati
 page_renta_reno = st.Page("pages/06_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
 page_synthese = st.Page("pages/07_synthese_opportunites.py", title="🏆 Top Opportunités", icon="✨")
 page_admin = st.Page("pages/08_admin.py", title="⚙️ Espace Administration", icon="🛠️")
-page_banque = st.Page("pages/09_banque_epargne.py", title="🏛️ Banque & Épargne", icon="🏛️")
+
 page_cascade = st.Page("pages/10_banque_cascade.py", title="🔥 Cascade Optimisée", icon="⚔️")
 page_epargne = st.Page("pages/11_banque_epargne.py", title="📈 Simulateur Épargne", icon="💵")
 page_credits = st.Page("pages/12_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉")
