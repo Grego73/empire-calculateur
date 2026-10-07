@@ -128,56 +128,51 @@ if capital_brut > 0:
         txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
-        # --- CALCUL DES TAUX DE RENDEMENT RÉELS GLOBAUX ---
+        # =========================================================================
+        # 📊 AFFICHAGE DE TOUTES LES LIGNES COMPTABLES DE L'IMPACT FINANCIER
+        # =========================================================================
+        
+        # --- CALCULS DES RENDEMENTS GLOBAUX ---
         rendement_reel_cascade = (float(total_interets_optimises) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
         rendement_reel_brut = (float(interets_gros_bloc) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
-        surplus_rendement = rendement_reel_cascade - rendement_reel_brut
+        surplus_rendement = rendimiento_reel_cascade - rendement_reel_brut
 
+        # 1️⃣ LIGNE 1 : LES INTÉRÊTS SUR LE TERME (12 MOIS)
         st.markdown("### 📊 Impact Financier (Ajusté)")
         c_op1, c_op2, c_op3 = st.columns(3)
         with c_op1: 
-            st.metric(
-                label=f"🎯 Gain OPTIMISÉ {label_produit}", 
-                value=txt_optimise, 
-                delta=f"📈 Rendement : {rendement_reel_cascade:.2f}%"
-            )
+            st.metric(label=f"🎯 Gain OPTIMISÉ {label_produit}", value=txt_optimise, delta=f"📈 Rendement : {rendement_reel_cascade:.2f}%")
         with c_op2: 
-            st.metric(
-                label="🛑 Gain BRUT (1 dépôt unique / 12m)", 
-                value=txt_brut, 
-                delta=f"📉 Rendement : {rendement_reel_brut:.2f}%", 
-                delta_color="inverse"
-            )
+            st.metric(label="🛑 Gain BRUT (1 dépôt unique / 12m)", value=txt_brut, delta=f"📉 Rendement : {rendement_reel_brut:.2f}%", delta_color="inverse")
         with c_op3: 
-            st.metric(
-                label="👑 Surplus Net Sauvé", 
-                value=txt_sauve, 
-                delta=f"🔥 Gain de Taux : +{surplus_rendement:.2f}%"
-            )
+            st.metric(label="👑 Surplus Net Sauvé", value=txt_sauve, delta=f"🔥 Gain de Taux : +{surplus_rendement:.2f}%")
 
-
-        # --- 🔥 NOUVEAU BLOC : COMPARAISON DES GAINS MOYENS PAR JOUR RÉEL ---
+        # 2️⃣ LIGNE 2 : LES INTÉRÊTS MOYENS PAR JOUR RÉEL (24H)
         st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
-        
-        # Calcul des gains journaliers bruts
         gain_jour_optimise = total_interets_optimises // 12
         gain_jour_brut_unique = interets_gros_bloc // 12
         surplus_jour = gain_jour_optimise - gain_jour_brut_unique
         
-        # Formatage avec la même lettre (règle des 10 000)
         txt_j_opti = f"{float(gain_jour_optimise) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_j_brut = f"{float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_j_surplus = f"{float(surplus_jour) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         
-        # --- 🔥 NOUVEAU BLOC : COMPARAISON DES TOTAUX CUMULÉS (CAPITAL + INTÉRÊTS) ---
+        cj1, cj2, cj3 = st.columns(3)
+        with cj1:
+            st.metric("✨ Intérêts / Jour (Cascade)", txt_j_opti)
+            st.caption("Gain moyen toutes les 24h avec fractionnement")
+        with cj2:
+            st.metric("⏳ Intérêts / Jour (Unique)", txt_j_brut)
+            st.caption("Gain moyen toutes les 24h sans fractionnement")
+        with cj3:
+            st.metric("👑 Surplus Moyen / Jour", txt_j_surplus, "Gagné en plus chaque jour")
+
+        # 3️⃣ LIGNE 3 : SOLDE FINAL CUMULÉ (CAPITAL + INTÉRÊTS)
         st.markdown("##### 💰 Solde Total Cumulé au terme des 12 Jours (Capital + Intérêts)")
-        
-        # Calcul des masses financières globales (Entiers infinis)
         solde_final_cascade = capital_brut + total_interets_optimises
         solde_final_brut_unique = capital_brut + interets_gros_bloc
         surplus_solde_final = solde_final_cascade - solde_final_brut_unique
         
-        # Formatage avec la même lettre de palier (règle des 10 000)
         txt_total_cascade = f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_total_brut = f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_total_surplus = f"{float(surplus_solde_final) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
