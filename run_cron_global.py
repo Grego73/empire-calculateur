@@ -22,7 +22,7 @@ print("=========================================================================
 print(f"[TRACE] Heure France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
 
 # 3. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h25 et 3h55)
-if force_run or (heure_locale == 3 and 25 <= minute_locale <= 55):
+if force_run or (heure_locale == 3):
     print("🚀 Créneau de 03h30 validé ou Exécution forcée. Démarrage de la mise à jour complète...")
     
     # Lecture du secret d'accès Firebase NoSQL
