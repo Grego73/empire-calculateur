@@ -173,6 +173,9 @@ if capital_brut > 0:
     # =========================================================================
     # 🧮 CALCULS PRÉALABLES DES MASSES FINANCIÈRES GLOBALES
     # =========================================================================
+    if 'total_interets_optimises' not in locals() and 'total_interets_paliers_de_base' in locals():
+        total_interets_optimises = total_interets_paliers_de_base
+
     solde_final_cascade = capital_base_calcul + total_interets_optimises
     solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
 
@@ -202,7 +205,7 @@ if capital_brut > 0:
     suivi_unique = []
 
     for jour in range(1, 13):
-        # 1. Cascade Fractionnée (2.78 R au total)
+        # 1. Cascade Fractionnée
         solde_dep_cas = capital_base_calcul + (gain_jour_optimise * (jour - 1))
         solde_fin_cas = capital_base_calcul + (gain_jour_optimise * jour)
         suivi_cascade.append({
@@ -212,7 +215,7 @@ if capital_brut > 0:
             "Solde Cumulé (Ø)": f"{int(solde_fin_cas):,}".replace(",", " ")
         })
 
-        # 2. Unique Direct (0.12 R au total à cause des 2%)
+        # 2. Unique Direct (Taux écrasé)
         solde_dep_uni = capital_base_calcul + (gain_jour_brut_unique * (jour - 1))
         solde_fin_uni = capital_base_calcul + (gain_jour_brut_unique * jour)
         suivi_unique.append({
