@@ -411,6 +411,56 @@ else:
         with c2: st.metric(label="🏛️ À Rendre", value=f"{formater_monnaie_empire(remboursement_total)}")
         with c3: st.metric(label="📅 Échéance / Jour Réel", value=f"{formater_monnaie_empire(mensualite_jeu)}")
 
+            # =========================================================================
+            # 📋 TABLEAU DE SUIVI QUOTIDIEN SUR 12 JOURS (PIVOT ET REPLACEMENT)
+            # =========================================================================
+            st.markdown("---")
+            st.subheader("📅 Plan de Tir Journalier : Évolution du Pivot sur 12 Jours")
+            st.caption("Ce tableau simule la trajectoire réelle de votre capital si vous effectuez la manipulation de retrait et de replacement toutes les 24h réelles.")
+
+            suivi_jours = []
+            
+            # On calcule le taux journalier global combiné basé sur les livrets ouverts de ta cascade
+            # Pour la démonstration exacte du pivot à 100% (comme sur ton écran à 100 Ø)
+            capital_courant_simulation = int(min(capital_enveloppe, plafond_produit))
+            
+            # Extraction des caractéristiques de blocs pour appliquer le bon taux moyen pondéré
+            total_gains_24h_initial = 0
+            for bloc in repartition_livrets:
+                if "Valeur Brute (À COPIER EN JEU)" in bloc:
+                    val_b = int(bloc["Valeur Brute (À COPIER EN JEU)"])
+                    tx_b = float(bloc["Taux Garanti"].replace("%", "")) / 100.0
+                    total_gains_24h_initial += int(val_b * (tx_b / 12.0))
+            
+            # Ratio de rendement journalier pour appliquer la capitalisation glissante
+            if capital_courant_simulation > 0:
+                taux_journalier_moyen = float(total_gains_24h_initial) / capital_courant_simulation
+            else:
+                taux_journalier_moyen = 0.0
+
+            # Génération des 12 lignes du calendrier réel
+            for jour in range(1, 13):
+                capital_depart_jour = capital_courant_simulation
+                # Calcul de l'intérêt créé durant cette journée de 24h
+                interet_cree_ce_jour = int(capital_depart_jour * taux_journalier_moyen)
+                # Replacement immédiat : les intérêts fusionnent avec la base pour le lendemain
+                capital_fin_jour = capital_depart_jour + interet_cree_ce_jour
+                
+                suivi_jours.append({
+                    "Jour Réel (Mois Jeu)": f"Jour {jour}",
+                    "Capital Initial (Ø)": f"{capital_depart_jour:,}".replace(",", " "),
+                    "Intérêts Gagnés (24h) (Ø)": f"+ {interet_cree_ce_jour:,}".replace(",", " "),
+                    "Capital Final (Replaced) (Ø)": f"{capital_fin_jour:,}".replace(",", " ")
+                })
+                
+                # Mise à jour du capital pour la boucle du jour suivant
+                capital_courant_simulation = capital_fin_jour
+
+            # Rendu visuel de la table pour Grego73
+            df_suivi_daily = pd.DataFrame(suivi_jours)
+            st.dataframe(df_suivi_daily, use_container_width=True, hide_index=True)
+
+
 # =========================================================================
 # 🏛 GRILLES DE RÉFÉRENCE NATIVES DU SERVEUR
 # =========================================================================
