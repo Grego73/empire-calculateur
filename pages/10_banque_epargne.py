@@ -3,7 +3,11 @@ import pandas as pd
 from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNAIRE_PALIERS
 
 # Configuration de la page
-st.set_page_config(page_title="Banque Fédérale - Monde 8", layout="wide")
+st.set_page_config(
+    page_title="Banque Fédérale - Monde 8", 
+    layout="wide", # Force l'affichage sur 100% de la largeur de l'écran
+    initial_sidebar_state="expanded" # Garde le menu de gauche bien ouvert
+)
 
 st.title("🏛️ Système Bancaire Central & Cascade Cumulative — Monde 8")
 st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet d'épargne (12 mois de jeu) dure **12 jours réels**.")
