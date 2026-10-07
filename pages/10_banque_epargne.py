@@ -5,8 +5,8 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNA
 # Configuration de la page
 st.set_page_config(page_title="Banque Fédérale - Monde 8", layout="wide")
 
-st.title("🏛️ Système Bancaire Central & Optimiseur — Monde 8")
-st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet de livret/épargne (12 mois de jeu) dure **12 jours réels**.")
+st.title("🏛️ Système Bancaire Central & Cascade Cumulative — Monde 8")
+st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet d'épargne (12 mois de jeu) dure **12 jours réels**.")
 
 # =========================================================================
 # 📊 ARCHITECTURE DES GRILLES TARIFAIRES OFFICIELLES (ENTIERS TRÈS GRANDS)
@@ -15,25 +15,25 @@ st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle compl
 PLAFOND_LIVRET_I = 6 * DICTIONNAIRE_PALIERS.get("R", 10**27)  # 6 R
 PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)   # 4 R
 
-# Grille de référence pour l'affichage et la recherche de taux brut
-GRILLE_EPARGNE = [
-    {"seuil": 0, "taux": 100.0},
-    {"seuil": 300_000_010 * 10**18, "taux": 80.0},        # 300_000_010 E
-    {"seuil": 600_000_010 * 10**18, "taux": 60.0},        # 600_000_010 E
-    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},      # 2_000_000_100 E
-    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},      # 5_000_000_100 E
-    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},     # 10_000_001_000 E
-    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}       # 15_000_001_000 E
+# Liste des seuils bruts officiels du jeu pour le calcul cumulatif
+seuils_officiels = [
+    {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
+    {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
+    {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
+    {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
+    {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
+    {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
-# Déclaration globale de la grille stricte de cascade pour éviter le NameError
-seuils_stricts = [
-    {"nom": "Palier 1 (Taux 100%)", "limite": 300_000_010 * 10**18, "taux": 100.0},
-    {"nom": "Palier 2 (Taux 80%)", "limite": 600_000_010 * 10**18, "taux": 80.0},
-    {"nom": "Palier 3 (Taux 60%)", "limite": 2_000_000_100 * 10**18, "taux": 60.0},
-    {"nom": "Palier 4 (Taux 40%)", "limite": 5_000_000_100 * 10**18, "taux": 40.0},
-    {"nom": "Palier 5 (Taux 20%)", "limite": 10_000_001_000 * 10**18, "taux": 20.0},
-    {"nom": "Palier 6 (Taux 10%)", "limite": 15_000_001_000 * 10**18, "taux": 10.0}
+# Grille brute pour la recherche du taux global unifié
+GRILLE_EPARGNE = [
+    {"seuil": 0, "taux": 100.0},
+    {"seuil": 300_000_010 * 10**18, "taux": 80.0},
+    {"seuil": 600_000_010 * 10**18, "taux": 60.0},
+    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},
+    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},
+    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},
+    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}
 ]
 
 GRILLE_EMPRUNTS = [
@@ -69,124 +69,114 @@ else:
     taux_epargne_auto = determiner_taux(capital_brut, GRILLE_EPARGNE)
     taux_emprunt_auto = determiner_taux(capital_brut, GRILLE_EMPRUNTS)
 
-    # --- TABS DES PRODUITS BANCAIRES ---
-    tab_opti, tab_compte, tab_livret_i, tab_emprunt = st.tabs([
-        "🔥 1. Découpage Optimisé (Cascade)",
+    # --- TABS PRINCIPAUX DES PRODUITS BANCAIRES ---
+    tab_opti, tab_compte_brut, tab_livret_brut, tab_emprunt = st.tabs([
+        "🔥 1. Découpages Optimisés (Cascade)",
         "📈 2. Compte Épargne (Dépôt Unique)", 
         "🔒 3. Livret I (Dépôt Unique)", 
         "🏦 4. Crédits (Emprunts)"
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE ACCUMULÉE (FORMULE GREGO73)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (SOUS-ONGLETS PRODUITS)
     # ---------------------------------------------------------------------
     with tab_opti:
-        st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
-        st.info("Cette matrice sature chaque tranche en calculant l'espace disponible par rapport au capital cumulé des paliers précédents.")
-        
-        capital_restant = int(capital_brut)
-        repartition_livrets = []
-        total_interets_optimises = 0
-        capital_deja_place = 0  # Suivi du capital cumulé total pour appliquer ta formule
-        
-        # Liste des seuils bruts officiels du jeu pour le calcul cumulatif
-        seuils_officiels = [
-            {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
-            {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
-            {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
-            {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
-            {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
-            {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
-        ]
+        sub_tab_livret, sub_tab_compte = st.tabs(["🔒 Cascade Livrets I (Max 6 R)", "📈 Cascade Comptes Épargnes (Max 4 R)"])
 
-        for palier in seuils_officiels:
-            if capital_restant <= 0:
-                break
+        def generer_cascade_cumulative(capital_enveloppe, plafond_produit, label_produit):
+            capital_restant = min(int(capital_enveloppe), int(plafond_produit))
+            
+            if int(capital_enveloppe) > int(plafond_produit):
+                st.error(f"🛑 L'enveloppe saisie dépasse le plafond autorisé pour ce produit ({formater_monnaie_empire(plafond_produit)} Ø). Le calcul a été bridé au maximum légal.")
+            
+            repartition_livrets = []
+            total_interets_optimises = 0
+            capital_deja_place = 0
+            
+            for palier in seuils_officiels:
+                if capital_restant <= 0:
+                    break
+                    
+                taux_palier = palier["taux"]
+                seuil_max_strict = int(palier["seuil_max"])
                 
-            taux_palier = palier["taux"]
-            seuil_max_strict = int(palier["seuil_max"])
-            
-            # 🔥 TA FORMULE EXACTE : (Seuil Max du Palier - 1) - Tout ce qui a déjà été placé avant
-            montant_parfait_livret = (seuil_max_strict - 1) - capital_deja_place
-            
-            # S'il reste moins d'argent que la capacité du palier, on prend tout le reste
-            montant_a_placer = min(capital_restant, montant_parfait_livret)
-            
-            if montant_a_placer > 0:
-                # Calcul des intérêts (12 mois de jeu)
-                gain_terme = int(montant_a_placer * (taux_palier / 100.0))
-                # 🔥 AJOUT DU GAIN PAR JOUR RÉEL (Intérêts divisés par 12)
-                gain_journalier = gain_terme // 12
+                # Formule cumulative Grego73 : (Seuil Max - 1) - Déjà placé avant
+                montant_parfait_livret = (seuil_max_strict - 1) - capital_deja_place
+                montant_a_placer = min(capital_restant, montant_parfait_livret)
                 
-                # Formatages visuels
-                valeur_brute_lisible = f"{montant_a_placer:,}".replace(",", " ")
-                gain_terme_visuel = f"~ {gain_terme // 10**18:,} E".replace(",", " ") if gain_terme >= 10**18 else f"{gain_terme:,} Ø"
-                gain_jour_visuel = f"~ {gain_journalier // 10**18:,} E".replace(",", " ") if gain_journalier >= 10**18 else f"{gain_journalier:,} Ø"
+                if montant_a_placer > 0:
+                    gain_terme = int(montant_a_placer * (taux_palier / 100.0))
+                    gain_journalier = gain_terme // 12
+                    
+                    valeur_brute_lisible = f"{montant_a_placer:,}".replace(",", " ")
+                    gain_terme_visuel = f"~ {gain_terme // 10**18:,} E".replace(",", " ") if gain_terme >= 10**18 else f"{gain_terme:,} Ø"
+                    gain_jour_visuel = f"~ {gain_journalier // 10**18:,} E".replace(",", " ") if gain_journalier >= 10**18 else f"{gain_journalier:,} Ø"
+                    
+                    repartition_livrets.append({
+                        "Type de Bloc": f"Saturateur ({palier['nom']})",
+                        "Valeur Brute (Lisible)": valeur_brute_lisible,
+                        "Taux Garanti": f"{taux_palier:.1f}%",
+                        "Gain / Jour Réel": gain_jour_visuel,
+                        "Gain au Terme (12 mois)": gain_terme_visuel,
+                        "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
+                    })
+                    
+                    total_interets_optimises += gain_terme
+                    capital_restant -= montant_a_placer
+                    capital_deja_place += montant_a_placer
+
+            if capital_restant > 0:
+                taux_minimum_banque = 2.0
+                gain_terme_residu = int(capital_restant * (taux_minimum_banque / 100.0))
+                gain_journalier_residu = gain_terme_residu // 12
+                
+                valeur_residu_lisible = f"{capital_restant:,}".replace(",", " ")
+                gain_terme_visuel = f"~ {gain_terme_residu // 10**18:,} E".replace(",", " ") if gain_terme_residu >= 10**18 else f"{gain_terme_residu:,} Ø"
+                gain_jour_visuel = f"~ {gain_journalier_residu // 10**18:,} E".replace(",", " ") if gain_journalier_residu >= 10**18 else f"{gain_journalier_residu:,} Ø"
                 
                 repartition_livrets.append({
-                    "Type de Bloc": f"Saturateur ({palier['nom']})",
-                    "Valeur Brute (Lisible)": valeur_brute_lisible,
-                    "Taux Garanti": f"{taux_palier:.1f}%",
+                    "Type de Bloc": "Excédent global (Tranche minimale 2.0%)",
+                    "Valeur Brute (Lisible)": valeur_residu_lisible,
+                    "Taux Garanti": f"{taux_minimum_banque:.1f}%",
                     "Gain / Jour Réel": gain_jour_visuel,
                     "Gain au Terme (12 mois)": gain_terme_visuel,
-                    "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
+                    "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
                 })
-                
-                total_interets_optimises += gain_terme
-                capital_restant -= montant_a_placer
-                capital_deja_place += montant_a_placer
+                total_interets_optimises += gain_terme_residu
 
-        # Si l'enveloppe globale dépasse le Palier 6 (Excédent à 2%)
-        if capital_restant > 0:
-            taux_minimum_banque = 2.0
-            gain_terme_residu = int(capital_restant * (taux_minimum_banque / 100.0))
-            gain_journalier_residu = gain_terme_residu // 12
+            if repartition_livrets:
+                df_opti_visuel = pd.DataFrame(repartition_livrets)
+                st.dataframe(
+                    df_opti_visuel,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn(
+                            "Valeur Brute (À COPIER EN JEU)",
+                            help="Passez votre souris sur la cellule et cliquez sur le bouton de copie à droite !",
+                        )
+                    }
+                )
             
-            valeur_residu_lisible = f"{capital_restant:,}".replace(",", " ")
-            gain_terme_visuel = f"~ {gain_terme_residu // 10**18:,} E".replace(",", " ") if gain_terme_residu >= 10**18 else f"{gain_terme_residu:,} Ø"
-            gain_jour_visuel = f"~ {gain_journalier_residu // 10**18:,} E".replace(",", " ") if gain_journalier_residu >= 10**18 else f"{gain_journalier_residu:,} Ø"
-            
-            repartition_livrets.append({
-                "Type de Bloc": "Excédent global (Tranche minimale 2.0%)",
-                "Valeur Brute (Lisible)": valeur_residu_lisible,
-                "Taux Garanti": f"{taux_minimum_banque:.1f}%",
-                "Gain / Jour Réel": gain_jour_visuel,
-                "Gain au Terme (12 mois)": gain_terme_visuel,
-                "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
-            })
-            total_interets_optimises += gain_terme_residu
+            interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
+            argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
-        # Rendu du tableau avec boutons de copie
-        if repartition_livrets:
-            df_opti_visuel = pd.DataFrame(repartition_livrets)
-            st.dataframe(
-                df_opti_visuel,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn(
-                        "Valeur Brute (À COPIER EN JEU)",
-                        help="Passez votre souris sur la cellule et cliquez sur le bouton de copie à droite !",
-                    )
-                }
-            )
-        else:
-            st.info("Aucun livret généré.")
+            st.markdown("### 📊 Analyse d'Impact Financier")
+            c_op1, c_op2, c_op3 = st.columns(3)
+            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
+            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
+            with c_op3: st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø")
 
-        interets_gros_bloc = int(capital_brut * (taux_epargne_auto / 100.0))
-        argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
-
-        st.markdown("### 📊 Analyse d'Impact Financier")
-        c_op1, c_op2, c_op3 = st.columns(3)
-        with c_op1: st.metric("🎯 Gain OPTIMISÉ Fractionné", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
-        with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
-        with c_op3: st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø")
+        with sub_tab_livret:
+            generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
+        with sub_tab_compte:
+            generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
 
     # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
     # ---------------------------------------------------------------------
-    with tab_compte:
-        st.subheader("📦 Configuration du Nouveau Compte Épargne")
+    with tab_compte_brut:
+        st.subheader("📦 Configuration du Nouveau Compte Épargne (Unique)")
         choix_duree_jeu = st.selectbox("Sélectionnez la durée de blocage souhaitée :", options=[6, 8, 12, 18, 24, 36, 48], format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", index=2)
         
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
@@ -220,9 +210,10 @@ else:
     # ---------------------------------------------------------------------
     # 🔒 3. LIVRET I (DÉPÔT UNIQUE)
     # ---------------------------------------------------------------------
-    with tab_livret_i:
-        st.subheader("🏛️ Situation de vos Livrets I")
+    with tab_livret_brut:
+        st.subheader("🏛️ Situation de vos Livrets I (Unique)")
         dispo_livret = max(0, PLAFOND_LIVRET_I - capital_brut)
+        
         if capital_brut > PLAFOND_LIVRET_I:
             st.error(f"🛑 Plafond de 6 R dépassé ! Tout retrait est définitif : le jeu bloquera toute réouverture. Limite : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
         else:
@@ -233,7 +224,6 @@ else:
         taux_decimal = taux_epargne_auto / 100.0
         taux_journalier_reel = taux_decimal / 12.0
         
-        # Courbe lissée du Livret I (Axe X calé sur des entiers pour bloquer le tri alphabétique)
         points_l = []
         for j in range(0, 13):
             points_l.append({
@@ -268,15 +258,8 @@ st.subheader("📜 Grilles de Référence du Serveur")
 col_t1, col_t2 = st.columns(2)
 with col_t1:
     st.markdown("**Tranches Épargne (Livrets & Comptes)**")
-    st.dataframe(
-        pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Accordé": f"{t['taux']:.1f}%"} for t in GRILLE_EPARGNE]), 
-        use_container_width=True, 
-        hide_index=True
-    )
+    st.dataframe(pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Accordé": f"{t['taux']:.1f}%"} for t in GRILLE_EPARGNE]), use_container_width=True, hide_index=True)
 with col_t2:
     st.markdown("**Tranches Emprunts (Crédits)**")
-    st.dataframe(
-        pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Facturé": f"{t['taux']:.1f}%"} for t in GRILLE_EMPRUNTS]), 
-        use_container_width=True, 
-        hide_index=True
-    )
+    st.dataframe(pd.DataFrame([{"Seuil Minimal": formater_monnaie_empire(t["seuil"]) + " Ø", "Taux Facturé": f"{t['taux']:.1f}%"} for t in GRILLE_EMPRUNTS]), use_container_width=True, hide_index=True)
+
