@@ -11,6 +11,19 @@ st.set_page_config(
 
 st.title("🏛️ Système Bancaire Central & Cascade Cumulative — Monde 8")
 st.info("🕒 Rappel temporel : **1 jour réel = 1 mois de jeu**. Un cycle complet d'épargne (12 mois de jeu) dure **12 jours réels**.")
+# Force le layout à rester en mode LARGE à 100% de l'écran, sans jamais rétrécir
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 5rem !important;
+            padding-right: 5rem !important;
+        }
+    </style>
+    """,
+    unsafe_html=True
+)
 
 # =========================================================================
 # 📊 ARCHITECTURE DES GRILLES TARIFAIRES OFFICIELLES (ENTIERS TRÈS GRANDS)
