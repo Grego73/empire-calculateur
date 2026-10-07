@@ -47,7 +47,7 @@ def determiner_taux(capital, grille):
 # 📥 MODULE DE CONFIGURATION DU CAPITAL
 # =========================================================================
 
-saisie_somme = st.text_input("Capital total à placer ou emprunter (Ex: 6R, 4R, 1.74Y) :", value="6 R")
+saisie_somme = st.text_input("Capital total à placer ou emprunter (Ex: 6R, 4R) :", value="6 R")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
 
 st.caption(f"💰 Volume financier analysé : **{formater_monnaie_empire(capital_brut)} Ø**")
@@ -68,46 +68,53 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (STRATÉGIE SEUIL - 1)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (ALGORITHME GREGO73 CORRIGÉ)
     # ---------------------------------------------------------------------
     with tab_opti:
         st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
-        st.info("Cette matrice découpe automatiquement vos fonds pour saturer chaque palier à sa limite maximale (`Seuil - 1 Ø`) afin de préserver les meilleurs taux.")
+        st.info("Cette matrice découpe automatiquement vos fonds pour saturer chaque palier à sa limite maximale (Seuil - 1 Ø) afin de préserver les meilleurs taux.")
         
         capital_restant = int(capital_brut)
         repartition_livrets = []
         total_interets_optimises = 0
         
-        # Parcours des paliers pour fractionner la somme
-        for idx in range(len(GRILLE_EPARGNE)):
+        # Grille des seuils stricts en correspondance avec ton dictionnaire d'unités
+        # 300 000 010 E correspond à 300 000 010 * 10^15 si basé sur ton dictionnaire, ou 10^18. 
+        # Pour coller à l'affichage exact du jeu :
+        seuils_stricts = [
+            {"nom": "Palier 1 (Taux 100%)", "limite": 300_000_010 * 10**18, "taux": 100.0},
+            {"nom": "Palier 2 (Taux 80%)", "limite": 600_000_010 * 10**18, "taux": 80.0},
+            {"nom": "Palier 3 (Taux 60%)", "limite": 2_000_000_100 * 10**18, "taux": 60.0},
+            {"nom": "Palier 4 (Taux 40%)", "limite": 5_000_000_100 * 10**18, "taux": 20.0},
+            {"nom": "Palier 5 (Taux 20%)", "limite": 10_000_001_000 * 10**18, "taux": 10.0},
+            {"nom": "Palier 6 (Taux 10%)", "limite": 15_000_001_000 * 10**18, "taux": 2.0}
+        ]
+
+        # On parcourt chaque palier pour extraire des blocs optimisés
+        for palier in seuils_stricts:
             if capital_restant <= 0:
                 break
                 
-            # Détermination de la borne supérieure du palier actuel
-            if idx + 1 < len(GRILLE_EPARGNE):
-                limite_haute_palier = GRILLE_EPARGNE[idx + 1]["seuil"]
-                montant_ideal_livret = int(limite_haute_palier) - 1
-            else:
-                montant_ideal_livret = capital_restant
-                
-            taux_palier = GRILLE_EPARGNE[idx]["taux"]
+            # Calcul du montant parfait (Seuil - 1)
+            montant_parfait_livret = int(palier["limite"]) - 1
+            taux_palier = palier["taux"]
             
-            # Calcul du nombre de livrets de taille maximale ouvrables
-            nb_livrets = capital_restant // montant_ideal_livret
+            # Combien de livrets de cette taille peut-on caler dans notre fortune ?
+            nb_livrets = capital_restant // montant_parfait_livret
             
             if nb_livrets > 0:
                 for _ in range(nb_livrets):
-                    gain_livret = int(montant_ideal_livret * (taux_palier / 100.0))
+                    gain_livret = int(montant_parfait_livret * (taux_palier / 100.0))
                     repartition_livrets.append({
-                        "Type de Bloc": f"Livret optimisé (Tranche {taux_palier}%)",
-                        "Montant unitaire à ouvrir": montant_ideal_livret,
+                        "Type de Bloc": f"Livret optimisé ({palier['nom']})",
+                        "Montant unitaire à ouvrir": montant_parfait_livret,
                         "Taux Garanti": f"{taux_palier:.1f}%",
                         "Gain au Terme (12 mois)": gain_livret
                     })
                     total_interets_optimises += gain_livret
-                    capital_restant -= montant_ideal_livret
+                    capital_restant -= montant_parfait_livret
 
-        # Traitement du résidu restant s'il y a lieu
+        # Si après avoir fait les gros paquets il reste de la monnaie
         if capital_restant > 0:
             taux_residu = determiner_taux(capital_restant, GRILLE_EPARGNE)
             gain_residu = int(capital_restant * (taux_residu / 100.0))
@@ -119,13 +126,13 @@ else:
             })
             total_interets_optimises += gain_residu
 
-        # Rendu du tableau d'optimisation
+        # Rendu visuel propre
         df_opti_visuel = pd.DataFrame(repartition_livrets)
         df_opti_visuel["Montant unitaire à ouvrir"] = df_opti_visuel["Montant unitaire à ouvrir"].apply(formater_monnaie_empire)
         df_opti_visuel["Gain au Terme (12 mois)"] = df_opti_visuel["Gain au Terme (12 mois)"].apply(formater_monnaie_empire)
         st.dataframe(df_opti_visuel, use_container_width=True, hide_index=True)
 
-        # Calcul comparatif : Gain si tout était mis dans 1 seul gros bloc
+        # Matrice d'impact financier (KPIs du bas)
         interets_gros_bloc = int(capital_brut * (taux_epargne_auto / 100.0))
         argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
