@@ -121,10 +121,11 @@ if capital_brut > 0:
     with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
 
     # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX CÔTE À CÔTE
+    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX EMPILÉS SANS DÉFILEMENT (SCROLL)
     # =========================================================================
     st.markdown("---")
     st.subheader("📅 Plan de Tir Journalier : Comparatif du Pivot sur 12 Jours")
+    st.caption("Ces tableaux simulent l'évolution de votre capital jour après jour avec récupération et replacement quotidien des intérêts.")
 
     capital_courant_cascade = int(capital_base_calcul)
     taux_j_cascade = float(gain_jour_optimise) / capital_courant_cascade if capital_courant_cascade > 0 else 0.0
@@ -141,7 +142,7 @@ if capital_brut > 0:
         int_j_cas = int(cap_dep_cas * taux_j_cascade)
         cap_fin_cas = cap_dep_cas + int_j_cas
         suivi_cascade.append({
-            "Jour Réel": f"Jour {jour}",
+            "Jour Réel": f"Jour {jour:02d}",
             "Solde Départ (Ø)": f"{cap_dep_cas:,}".replace(",", " "),
             "Intérêts (24h) (Ø)": f"+ {int_j_cas:,}".replace(",", " "),
             "Solde Final (Ø)": f"{cap_fin_cas:,}".replace(",", " ")
@@ -153,17 +154,18 @@ if capital_brut > 0:
         int_j_uni = int(cap_dep_uni * taux_j_unique)
         cap_fin_uni = cap_dep_uni + int_j_uni
         suivi_unique.append({
-            "Jour Réel": f"Jour {jour}",
+            "Jour Réel": f"Jour {jour:02d}",
             "Solde Départ (Ø)": f"{cap_dep_uni:,}".replace(",", " "),
             "Intérêts (24h) (Ø)": f"+ {int_j_uni:,}".replace(",", " "),
             "Solde Final (Ø)": f"{cap_fin_uni:,}".replace(",", " ")
         })
         capital_courant_unique = cap_fin_uni
 
-    col_tab1, col_tab2 = st.columns(2)
-    with col_tab1:
-        st.markdown("**🔒 Méthode 1 : Pivot Quotidien en Cascade (Fractionné)**")
-        st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True)
-    with col_tab2:
-        st.markdown("**🛑 Méthode 2 : Pivot Quotidien Unique (Un seul gros bloc)**")
-        st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True)
+    # Affichage vertical (l'un sur l'autre) et forçage de la hauteur à 500px pour dérouler les 12 lignes
+    st.markdown("#### **🔒 Méthode 1 : Pivot Quotidien en Cascade (Fractionné)**")
+    st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True, height=460)
+    
+    st.markdown("<br>", unsafe_allow_html=True) # Petit espace
+    
+    st.markdown("#### **🛑 Méthode 2 : Pivot Quotidien Unique (Un seul gros bloc)**")
+    st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=460)
