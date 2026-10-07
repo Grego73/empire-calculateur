@@ -128,7 +128,6 @@ if capital_brut > 0:
         txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
         txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
-        st.markdown("### 📊 Impact Financier (Ajusté)")
         # --- CALCUL DES TAUX DE RENDEMENT RÉELS GLOBAUX ---
         rendement_reel_cascade = (float(total_interets_optimises) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
         rendement_reel_brut = (float(interets_gros_bloc) / float(capital_brut) * 100) if capital_brut > 0 else 0.0
