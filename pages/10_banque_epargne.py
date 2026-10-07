@@ -78,58 +78,70 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (VALEUR BRUTE EN PREMIER)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE GLISSANTE (CORRIGÉ VRAIE RÈGLE)
     # ---------------------------------------------------------------------
     with tab_opti:
         st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
-        st.info("Cette matrice découpe automatiquement vos fonds. Utilisez les boutons de copie à droite pour coller les valeurs brutes directement en jeu.")
+        st.info("Cette matrice sature le montant maximum autorisé pour chaque tranche (Seuil - 1 Ø) et fait glisser le reste de vos fonds vers les paliers inférieurs.")
         
         capital_restant = int(capital_brut)
         repartition_livrets = []
         total_interets_optimises = 0
         
-        for palier in seuils_stricts:
+        # On parcourt chaque palier l'un après l'autre
+        for idx, palier in enumerate(seuils_stricts):
+            if capital_restant <= 0:
+                break
+                
             limite_seuil_brute = int(palier["limite"])
-            montant_parfait_livret = limite_seuil_brute - 1
             taux_palier = palier["taux"]
             
-            nb_livrets = capital_restant // montant_parfait_livret
+            # Pour chaque palier, on calcule la taille maximale disponible dans cette tranche
+            if idx == 0:
+                # Premier palier : on prend la limite brute complète - 1 Ø
+                montant_parfait_livret = limite_seuil_brute - 1
+            else:
+                # Paliers suivants : l'espace disponible dans cette tranche correspond à (Seuil Actuel - Seuil Précédent)
+                seuil_precedent = int(seuils_stricts[idx-1]["limite"])
+                montant_parfait_livret = (limite_seuil_brute - seuil_precedent) - 1
             
-            if nb_livrets > 0:
-                for _ in range(nb_livrets):
-                    gain_livret = int(montant_parfait_livret * (taux_palier / 100.0))
-                    
-                    gain_e = gain_livret // 10**18
-                    
-                    # Séparateur par milliers (espaces) pour la valeur brute lisible
-                    valeur_brute_lisible = f"{montant_parfait_livret:,}".replace(",", " ")
-                    
-                    repartition_livrets.append({
-                        "Type de Bloc": f"Livret optimisé ({palier['nom']})",
-                        "Valeur Brute (Lisible)": valeur_brute_lisible,
-                        "Taux Garanti": f"{taux_palier:.1f}%",
-                        "Gain au Terme (12 mois)": f"~ {gain_e:,} E".replace(",", " "),
-                        "Valeur Brute (À COPIER EN JEU)": str(montant_parfait_livret)
-                    })
-                    total_interets_optimises += gain_livret
-                    capital_restant -= montant_parfait_livret
+            # Sécurité si le capital restant est plus petit que l'espace du palier
+            montant_a_placer = min(capital_restant, montant_parfait_livret)
+            
+            if montant_a_placer > 0:
+                gain_livret = int(montant_a_placer * (taux_palier / 100.0))
+                valeur_brute_lisible = f"{montant_a_placer:,}".replace(",", " ")
+                
+                # Formatage du gain pour l'affichage (si > 10^18 on affiche en E, sinon en Ø)
+                gain_visuel = f"~ {gain_livret // 10**18:,} E".replace(",", " ") if gain_livret >= 10**18 else f"{gain_livret:,} Ø"
+                
+                repartition_livrets.append({
+                    "Type de Bloc": f"Saturateur ({palier['nom']})",
+                    "Valeur Brute (Lisible)": valeur_brute_lisible,
+                    "Taux Garanti": f"{taux_palier:.1f}%",
+                    "Gain au Terme (12 mois)": gain_visuel,
+                    "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
+                })
+                
+                total_interets_optimises += gain_livret
+                capital_restant -= montant_a_placer
 
+        # Si après avoir parcouru tous les paliers officiels il reste un reliquat massif (fortune > Palier 6)
         if capital_restant > 0:
-            taux_residu = determiner_taux(capital_restant, GRILLE_EPARGNE)
-            gain_residu = int(capital_restant * (taux_residu / 100.0))
-            
-            gain_residu_e = gain_residu // 10**18
+            taux_minimum_banque = 2.0  # Taux de la dernière tranche pour l'excédent
+            gain_residu = int(capital_restant * (taux_minimum_banque / 100.0))
             valeur_residu_lisible = f"{capital_restant:,}".replace(",", " ")
             
             repartition_livrets.append({
-                "Type de Bloc": "Reliquat final de l'enveloppe",
+                "Type de Bloc": "Excédent global (Tranche minimale 2.0%)",
                 "Valeur Brute (Lisible)": valeur_residu_lisible,
-                "Taux Garanti": f"{taux_residu:.1f}%",
-                "Gain au Terme (12 mois)": f"{gain_residu_e:,} E".replace(",", " "),
+                "Taux Garanti": f"{taux_minimum_banque:.1f}%",
+                "Gain au Terme (12 mois)": f"~ {gain_residu // 10**18:,} E".replace(",", " ") if gain_residu >= 10**18 else f"{gain_residu:,} Ø",
                 "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
             })
             total_interets_optimises += gain_residu
 
+        # Génération de la table Streamlit avec le bouton de copie
         if repartition_livrets:
             df_opti_visuel = pd.DataFrame(repartition_livrets)
             st.dataframe(
@@ -154,7 +166,6 @@ else:
         with c_op1: st.metric("🎯 Gain OPTIMISÉ Fractionné", f"{formater_monnaie_empire(total_interets_optimises)} Ø")
         with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", f"{formater_monnaie_empire(interets_gros_bloc)} Ø", f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
         with c_op3: st.metric("👑 Surplus Net Sauvé", f"{formater_monnaie_empire(argent_sauve)} Ø")
-
 
     # ---------------------------------------------------------------------
     # 📈 2. COMPTE ÉPARGNE (DÉPÔT UNIQUE)
