@@ -68,54 +68,43 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (CORRECTIONS UNITÉS OFFICIELLES)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE (AVEC COPIER-COLLER DIRECT)
     # ---------------------------------------------------------------------
     with tab_opti:
         st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
-        st.info("Cette matrice découpe automatiquement vos fonds pour saturer chaque palier à sa limite maximale (Seuil - 1 Ø) afin de préserver les meilleurs taux.")
+        st.info("Cette matrice découpe automatiquement vos fonds. Utilisez les boutons de copie à droite pour coller les valeurs brutes directement en jeu.")
         
         capital_restant = int(capital_brut)
         repartition_livrets = []
         total_interets_optimises = 0
         
-        # Correspondance exacte avec les 27 zéros du jeu (Seuils en valeurs absolues brutes)
-        seuils_stricts = [
-            {"nom": "Palier 1 (Taux 100%)", "limite": 300000010 * 10**18, "taux": 100.0},
-            {"nom": "Palier 2 (Taux 80%)", "limite": 600000010 * 10**18, "taux": 80.0},
-            {"nom": "Palier 3 (Taux 60%)", "limite": 2000000100 * 10**18, "taux": 60.0},
-            {"nom": "Palier 4 (Taux 40%)", "limite": 5000000100 * 10**18, "taux": 40.0},
-            {"nom": "Palier 5 (Taux 20%)", "limite": 10000001000 * 10**18, "taux": 20.0},
-            {"nom": "Palier 6 (Taux 10%)", "limite": 15000001000 * 10**18, "taux": 10.0}
-        ]
-
-        # On parcourt chaque palier pour extraire des blocs optimisés
+        # Parcours de chaque palier pour extraire des blocs optimisés
         for palier in seuils_stricts:
             limite_seuil_brute = int(palier["limite"])
             montant_parfait_livret = limite_seuil_brute - 1
             taux_palier = palier["taux"]
             
-            # Combien de livrets de cette taille peut-on ouvrir ?
+            # Combien de livrets de cette taille peut-on caler dans notre fortune ?
             nb_livrets = capital_restant // montant_parfait_livret
             
             if nb_livrets > 0:
                 for _ in range(nb_livrets):
                     gain_livret = int(montant_parfait_livret * (taux_palier / 100.0))
                     
-                    # FORMATAGE SANS VIRGULE EN COMPTANT EN UNITÉS ENTIÈRES "E"
                     val_e = limite_seuil_brute // 10**18
                     gain_e = gain_livret // 10**18
                     
                     repartition_livrets.append({
                         "Type de Bloc": f"Livret optimisé ({palier['nom']})",
-                        "Montant à ouvrir": f"{val_e:,} E - 1 Ø".replace(",", " "),
+                        "Affichage Empire": f"{val_e:,} E - 1 Ø".replace(",", " "),
                         "Taux Garanti": f"{taux_palier:.1f}%",
-                        "Gain au Terme (12 mois)": f"~ {gain_e:,} E".replace(",", " ")
+                        "Gain au Terme (12 mois)": f"~ {gain_e:,} E".replace(",", " "),
+                        "Valeur Brute (À COPIER EN JEU)": str(montant_parfait_livret) # Version texte brute pour le copier-coller
                     })
                     total_interets_optimises += gain_livret
                     capital_restant -= montant_parfait_livret
 
-
-        # Si après avoir fait les gros paquets il reste un reliquat
+        # Traitement du reliquat résiduel
         if capital_restant > 0:
             taux_residu = determiner_taux(capital_restant, GRILLE_EPARGNE)
             gain_residu = int(capital_restant * (taux_residu / 100.0))
@@ -125,20 +114,33 @@ else:
             
             repartition_livrets.append({
                 "Type de Bloc": "Reliquat final de l'enveloppe",
-                "Montant à ouvrir": f"{residu_e:,.2f} E".replace(",", " "),
+                "Affichage Empire": f"{residu_e:,.2f} E".replace(",", " "),
                 "Taux Garanti": f"{taux_residu:.1f}%",
-                "Gain au Terme (12 mois)": f"{gain_residu_e:,.2f} E".replace(",", " ")
+                "Gain au Terme (12 mois)": f"{gain_residu_e:,.2f} E".replace(",", " "),
+                "Valeur Brute (À COPIER EN JEU)": str(capital_restant) # Version texte brute pour le copier-coller
             })
             total_interets_optimises += gain_residu
 
-        # Rendu du tableau
+        # Rendu du tableau interactif avec bouton copier-coller intégré natively par Streamlit !
         if repartition_livrets:
             df_opti_visuel = pd.DataFrame(repartition_livrets)
-            st.dataframe(df_opti_visuel, use_container_width=True, hide_index=True)
+            
+            # Utilisation de st.data_editor ou st.dataframe configuré pour afficher le bouton de copie
+            st.dataframe(
+                df_opti_visuel,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn(
+                        "Valeur Brute (À COPIER EN JEU)",
+                        help="Passez votre souris sur la cellule et cliquez sur le petit bouton de copie qui apparaît à droite !",
+                    )
+                }
+            )
         else:
             st.info("Aucun livret généré.")
 
-        # Matrice d'impact financier du bas (Garde le format d'origine R ou Y global pour les totaux massifs)
+        # Matrice d'impact financier du bas
         interets_gros_bloc = int(capital_brut * (taux_epargne_auto / 100.0))
         argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
