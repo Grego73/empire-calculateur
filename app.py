@@ -129,7 +129,7 @@ page_renta_const = st.Page("pages/5_analyse_locative.py", title="Analyse Locativ
 page_renta_reno = st.Page("pages/6_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️")
 page_synthese = st.Page("pages/7_synthese_opportunites.py", title="🏆 Top Opportunités", icon="✨")
 page_admin = st.Page("pages/8_admin.py", title="⚙️ Espace Administration", icon="🛠️")
-page_banque = st.Page("pages/9_banque_epargne.py", title="🏛️ Banque & Épargne", icon="🏛️")
+page_banque = st.Page("pages/10_banque_epargne.py", title="🏛️ Banque & Épargne", icon="🏛️")
 
 pg = st.navigation({
     "Accueil": [page_home],
