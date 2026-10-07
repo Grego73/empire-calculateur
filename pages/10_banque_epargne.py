@@ -158,25 +158,28 @@ else:
                     }
                 )
             
-            # --- CORRECTION DE L'HARMONISATION DES UNITÉS ---
+            # --- HARMONISATION DES UNITÉS AVEC SEUIL DE BASCULE À 10 000 ---
             interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
             argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
             st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
             
-            # On choisit l'unité la plus adaptée pour comparer les trois valeurs sans mélanger
-            # Si le gain optimisé atteint le niveau des Rons (R), on affiche tout en R
-            unite_r = 10**27
-            unite_y = 10**24
+            unite_y = 10**24  # Yotta
+            unite_r = 10**27  # Ron
             
-            if total_interets_optimises >= unite_r:
-                txt_optimise = f"{float(total_interets_optimises) / unite_r:.2f} R Ø"
-                txt_brut = f"{float(interets_gros_bloc) / unite_r:.2f} R Ø"
-                txt_sauve = f"{float(argent_sauve) / unite_r:.2f} R Ø"
+            # Formule : On calcule la valeur en Yottas (Y)
+            valeur_en_y = float(total_interets_optimises) / unite_y
+            
+            # 🔥 RÈGLE DE BASCULE : Si la valeur est inférieure à 10 000 Y, on force l'affichage en Y
+            if valeur_en_y < 10000.0:
+                txt_optimise = f"{valeur_en_y:,.2f} Y Ø".replace(",", " ")
+                txt_brut = f"{(float(interets_gros_bloc) / unite_y):,.2f} Y Ø".replace(",", " ")
+                txt_sauve = f"{(float(argent_sauve) / unite_y):,.2f} Y Ø".replace(",", " ")
             else:
-                txt_optimise = f"{float(total_interets_optimises) / unite_y:.2f} Y Ø"
-                txt_brut = f"{float(interets_gros_bloc) / unite_y:.2f} Y Ø"
-                txt_sauve = f"{float(argent_sauve) / unite_y:.2f} Y Ø"
+                # Si on dépasse ou atteint 10 000 Y, on passe proprement à la lettre supérieure (R)
+                txt_optimise = f"{(float(total_interets_optimises) / unite_r):,.2f} R Ø".replace(",", " ")
+                txt_brut = f"{(float(interets_gros_bloc) / unite_r):,.2f} R Ø".replace(",", " ")
+                txt_sauve = f"{(float(argent_sauve) / unite_r):,.2f} R Ø".replace(",", " ")
 
             c_op1, c_op2, c_op3 = st.columns(3)
             with c_op1: 
@@ -185,6 +188,7 @@ else:
                 st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
             with c_op3: 
                 st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
+        st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
 
         with sub_tab_livret:
             generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
