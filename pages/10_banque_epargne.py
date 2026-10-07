@@ -78,70 +78,85 @@ else:
     ])
 
     # ---------------------------------------------------------------------
-    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE GLISSANTE (CORRIGÉ VRAIE RÈGLE)
+    # 🔥 1. MOTEUR DE DÉCOUPAGE EN CASCADE ACCUMULÉE (FORMULE GREGO73)
     # ---------------------------------------------------------------------
     with tab_opti:
         st.subheader("⚔️ Plan de Répartition anti-décote de l'Empire")
-        st.info("Cette matrice sature le montant maximum autorisé pour chaque tranche (Seuil - 1 Ø) et fait glisser le reste de vos fonds vers les paliers inférieurs.")
+        st.info("Cette matrice sature chaque tranche en calculant l'espace disponible par rapport au capital cumulé des paliers précédents.")
         
         capital_restant = int(capital_brut)
         repartition_livrets = []
         total_interets_optimises = 0
+        capital_deja_place = 0  # Suivi du capital cumulé total pour appliquer ta formule
         
-        # On parcourt chaque palier l'un après l'autre
-        for idx, palier in enumerate(seuils_stricts):
+        # Liste des seuils bruts officiels du jeu pour le calcul cumulatif
+        seuils_officiels = [
+            {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
+            {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
+            {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
+            {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
+            {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
+            {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
+        ]
+
+        for palier in seuils_officiels:
             if capital_restant <= 0:
                 break
                 
-            limite_seuil_brute = int(palier["limite"])
             taux_palier = palier["taux"]
+            seuil_max_strict = int(palier["seuil_max"])
             
-            # Pour chaque palier, on calcule la taille maximale disponible dans cette tranche
-            if idx == 0:
-                # Premier palier : on prend la limite brute complète - 1 Ø
-                montant_parfait_livret = limite_seuil_brute - 1
-            else:
-                # Paliers suivants : l'espace disponible dans cette tranche correspond à (Seuil Actuel - Seuil Précédent)
-                seuil_precedent = int(seuils_stricts[idx-1]["limite"])
-                montant_parfait_livret = (limite_seuil_brute - seuil_precedent) - 1
+            # 🔥 TA FORMULE EXACTE : (Seuil Max du Palier - 1) - Tout ce qui a déjà été placé avant
+            montant_parfait_livret = (seuil_max_strict - 1) - capital_deja_place
             
-            # Sécurité si le capital restant est plus petit que l'espace du palier
+            # S'il reste moins d'argent que la capacité du palier, on prend tout le reste
             montant_a_placer = min(capital_restant, montant_parfait_livret)
             
             if montant_a_placer > 0:
-                gain_livret = int(montant_a_placer * (taux_palier / 100.0))
-                valeur_brute_lisible = f"{montant_a_placer:,}".replace(",", " ")
+                # Calcul des intérêts (12 mois de jeu)
+                gain_terme = int(montant_a_placer * (taux_palier / 100.0))
+                # 🔥 AJOUT DU GAIN PAR JOUR RÉEL (Intérêts divisés par 12)
+                gain_journalier = gain_terme // 12
                 
-                # Formatage du gain pour l'affichage (si > 10^18 on affiche en E, sinon en Ø)
-                gain_visuel = f"~ {gain_livret // 10**18:,} E".replace(",", " ") if gain_livret >= 10**18 else f"{gain_livret:,} Ø"
+                # Formatages visuels
+                valeur_brute_lisible = f"{montant_a_placer:,}".replace(",", " ")
+                gain_terme_visuel = f"~ {gain_terme // 10**18:,} E".replace(",", " ") if gain_terme >= 10**18 else f"{gain_terme:,} Ø"
+                gain_jour_visuel = f"~ {gain_journalier // 10**18:,} E".replace(",", " ") if gain_journalier >= 10**18 else f"{gain_journalier:,} Ø"
                 
                 repartition_livrets.append({
                     "Type de Bloc": f"Saturateur ({palier['nom']})",
                     "Valeur Brute (Lisible)": valeur_brute_lisible,
                     "Taux Garanti": f"{taux_palier:.1f}%",
-                    "Gain au Terme (12 mois)": gain_visuel,
+                    "Gain / Jour Réel": gain_jour_visuel,
+                    "Gain au Terme (12 mois)": gain_terme_visuel,
                     "Valeur Brute (À COPIER EN JEU)": str(montant_a_placer)
                 })
                 
-                total_interets_optimises += gain_livret
+                total_interets_optimises += gain_terme
                 capital_restant -= montant_a_placer
+                capital_deja_place += montant_a_placer
 
-        # Si après avoir parcouru tous les paliers officiels il reste un reliquat massif (fortune > Palier 6)
+        # Si l'enveloppe globale dépasse le Palier 6 (Excédent à 2%)
         if capital_restant > 0:
-            taux_minimum_banque = 2.0  # Taux de la dernière tranche pour l'excédent
-            gain_residu = int(capital_restant * (taux_minimum_banque / 100.0))
+            taux_minimum_banque = 2.0
+            gain_terme_residu = int(capital_restant * (taux_minimum_banque / 100.0))
+            gain_journalier_residu = gain_terme_residu // 12
+            
             valeur_residu_lisible = f"{capital_restant:,}".replace(",", " ")
+            gain_terme_visuel = f"~ {gain_terme_residu // 10**18:,} E".replace(",", " ") if gain_terme_residu >= 10**18 else f"{gain_terme_residu:,} Ø"
+            gain_jour_visuel = f"~ {gain_journalier_residu // 10**18:,} E".replace(",", " ") if gain_journalier_residu >= 10**18 else f"{gain_journalier_residu:,} Ø"
             
             repartition_livrets.append({
                 "Type de Bloc": "Excédent global (Tranche minimale 2.0%)",
                 "Valeur Brute (Lisible)": valeur_residu_lisible,
                 "Taux Garanti": f"{taux_minimum_banque:.1f}%",
-                "Gain au Terme (12 mois)": f"~ {gain_residu // 10**18:,} E".replace(",", " ") if gain_residu >= 10**18 else f"{gain_residu:,} Ø",
+                "Gain / Jour Réel": gain_jour_visuel,
+                "Gain au Terme (12 mois)": gain_terme_visuel,
                 "Valeur Brute (À COPIER EN JEU)": str(capital_restant)
             })
-            total_interets_optimises += gain_residu
+            total_interets_optimises += gain_terme_residu
 
-        # Génération de la table Streamlit avec le bouton de copie
+        # Rendu du tableau avec boutons de copie
         if repartition_livrets:
             df_opti_visuel = pd.DataFrame(repartition_livrets)
             st.dataframe(
