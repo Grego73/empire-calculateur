@@ -170,13 +170,30 @@ if capital_brut > 0:
     with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float((total_interets_cascade_compose - total_interets_paliers_de_base) // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
 
     st.markdown("##### 💰 Solde Total Cumulé (Capital + Intérêts)")
-    ct1, ct2, ct3 = st.columns(3)
-    with ct1: st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts découpés")
-    with ct2: st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")), st.caption("Capital + Intérêts unifiés")
-    with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
+    # =========================================================================
+    # 🧮 CALCULS PRÉALABLES DES MASSES FINANCIÈRES GLOBALES
+    # =========================================================================
+    solde_final_cascade = capital_base_calcul + total_interets_optimises
+    solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
+
+    gain_jour_optimise = total_interets_optimises // 12
+    gain_jour_brut_unique = interets_gros_bloc // 12
 
     # =========================================================================
-    # 📅 PLAN DE TIR JOURNALIER LINEAIRE CORRECT ET NETTOYÉ (EMPILÉ SANS SCROLL)
+    # 💰 AFFICHAGE DE LA RANGÉE 3 : SOLDE CUMULÉ (FORTUNE FINALE)
+    # =========================================================================
+    ct1, ct2, ct3 = st.columns(3)
+    with ct1: 
+        st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+        st.caption("Capital + Intérêts découpés")
+    with ct2: 
+        st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+        st.caption("Capital + Intérêts unifiés")
+    with ct3: 
+        st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
+
+    # =========================================================================
+    # 📅 PLAN DE TIR JOURNALIER LINEAIRE (EMPILÉ SANS SCROLL — HAUTEUR 500PX)
     # =========================================================================
     st.markdown("---")
     st.subheader("📅 Plan de Tir Journalier : Comparatif des Gains sur 12 Jours")
@@ -224,4 +241,3 @@ if capital_brut > 0:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Gain Écrasé par le Barème)**")
     st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True, height=500)
-
