@@ -34,13 +34,11 @@ else:
     capital_final_lineaire = capital_brut + interets_terme_lineaire
     
     # 🔄 2. Cas Composé Quotidien (Retrait et replacement chaque jour)
-    # Formule mathématique : Capital * (1 + r/365)^365. 
-    # Pour éviter les limites de taille des floats, on utilise la puissance native sur des floats précis
     facteur_compose = (1.0 + taux_journalier) ** 365
     capital_final_compose = int(capital_brut * facteur_compose)
     interets_terme_compose = capital_final_compose - capital_brut
 
-    # Gains intermédiaires pour l'affichage (Prélèvement anticipé linéaire au prorata)
+    # Gains intermédiaires pour l'affichage (Prélèvement anticipé au prorata temporis)
     gain_journalier_brut = int(capital_brut * taux_journalier)
     gain_mensuel_brut = int(capital_brut * (taux_decimal / 12.0))
 
@@ -82,15 +80,15 @@ else:
     df_comparatif = pd.DataFrame(donnees_comparatives)
     st.dataframe(df_comparatif, use_container_width=True, hide_index=True)
 
-    # --- GRAPHIC VISUEL D'EVOLUTION THEORIQUE ---
+    # --- GRAPHIC VISUEL D'EVOLUTION THEORIQUE (CORRIGÉ) ---
     st.markdown("### 📈 Trajectoire de croissance sur 365 jours")
     
-    # Génération d'une courbe simplifiée pour imager l'écart qui se creuse
+    # Génération d'une courbe échantillonnée tous les 10 jours pour des performances fluides
     points_courbe = []
-    for jour in:
-        # Évolution Linéaire
+    for jour in range(0, 366, 10):
+        # Évolution Linéaire au prorata
         val_lineaire = capital_brut + int(capital_brut * (taux_decimal * (jour / 365.0)))
-        # Évolution Composée
+        # Évolution Composée quotidienne
         val_composee = int(capital_brut * ((1.0 + taux_journalier) ** jour))
         
         points_courbe.append({
