@@ -21,23 +21,6 @@ seuils_officiels = [
     {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
-GRILLE_EPARGNE = [
-    {"seuil": 0, "taux": 100.0},
-    {"seuil": 300_000_010 * 10**18, "taux": 80.0},
-    {"seuil": 600_000_010 * 10**18, "taux": 60.0},
-    {"seuil": 2_000_000_100 * 10**18, "taux": 40.0},
-    {"seuil": 5_000_000_100 * 10**18, "taux": 20.0},
-    {"seuil": 10_000_001_000 * 10**18, "taux": 10.0},
-    {"seuil": 15_000_001_000 * 10**18, "taux": 2.0}
-]
-
-def determiner_taux(capital, grille):
-    taux_trouve = grille[0]["taux"]
-    for tranche in grille:
-        if capital >= tranche["seuil"]:
-            taux_trouve = tranche["taux"]
-    return taux_trouve
-
 saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
 st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**")
@@ -88,9 +71,11 @@ if capital_brut > 0:
 
     st.dataframe(pd.DataFrame(repartition_livrets), use_container_width=True, hide_index=True, column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")})
 
-    # 🧮 IMPACT FINANCIER
+    # 🧮 IMPACT FINANCIER ÉPURÉ
     capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
-    taux_base_brut = determiner_taux(capital_base_calcul, GRILLE_EPARGNE)
+    
+    # Pour le Livret I brut unique sans cascade, la banque applique le taux minimum de la grille (2.0%) à cause de la masse totale
+    taux_base_brut = 2.0  
     interets_gros_bloc = int(capital_base_calcul * (taux_base_brut / 100.0))
     argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
@@ -117,13 +102,68 @@ if capital_brut > 0:
     with c_op3: st.metric(label="👑 Surplus Net Sauvé", value=txt_sauve, delta=f"🔥 Gain de Taux : +{rendement_reel_cascade - rendement_reel_brut:.2f}%")
 
     st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
+    gain_jour_optimise = total_interets_optimises // 12
+    gain_jour_brut_unique = interets_gros_bloc // 12
+    surplus_jour = gain_jour_optimise - gain_jour_brut_unique
+
     cj1, cj2, cj3 = st.columns(3)
-    with cj1: st.metric("✨ Intérêts / Jour (Cascade)", f"{float(total_interets_optimises // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with cj2: st.metric("⏳ Intérêts / Jour (Unique)", f"{float(interets_gros_bloc // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float((total_interets_optimises - interets_gros_bloc) // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj1: st.metric("✨ Intérêts / Jour (Cascade)", f"{float(gain_jour_optimise) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj2: st.metric("⏳ Intérêts / Jour (Unique)", f"{float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float(surplus_jour) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
 
     st.markdown("##### 💰 Solde Total Cumulé (Capital + Intérêts)")
+    solde_final_cascade = capital_base_calcul + total_interets_optimises
+    solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
+    
     ct1, ct2, ct3 = st.columns(3)
-    with ct1: st.metric("🧱 Fortune Finale (Cascade)", f"{float(capital_base_calcul + total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with ct2: st.metric("📦 Fortune Finale (Unique)", f"{float(capital_base_calcul + interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with ct1: st.metric("🧱 Fortune Finale (Cascade)", f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with ct2: st.metric("📦 Fortune Finale (Unique)", f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
     with ct3: st.metric("👑 Surplus Net sur la Fortune", txt_sauve)
+
+    # =========================================================================
+    # 📅 PLAN DE TIR JOURNALIER : LES 2 TABLEAUX CÔTE À CÔTE
+    # =========================================================================
+    st.markdown("---")
+    st.subheader("📅 Plan de Tir Journalier : Comparatif du Pivot sur 12 Jours")
+
+    capital_courant_cascade = int(capital_base_calcul)
+    taux_j_cascade = float(gain_jour_optimise) / capital_courant_cascade if capital_courant_cascade > 0 else 0.0
+
+    capital_courant_unique = int(capital_base_calcul)
+    taux_j_unique = (taux_base_brut / 100.0) / 12.0
+
+    suivi_cascade = []
+    suivi_unique = []
+
+    for jour in range(1, 13):
+        # 1. Cascade Fractionnée
+        cap_dep_cas = capital_courant_cascade
+        int_j_cas = int(cap_dep_cas * taux_j_cascade)
+        cap_fin_cas = cap_dep_cas + int_j_cas
+        suivi_cascade.append({
+            "Jour Réel": f"Jour {jour}",
+            "Solde Départ (Ø)": f"{cap_dep_cas:,}".replace(",", " "),
+            "Intérêts (24h) (Ø)": f"+ {int_j_cas:,}".replace(",", " "),
+            "Solde Final (Ø)": f"{cap_fin_cas:,}".replace(",", " ")
+        })
+        capital_courant_cascade = cap_fin_cas
+
+        # 2. Dépôt Unique Direct
+        cap_dep_uni = capital_courant_unique
+        int_j_uni = int(cap_dep_uni * taux_j_unique)
+        cap_fin_uni = cap_dep_uni + int_j_uni
+        suivi_unique.append({
+            "Jour Réel": f"Jour {jour}",
+            "Solde Départ (Ø)": f"{cap_dep_uni:,}".replace(",", " "),
+            "Intérêts (24h) (Ø)": f"+ {int_j_uni:,}".replace(",", " "),
+            "Solde Final (Ø)": f"{cap_fin_uni:,}".replace(",", " ")
+        })
+        capital_courant_unique = cap_fin_uni
+
+    col_tab1, col_tab2 = st.columns(2)
+    with col_tab1:
+        st.markdown("**🔒 Méthode 1 : Pivot Quotidien en Cascade (Fractionné)**")
+        st.dataframe(pd.DataFrame(suivi_cascade), use_container_width=True, hide_index=True)
+    with col_tab2:
+        st.markdown("**🛑 Méthode 2 : Pivot Quotidien Unique (Un seul gros bloc)**")
+        st.dataframe(pd.DataFrame(suivi_unique), use_container_width=True, hide_index=True)
