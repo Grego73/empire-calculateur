@@ -137,6 +137,30 @@ if capital_brut > 0:
         with c_op3: 
             st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice préservé")
 
+        # --- 🔥 NOUVEAU BLOC : COMPARAISON DES GAINS MOYENS PAR JOUR RÉEL ---
+        st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
+        
+        # Calcul des gains journaliers bruts
+        gain_jour_optimise = total_interets_optimises // 12
+        gain_jour_brut_unique = interets_gros_bloc // 12
+        surplus_jour = gain_jour_optimise - gain_jour_brut_unique
+        
+        # Formatage avec la même lettre (règle des 10 000)
+        txt_j_opti = f"{float(gain_jour_optimise) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_j_brut = f"{float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        txt_j_surplus = f"{float(surplus_jour) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        
+        cj1, cj2, cj3 = st.columns(3)
+        with cj1:
+            st.metric("✨ Intérêts / Jour (Cascade)", txt_j_opti)
+            st.caption("Gain moyen toutes les 24h avec fractionnement")
+        with cj2:
+            st.metric("⏳ Intérêts / Jour (Unique)", txt_j_brut)
+            st.caption("Gain moyen toutes les 24h sans fractionnement")
+        with cj3:
+            st.metric("👑 Surplus Moyen / Jour", txt_j_surplus, "Gagné en plus chaque jour")
+
+
         # Plan de Tir Journalier (Suivi sur 12 jours)
         st.markdown("---")
         st.subheader("📅 Plan de Tir Journalier : Évolution du Pivot sur 12 Jours")
