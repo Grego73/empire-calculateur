@@ -103,5 +103,7 @@ if capital_brut > 0:
             cap_sim = cap_fin
         st.dataframe(pd.DataFrame(suivi_jours), use_container_width=True, hide_index=True)
 
-    with sub_tab_livret: generer_ndu_cascade(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
-    with sub_tab_compte: generer_rendu_cascade(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
+        with sub_tab_livret: 
+            generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
+        with sub_tab_compte: 
+            generer_cascade_cumulative(capital_brut, PLAFOND_EPARGNE, "Comptes Épargnes")
