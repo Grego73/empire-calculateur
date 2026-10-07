@@ -194,23 +194,29 @@ else:
             # =========================================================================
             st.markdown("### 📊 Analyse d'Impact Financier : Bloqué vs Pivot Quotidien")
             
+            # --- BLOC D'AFFICHAGE AVEC SEUIL DE BASCULE STRICT À 10 000 ---
             paliers_ordonnes = [
                 ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
                 ("E", 10**18), ("P", 10**15), ("T", 10**12), ("G", 10**9), ("M", 10**6)
             ]
             
-            # La valeur la plus haute sert de repère pour l'unité commune
             valeur_repere = max(total_interets_composes_cascade, capital_brut)
             lettre_choisie = "Ø"
             diviseur_choisi = 1
             
+            # On parcourt du plus grand au plus petit
             for lettre, valeur_palier in paliers_ordonnes:
                 if valeur_repere >= valeur_palier:
-                    if (float(valeur_repere) / valeur_palier) < 10000.0:
+                    # 🔥 REGLE UNIVERSELLE DE BASCULE À 10 000 :
+                    # On ne passe à la lettre supérieure que si on a au moins "10.00" de cette unité.
+                    # Sinon (ex: si on a 1.61 Z), on préfère l'écrire dans l'unité du dessous : "1 610 E".
+                    valeur_exprimee = float(valeur_repere) / valeur_palier
+                    if valeur_exprimee >= 10.0 or lettre == "M":
                         lettre_choisie = lettre
                         diviseur_choisi = valeur_palier
                         break
                     else:
+                        # Si on a moins de 10.0 (ex: 1.61), on force le glissement vers le palier inférieur
                         continue
 
             # Formatage des 3 compteurs sur la même échelle de lettre
