@@ -25,7 +25,7 @@ seuils_officiels = [
     {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
-# Grille brute pour la recherche du taux global unifié
+# Grille de référence pour le taux global unifié
 GRILLE_EPARGNE = [
     {"seuil": 0, "taux": 100.0},
     {"seuil": 300_000_010 * 10**18, "taux": 80.0},
@@ -157,38 +157,32 @@ else:
                         )
                     }
                 )
+            else:
+                st.info("Aucun livret généré.")
             
-            # --- HARMONISATION DES UNITÉS AVEC SEUIL DE BASCULE À 10 000 ---
+            # --- BLOC D'ANALYSE FINANCIÈRE HARMONISÉ (REGLE DES 10 000 Y) ---
             interets_gros_bloc = int(min(capital_brut, plafond_produit) * (taux_epargne_auto / 100.0))
             argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
 
             st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
             
-            unite_y = 10**24  # Yotta
-            unite_r = 10**27  # Ron
-            
-            # Formule : On calcule la valeur en Yottas (Y)
+            unite_y = 10**24
+            unite_r = 10**27
             valeur_en_y = float(total_interets_optimises) / unite_y
             
-            # 🔥 RÈGLE DE BASCULE : Si la valeur est inférieure à 10 000 Y, on force l'affichage en Y
             if valeur_en_y < 10000.0:
                 txt_optimise = f"{valeur_en_y:,.2f} Y Ø".replace(",", " ")
                 txt_brut = f"{(float(interets_gros_bloc) / unite_y):,.2f} Y Ø".replace(",", " ")
                 txt_sauve = f"{(float(argent_sauve) / unite_y):,.2f} Y Ø".replace(",", " ")
             else:
-                # Si on dépasse ou atteint 10 000 Y, on passe proprement à la lettre supérieure (R)
                 txt_optimise = f"{(float(total_interets_optimises) / unite_r):,.2f} R Ø".replace(",", " ")
                 txt_brut = f"{(float(interets_gros_bloc) / unite_r):,.2f} R Ø".replace(",", " ")
                 txt_sauve = f"{(float(argent_sauve) / unite_r):,.2f} R Ø".replace(",", " ")
 
             c_op1, c_op2, c_op3 = st.columns(3)
-            with c_op1: 
-                st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
-            with c_op2: 
-                st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
-            with c_op3: 
-                st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
-        st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
+            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
+            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_epargne_auto}%", delta_color="inverse")
+            with c_op3: st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
 
         with sub_tab_livret:
             generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
@@ -200,7 +194,12 @@ else:
     # ---------------------------------------------------------------------
     with tab_compte_brut:
         st.subheader("📦 Configuration du Nouveau Compte Épargne (Unique)")
-        choix_duree_jeu = st.selectbox("Sélectionnez la durée de blocage souhaitée :", options=[6, 8, 12, 18, 24, 36, 48], format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", index=2)
+        choix_duree_jeu = st.selectbox(
+            "Sélectionnez la durée de blocage souhaitée :", 
+            options=[6, 8, 12, 18, 24, 36, 48], 
+            format_func=lambda x: f"{x} mois (jeu) / {x} jours (réels)", 
+            index=2
+        )
         
         dispo_epargne = max(0, PLAFOND_EPARGNE - capital_brut)
         if capital_brut > PLAFOND_EPARGNE:
