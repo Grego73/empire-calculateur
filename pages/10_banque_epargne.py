@@ -164,46 +164,69 @@ else:
                 st.info("Aucun livret généré.")
             
             # 2. Calcul autonome du Taux Brut sans dépendance extérieure
-            capital_base_calcul = min(capital_brut, plafond_produit)
-            taux_brut_local = 100.0
-            for tranche in GRILLE_EPARGNE:
-                if capital_base_calcul >= tranche["seuil"]:
-                    taux_brut_local = tranche["taux"]
+            # =========================================================================
+            # 🧮 MOTEUR DE CAPITALISATION COMPOSÉE SUR LE FRACTIONNEMENT (12 JOURS)
+            # =========================================================================
+            total_interets_composes_cascade = 0
             
-            interets_gros_bloc = int(capital_base_calcul * (taux_brut_local / 100.0))
-            argent_sauve = max(0, total_interets_optimises - interets_gros_bloc)
+            # Pour chaque bloc optimisé généré dans la liste, on calcule sa version composée
+            for bloc in repartition_livrets:
+                # On extrait la valeur brute numérique qui a servi au calcul
+                # Note : On ignore l'excédent global ou les lignes sans clé brute numérique directe
+                if "Valeur Brute (À COPIER EN JEU)" in bloc:
+                    valeur_bloc_brute = int(bloc["Valeur Brute (À COPIER EN JEU)"])
+                    taux_bloc_decimal = float(bloc["Taux Garanti"].replace("%", "")) / 100.0
+                    taux_bloc_journalier = taux_bloc_decimal / 12.0
+                    
+                    # Formule des intérêts composés appliqués à ce sous-livret sur 12 jours réels
+                    facteur_bloc_compose = (1.0 + taux_bloc_journalier) ** 12
+                    solde_bloc_final_compose = int(valeur_bloc_brute * facteur_bloc_compose)
+                    
+                    # Les intérêts nets générés par ce bloc avec le pivot quotidien
+                    interets_bloc_composes = solde_bloc_final_compose - valeur_bloc_brute
+                    total_interets_composes_cascade += interets_bloc_composes
 
-            # 3. Moteur d'affichage avec règle de bascule à 10 000 pour toutes les lettres
-            st.markdown("### 📊 Analyse d'Impact Financier (Unités Alignées)")
+            # Différence financière absolue entre l'option composée et l'option bloquée linéaire
+            surplus_pivot_quotidien = max(0, total_interets_composes_cascade - total_interets_optimises)
+
+            # =========================================================================
+            # 📊 AFFICHAGE DE L'ANALYSE COMPARATIVE SÉCURISÉE (BASCULE TOUTES LETTRES)
+            # =========================================================================
+            st.markdown("### 📊 Analyse d'Impact Financier : Bloqué vs Pivot Quotidien")
             
             paliers_ordonnes = [
                 ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
                 ("E", 10**18), ("P", 10**15), ("T", 10**12), ("G", 10**9), ("M", 10**6)
             ]
             
-            valeur_repere = max(total_interets_optimises, capital_brut)
+            # La valeur la plus haute sert de repère pour l'unité commune
+            valeur_repere = max(total_interets_composes_cascade, capital_brut)
             lettre_choisie = "Ø"
             diviseur_choisi = 1
             
             for lettre, valeur_palier in paliers_ordonnes:
                 if valeur_repere >= valeur_palier:
-                    # RÈGLE DE BASCULE À 10 000 : On vérifie si la valeur dans cette unité reste < 10 000
                     if (float(valeur_repere) / valeur_palier) < 10000.0:
                         lettre_choisie = lettre
                         diviseur_choisi = valeur_palier
                         break
                     else:
-                        # Si ça dépasse 10 000, on laissera la boucle chercher l'unité supérieure suivante
                         continue
 
-            txt_optimise = f"{float(total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
-            txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
-            txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+            # Formatage des 3 compteurs sur la même échelle de lettre
+            txt_bloque = f"{float(total_interets_optimises) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+            txt_compose = f"{float(total_interets_composes_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+            txt_surplus_pivot = f"{float(surplus_pivot_quotidien) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
             c_op1, c_op2, c_op3 = st.columns(3)
-            with c_op1: st.metric(f"🎯 Gain OPTIMISÉ {label_produit}", txt_optimise)
-            with c_op2: st.metric("🛑 Gain BRUT (1 seul dépôt)", txt_brut, f"Taux écrasé à {taux_brut_local}%", delta_color="inverse")
-            with c_op3: st.metric("👑 Surplus Net Sauvé", txt_sauve, "Bénéfice additionnel préservé")
+            with c_op1: 
+                st.metric(f"🎯 Option Bloquée Classique (12 jours)", txt_bloque)
+                st.caption("Fonds intacts jusqu'au terme du livret")
+            with c_op2: 
+                st.metric(f"🔄 Option Pivot Quotidien (Composé)", txt_compose)
+                st.caption("Retrait, récupération et replacement toutes les 24h")
+            with c_op3: 
+                st.metric("👑 Surplus Généré par le Pivot", txt_surplus_pivot, "Gain net additionnel si tu fais la manipulation")
 
         with sub_tab_livret:
             generer_cascade_cumulative(capital_brut, PLAFOND_LIVRET_I, "Livrets I")
