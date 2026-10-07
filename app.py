@@ -123,8 +123,12 @@ def home_page():
 # 🗂️ DÉCLARATION ABSOLUE DES PAGES DE L'EMPIRE (MONDE 8)
 # =========================================================================
 
-# 1. Accueil & Saisie
-page_home = st.Page("app.py", title="Accueil & Saisie Unique", icon="🏠")
+# =========================================================================
+# 🗂️ DÉCLARATION SÉCURISÉE DES PAGES DE L'EMPIRE (MONDE 8)
+# =========================================================================
+
+# 1. Accueil (Lié directement au script d'entrée racine sans passer par le dossier pages)
+page_home = st.Page("app.py", title="Accueil & Saisie Unique", icon="🏠")  # 💡 Change "app.py" par "main.py" si ton fichier racine s'appelle main.py
 
 # 2. Pôle Holding & Comptabilité
 page_frais = st.Page("pages/1_frais_gestion.py", title="Frais de Gestion", icon="📊")
