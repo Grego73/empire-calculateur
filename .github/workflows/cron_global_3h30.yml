@@ -2,10 +2,11 @@ name: ⏱️ Synchro Globale API Empire (Quotidien 3h30)
 
 on:
   schedule:
-    # 1:30 UTC -> 3:30 (Hiver UTC+1) | 2:30 UTC -> 4:30 (Été UTC+2 -> capturé par la tolérance de votre script Python)
     - cron: '30 1,2 * * *'
-  workflow_dispatch: # Permet toujours un déclenchement manuel en 1 clic
-
+  workflow_dispatch: # Permet toujours le déclenchement manuel
+  repository_dispatch: # NOOUVEAU : Permet au Cron Job externe de le lancer
+    types: [run_global]
+    
 jobs:
   execution_cron_global:
     runs-on: ubuntu-latest
