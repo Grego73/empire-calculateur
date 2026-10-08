@@ -23,8 +23,8 @@ force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
 print(f"[TRACE] Heure système UTC : {datetime.now().strftime('%H:%M:%S')}")
 print(f"[TRACE] Heure locale France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
 
-# 2. Validation de la fenêtre cible : Autorisé à 3h du matin (et tolérance à 4h en cas de décalage ou retard GitHub)
-heures_autorisees_global = 
+# 2. Validation de la fenêtre cible : Autorisé à 3h et 4h du matin (Tolérance retard GitHub)
+heures_autorisees_global = [3, 4]
 
 if force_run or (heure_locale in heures_autorisees_global):
     print("🚀 Fenêtre horaire confirmée par l'horloge. Démarrage de la mise à jour complète...")
@@ -50,7 +50,8 @@ if force_run or (heure_locale in heures_autorisees_global):
         sys.path.append(os.path.abspath(os.path.dirname(__file__)))
         from crons.cron_update_api import executer_mise_a_jour_cron
 
-        print("[TRACE] Déclenchement du traitement global (Exclure_players = True pour économiser les quotas NoSQL)...")
+        # RÈGLE MANDATOIRE : exclure_players=True pour économiser les quotas NoSQL
+        print("[TRACE] Déclenchement du traitement global (Exclure_players = True)...")
         journaux_execution = executer_mise_a_jour_cron(exclure_players=True)
         
         print("\n------------------- JOURNAUX DU ROBOT GLOBAL -------------------")
