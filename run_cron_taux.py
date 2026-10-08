@@ -1,83 +1,90 @@
-import os
-import sys
-import json
+import requests
 from datetime import datetime
-import zoneinfo
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, firestore
 
-print("==========================================================================")
-print("🔍 SCRIPT GITHUB ACTIONS — CRON TAUX LÉGER 4H (OPTIMISÉ ÉTÉ/HIVER)")
-print("==========================================================================")
-
-# 1. TRACE HORAIRE & FUSEAU DE L'EMPIRE
-tz_france = zoneinfo.ZoneInfo("Europe/Paris")
-heure_actuelle_france = datetime.now(tz_france)
-
-heure_locale = heure_actuelle_france.hour
-minute_locale = heure_actuelle_france.minute
-
-print(f"[TRACE] Heure système UTC : {datetime.now().strftime('%H:%M:%S')}")
-print(f"[TRACE] Heure locale France : {heure_actuelle_france.strftime('%H:%M:%S')}")
-
-evenement_github = os.environ.get("GITHUB_EVENT_NAME", "").strip().lower()
-force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
-print(f"📋 Diagnostic Horloge — Heure France : {heure_locale}h{minute_locale} | Événement GitHub : '{evenement_github}' | Run Forcé : {force_run}")
-
-# 2. ARCHITECTURE DES DOSSIERS
-print(f"[TRACE] Dossier de travail actuel : {os.getcwd()}")
-print(f"[TRACE] Liste des fichiers à la racine : {os.listdir('.')}")
-
-# Heures cibles de l'API + Heures de bascule saisonnière pour couvrir à 100% les crons de GitHub (01 min)
-heures_autorisees_jeu = [0, 1, 4, 5, 8, 9, 12, 13, 16, 17, 20, 21, 23]
-
-# 3. VALIDATION DU CRÉNEAU HORAIRE
-if force_run or (heure_locale in heures_autorisees_jeu):
-    print("🚀 Autorisation accordée par l'horloge. Initialisation du processus...")
+def executer_mise_a_jour_taux_uniquement():
+    import zoneinfo
+    # Configuration du fuseau horaire de l'Empire (Heure de Paris)
+    tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
     
-    # 4. VÉRIFICATION DU SECRET SECURE
-    secret_brut = os.environ.get("FIREBASE_CREDENTIALS_JSON", "").strip()
-    if not secret_brut:
-        print("[❌ ERREUR CRITIQUE] Le secret 'FIREBASE_CREDENTIALS_JSON' est introuvable dans GitHub Settings.")
-        sys.exit(1)
-        
+    logs = []
+    logs.append(f"⏱️ Démarrage du Cron Taux Léger : {datetime.now(tz_paris).strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Récupération du client Firestore
+    db = firestore.client()
+    
+    # 🔑 CLÉ OFFICIELLE RESTAURÉE (Respect strict de la casse)
+    API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
+    BASE_URL = "https://empireimmo.com"
+    
+    url_materials = f"{BASE_URL}/api/materials.json?key={API_KEY}"
+    url_buildings = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
+    
+    # En-tête obligatoire pour s'identifier proprement auprès de l'API du jeu
+    headers_navigation = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Application-Empire-Calculateur",
+        "Accept": "application/json"
+    }
+    
+    taux_batiments = 0
+    taux_materiaux = 0
+    
+    # 🛒 1. APPEL DE L'API MATERIALS (MATÉRIAUX)
     try:
-        structure_cles = json.loads(secret_brut)
-        print(f"[✅ COMPORTEMENT] JSON de connexion valide. Project ID : '{structure_cles.get('project_id')}'")
-    except Exception as e_json:
-        print(f"[❌ ERREUR] Le secret n'est pas un JSON valide : {e_json}")
-        sys.exit(1)
+        logs.append("[TRACE] Requête HTTP Materials lancée...")
+        rep_mat = requests.get(url_materials, headers=headers_navigation, timeout=15)
+        
+        if rep_mat.status_code == 200:
+            data_mat = rep_mat.json()
+            taux_materiaux = data_mat.get("taux_promoteur", 0)
+            logs.append(f"[✅] Authentification Materials validée. Taux extrait : {taux_materiaux}%")
+        else:
+            logs.append(f"❌ Rejet API Materials — Code HTTP {rep_mat.status_code}")
+    except Exception as e_mat:
+        logs.append(f"❌ Erreur de transmission Materials : {e_mat}")
 
-    # 5. INITIALISATION FIREBASE
-    if not firebase_admin._apps:
-        try:
-            structure_cles["private_key"] = structure_cles["private_key"].replace("\\n", "\n")
-            cred = credentials.Certificate(structure_cles)
-            firebase_admin.initialize_app(cred)
-            print("[✅ COMPORTEMENT] Firebase Admin SDK initialisé avec succès.")
-        except Exception as e_fb:
-            print(f"[❌ ERREUR] Échec d'allumage Firebase : {e_fb}")
-            sys.exit(1)
-
-    # 6. EXECUTION DU CRON METIER
+    # 🏢 2. APPEL DE L'API BUILDINGS (BÂTIMENTS)
     try:
-        sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-        from crons.cron_update_taux import executer_mise_a_jour_taux_uniquement
-        print("[✅ COMPORTEMENT] Module crons.cron_update_taux importé. Lancement du robot...")
+        logs.append("[TRACE] Requête HTTP Buildings lancée...")
+        rep_bld = requests.get(url_buildings, headers=headers_navigation, timeout=15)
         
-        journaux_metier = executer_mise_a_jour_taux_uniquement()
+        if rep_bld.status_code == 200:
+            data_bld = rep_bld.json()
+            taux_batiments = data_bld.get("taux_promoteur", 0)
+            logs.append(f"[✅] Authentification Buildings validée. Taux extrait : {taux_batiments}%")
+        else:
+            logs.append(f"❌ Rejet API Buildings — Code HTTP {rep_bld.status_code}")
+    except Exception as e_bld:
+        logs.append(f"❌ Erreur de transmission Buildings : {e_bld}")
+
+    # 3. ENREGISTREMENT ET HISTORISATION FIRESTORE AVEC HORLOGE EMPIRE
+    try:
+        taux_batiments = int(taux_batiments)
+        taux_materiaux = int(taux_materiaux)
         
-        print("\n------------------- LOGS INTERNES DU SCRIPT METIER -------------------")
-        print("\n".join(journaux_metier))
-        print("-----------------------------------------------------------------------\n")
+        # Capture des dates synchronisées sur l'heure française
+        date_liaison = datetime.now(tz_paris).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp_id = datetime.now(tz_paris).strftime("%Y%m%d_%H%M%S")
         
-        print("[✅ COMPORTEMENT] Fin du processus complet avec succès.")
-        sys.exit(0)
-    except Exception as err_execution:
-        print(f"[❌ ERREUR CRITIQUE] Le script s'est arrêté au milieu de son exécution : {err_execution}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-else:
-    print(f"💤 Créneau ignoré ({heure_locale}h{minute_locale}). Ce déclenchement automatique est réservé à l'autre saison. Veille automatique.")
-    sys.exit(0)
+        payload_taux = {
+            "date_extraction": date_liaison,
+            "date_mise_a_jour": date_liaison,
+            "taux_promoteur_batiments": taux_batiments,
+            "taux_promoteur_materiaux": taux_materiaux
+        }
+        
+        # Écriture du document fixe lu en direct par l'application Streamlit
+        db.collection("configuration").document("config_actuelle").set(payload_taux)
+        logs.append("✅ Document maître 'configuration/config_actuelle' mis à jour.")
+        
+        # Enregistrement dans la collection historique d'évolution (Courbes graphiques)
+        id_doc_historique = f"config_{timestamp_id}"
+        db.collection("configuration").document(id_doc_historique).set(payload_taux)
+        logs.append(f"📈 Historique sauvegardé sous l'ID : '{id_doc_historique}'")
+        
+        logs.append(f"🎯 Fin de session réussie ! Valeurs enregistrées en base -> Bâtiments : {taux_batiments}% | Matériaux : {taux_materiaux}%")
+    except Exception as e_db:
+        logs.append(f"💥 Erreur d'écriture NoSQL Firestore : {str(e_db)}")
+        
+    return logs
