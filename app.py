@@ -77,7 +77,7 @@ def home_page():
     if df_players_actuel is not None and not df_players_actuel.empty:
         infos_joueur = df_players_actuel[df_players_actuel["pseudo"].str.upper() == PSEUDO_JOUEUR.upper()]
         if not infos_joueur.empty:
-            row_j = infos_joueur.iloc[0]
+            row_j = infos_joueur.iloc
             m1, m2, m3 = st.columns(3)
             with m1: st.metric(label="🏆 Classement Général", value=f"{row_j['classement']}e place")
             with m2: st.metric(label="⭐ Niveau Actuel", value=f"Niveau {row_j['niveau']}")
@@ -142,7 +142,7 @@ def home_page():
 # Déclaration de l'accueil principal
 page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", default=True)
 
-# Détermination du chemin racine absolu pour éviter les pertes de repères du serveur Cloud
+# Détermination du chemin racine absolu
 RACINE = os.path.dirname(os.path.abspath(__file__))
 
 def resoudre_chemin(nom_fichier):
@@ -164,15 +164,14 @@ p_chantiers = st.Page(resoudre_chemin("06_chantiers_et_embellissement.py"), titl
 p_promos = st.Page(resoudre_chemin("07_synthese_opportunites.py"), title="🌟 Top Opportunités", icon="✨", url_path="rentabilite_promotions")
 
 p_admin = st.Page(resoudre_chemin("08_admin.py"), title="Espace Administration", icon="🛠️", url_path="admin_general")
-# p_trigger = st.Page(resoudre_chemin("09_cron_trigger_taux.py"), title="Déclencheur Crons", icon="⚙️", url_path="admin_crons")
 
-# Construction finale de la structure (p_trigger est maintenant bien instancié au-dessus !)
+# Construction finale de la structure (sans le module de trigger)
 navigation_dict = {
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
     "🏦 Pôle Bancaire Fédéral": [p_livrets, p_comptes, p_epargne, p_credits],
     "Calculs de Rentabilité": [p_locative, p_chantiers, p_promos],
-    "Administration": [p_admin, p_trigger]
+    "Administration": [p_admin]
 }
 
 # Lancement sécurisé
