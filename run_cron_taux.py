@@ -1,91 +1,61 @@
-import requests
+import os
+import sys
+import json
 from datetime import datetime
+import zoneinfo
 import firebase_admin
-from firebase_admin import credentials, firestore
-from crons.cron_update_taux import executer_mise_a_jour_taux_uniquement
+from firebase_admin import credentials
 
-def executer_mise_a_jour_taux_uniquement():
-    import zoneinfo
-    # Configuration du fuseau horaire de l'Empire (Heure de Paris)
-    tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
-    
-    logs = []
-    logs.append(f"⏱️ Démarrage du Cron Taux Léger : {datetime.now(tz_paris).strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # Récupération du client Firestore
-    db = firestore.client()
-    
-    # 🔑 CLÉ OFFICIELLE RESTAURÉE (Respect strict de la casse)
-    API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-    BASE_URL = "https://empireimmo.com"
-    
-    url_materials = f"{BASE_URL}/api/materials.json?key={API_KEY}"
-    url_buildings = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
-    
-    # En-tête obligatoire pour s'identifier proprement auprès de l'API du jeu
-    headers_navigation = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Application-Empire-Calculateur",
-        "Accept": "application/json"
-    }
-    
-    taux_batiments = 0
-    taux_materiaux = 0
-    
-    # 🛒 1. APPEL DE L'API MATERIALS (MATÉRIAUX)
-    try:
-        logs.append("[TRACE] Requête HTTP Materials lancée...")
-        rep_mat = requests.get(url_materials, headers=headers_navigation, timeout=15)
-        
-        if rep_mat.status_code == 200:
-            data_mat = rep_mat.json()
-            taux_materiaux = data_mat.get("taux_promoteur", 0)
-            logs.append(f"[✅] Authentification Materials validée. Taux extrait : {taux_materiaux}%")
-        else:
-            logs.append(f"❌ Rejet API Materials — Code HTTP {rep_mat.status_code}")
-    except Exception as e_mat:
-        logs.append(f"❌ Erreur de transmission Materials : {e_mat}")
+print("==========================================================================")
+print("🚀 SCRIPT GITHUB ACTIONS — CRON TAUX LÉGER (NETTOYÉ & FORCÉ)")
+print("==========================================================================")
 
-    # 🏢 2. APPEL DE L'API BUILDINGS (BÂTIMENTS)
-    try:
-        logs.append("[TRACE] Requête HTTP Buildings lancée...")
-        rep_bld = requests.get(url_buildings, headers=headers_navigation, timeout=15)
-        
-        if rep_bld.status_code == 200:
-            data_bld = rep_bld.json()
-            taux_batiments = data_bld.get("taux_promoteur", 0)
-            logs.append(f"[✅] Authentification Buildings validée. Taux extrait : {taux_batiments}%")
-        else:
-            logs.append(f"❌ Rejet API Buildings — Code HTTP {rep_bld.status_code}")
-    except Exception as e_bld:
-        logs.append(f"❌ Erreur de transmission Buildings : {e_bld}")
+# 1. Trace horaire pour information dans les logs
+tz_france = zoneinfo.ZoneInfo("Europe/Paris")
+heure_actuelle_france = datetime.now(tz_france)
+print(f"[TRACE] Heure système UTC : {datetime.now().strftime('%H:%M:%S')}")
+print(f"[TRACE] Heure locale France : {heure_actuelle_france.strftime('%H:%M:%S')}")
 
-    # 3. ENREGISTREMENT ET HISTORISATION FIRESTORE AVEC HORLOGE EMPIRE
+# 2. Validation du Secret Firebase
+secret_brut = os.environ.get("FIREBASE_CREDENTIALS_JSON", "").strip()
+if not secret_brut:
+    print("[❌ ERREUR CRITIQUE] Le secret 'FIREBASE_CREDENTIALS_JSON' est introuvable.")
+    sys.exit(1)
+    
+try:
+    structure_cles = json.loads(secret_brut)
+    print(f"[✅] JSON de connexion valide. Project ID : '{structure_cles.get('project_id')}'")
+except Exception as e_json:
+    print(f"[❌] Le secret n'est pas un JSON valide : {e_json}")
+    sys.exit(1)
+
+# 3. Connexion à Firebase
+if not firebase_admin._apps:
     try:
-        taux_batiments = int(taux_batiments)
-        taux_materiaux = int(taux_materiaux)
-        
-        # Capture des dates synchronisées sur l'heure française
-        date_liaison = datetime.now(tz_paris).strftime("%Y-%m-%d %H:%M:%S")
-        timestamp_id = datetime.now(tz_paris).strftime("%Y%m%d_%H%M%S")
-        
-        payload_taux = {
-            "date_extraction": date_liaison,
-            "date_mise_a_jour": date_liaison,
-            "taux_promoteur_batiments": taux_batiments,
-            "taux_promoteur_materiaux": taux_materiaux
-        }
-        
-        # Écriture du document fixe lu en direct par l'application Streamlit
-        db.collection("configuration").document("config_actuelle").set(payload_taux)
-        logs.append("✅ Document maître 'configuration/config_actuelle' mis à jour.")
-        
-        # Enregistrement dans la collection historique d'évolution (Courbes graphiques)
-        id_doc_historique = f"config_{timestamp_id}"
-        db.collection("configuration").document(id_doc_historique).set(payload_taux)
-        logs.append(f"📈 Historique sauvegardé sous l'ID : '{id_doc_historique}'")
-        
-        logs.append(f"🎯 Fin de session réussie ! Valeurs enregistrées en base -> Bâtiments : {taux_batiments}% | Matériaux : {taux_materiaux}%")
-    except Exception as e_db:
-        logs.append(f"💥 Erreur d'écriture NoSQL Firestore : {str(e_db)}")
-        
-    return logs
+        structure_cles["private_key"] = structure_cles["private_key"].replace("\\n", "\n")
+        cred = credentials.Certificate(structure_cles)
+        firebase_admin.initialize_app(cred)
+        print("[✅] Firebase Admin SDK initialisé avec succès.")
+    except Exception as e_fb:
+        print(f"[❌] Échec d'allumage Firebase : {e_fb}")
+        sys.exit(1)
+
+# 4. Exécution systématique du traitement des taux
+try:
+    sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+    from crons.cron_update_taux import executer_mise_a_jour_taux_uniquement
+    print("[✅] Lancement du robot de synchronisation des taux...")
+    
+    journaux_metier = executer_mise_a_jour_taux_uniquement()
+    
+    print("\n------------------- LOGS INTERNES DU SCRIPT METIER -------------------")
+    print("\n".join(journaux_metier) if isinstance(journaux_metier, list) else str(journaux_metier))
+    print("-----------------------------------------------------------------------\n")
+    
+    print("[✅] Fin du processus complet avec succès.")
+    sys.exit(0)
+except Exception as err_execution:
+    print(f"[❌ ERREUR CRITIQUE] Le script s'est arrêté au milieu : {err_execution}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
