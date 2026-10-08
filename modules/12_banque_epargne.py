@@ -15,7 +15,7 @@ capital_brut = convertir_saisie_en_nombre(saisie_somme)
 
 col1, col2 = st.columns(2)
 with col1:
-    choix_duree = st.selectbox("Durée théorique du livret de base :", options=, index=2, key="dur_ce")
+    choix_duree = st.selectbox("Durée théorique du livret de base :", options=[6, 8, 12, 18, 24, 36, 48], index=2, key="dur_ce")
 with col2:
     saisie_inj = st.text_input("Montant à verser en plus à chaque nouveau jour de jeu :", value="0 Ø", key="inj_ce")
     injection_quotidienne = convertir_saisie_en_nombre(saisie_inj)
@@ -36,7 +36,7 @@ if capital_brut > 0:
     st.markdown("---")
     st.markdown("##### 📈 Courbes de richesse cumulée (Horizon : Horizon maximal de 48 jours de jeu)")
     
-    durées_officielles =
+    durées_officielles = [6, 8, 12, 18, 24, 36, 48]
     points_strategies = []
     historique_capital = {d: int(capital_brut) for d in durées_officielles}
     base_cycle_capital = {d: int(capital_brut) for d in durées_officielles}
