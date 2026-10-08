@@ -11,10 +11,10 @@ from utils import (
     verifier_concordance_rapport
 )
 
-# 🔒 1. CONFIGURATION GLOBALE INTERNATIONALE (Impérativement en ligne 1 en mode LARGE)
+# 🔒 1. CONFIGURATION GLOBALE INTERNATIONALE
 st.set_page_config(page_title="Calculateur Empire", page_icon="💼", layout="wide", initial_sidebar_state="expanded")
 
-# Injection CSS pour bloquer la mise en page large permanente sans sauter
+# Injection CSS pour bloquer la mise en page large permanente
 st.markdown(
     """
     <style>
@@ -28,7 +28,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 📥 INITIALISATION DES VARIABLES DE SESSION (Optimisée)
+# 📥 INITIALISATION DES VARIABLES DE SESSION
 cles_session = [
     "tab_finance", "tab_capital", "tab_primes", "tab_frais", 
     "tab_projets_achat_loc", "tab_projets_construction", "tab_projets_embellissement"
@@ -145,22 +145,22 @@ def securiser_page(chemin, title, icon):
 
 
 # =========================================================================
-# 🧭 4. CARTOGRAPHIE DYNAMIQUE DU MOTEUR DE NAVIGATION (SÉCURISÉE)
+# 🧭 4. CARTOGRAPHIE DYNAMIQUE DU MOTEUR DE NAVIGATION (SYNCHRONISÉE)
 # =========================================================================
 
-# Déclaration sécurisée de l'accueil (Toujours valide)
+# Déclaration sécurisée de l'accueil
 page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", default=True)
 
-# 1. Pôle Holding & Comptabilité (Noms des fichiers réels sans le '0' initial)
+# 🏢 Pôle Holding & Comptabilité (Noms corrigés d'après ta capture GitHub)
 list_holding = [
-    securiser_page("pages/1_frais_gestion.py", "Frais de Gestion", "📊"),
-    securiser_page("pages/2_primes.py", "Gestion des Primes", "💰"),
-    securiser_page("pages/3_performance.py", "Analyse de Performance", "📈"),
-    securiser_page("pages/4_equilibrage.py", "Équilibrage & Injection", "⚖️")
+    securiser_page("pages/01_frais_gestion.py", "Frais de Gestion", "📊"),
+    securiser_page("pages/02_primes.py", "Gestion des Primes", "💰"),
+    securiser_page("pages/03_performance.py", "Analyse de Performance", "📈"),
+    securiser_page("pages/04_equilibrage.py", "Équilibrage & Injection", "⚖️")
 ]
 menu_holding = [p for p in list_holding if p is not None]
 
-# 2. Pôle Bancaire Fédéral
+# 🏦 Pôle Bancaire Fédéral (Noms vérifiés d'après ta capture GitHub)
 list_banque = [
     securiser_page("pages/10_banque_cascade_livrets.py", "🔒 Cascade Livrets I", "⚔️"),
     securiser_page("pages/11_banque_cascade_comptes.py", "📈 Cascade Comptes Épargnes", "⚖️"),
@@ -169,22 +169,22 @@ list_banque = [
 ]
 menu_banque = [p for p in list_banque if p is not None]
 
-# 3. Pôle Calculs de Rentabilité
+# 📋 Pôle Calculs de Rentabilité (Noms corrigés d'après ta capture GitHub)
 list_renta = [
-    securiser_page("pages/5_analyse_locative.py", "Analyse Locative & R.O.I", "📋"),
-    securiser_page("pages/6_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️"),
-    securiser_page("pages/7_synthese_opportunites.py", "🌟 Top Opportunités", "✨")
+    securiser_page("pages/05_analyse_locative.py", "Analyse Locative & R.O.I", "📋"),
+    securiser_page("pages/06_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️"),
+    securiser_page("pages/07_synthese_opportunites.py", "🌟 Top Opportunités", "✨")
 ]
 menu_renta = [p for p in list_renta if p is not None]
 
-# 4. Administration & Crons
+# 🛠️ Administration & Crons (Noms corrigés d'après ta capture GitHub)
 list_admin = [
-    securiser_page("pages/8_admin.py", "Espace Administration", "🛠️"),
-    securiser_page("pages/9_cron_trigger_taux.py", "Déclencheur Crons", "⚙️")
+    securiser_page("pages/08_admin.py", "Espace Administration", "🛠️"),
+    securiser_page("pages/09_cron_trigger_taux.py", "Déclencheur Crons", "⚙️")
 ]
 menu_admin = [p for p in list_admin if p is not None]
 
-# 🏗️ ASSEMBLAGE DU DICTIONNAIRE DE NAVIGATION AVEC FILTRAGE ANTI-VIDE STRICTE
+# Assemblage du dictionnaire final avec barrière de sécurité anti-section vide
 navigation_dict = {"Accueil": [page_home]}
 
 if menu_holding: 
@@ -196,7 +196,6 @@ if menu_renta:
 if menu_admin: 
     navigation_dict["Administration"] = menu_admin
 
-# 🔥 Exécution officielle garantie sans crash, peu importe l'état des fichiers locaux
+# Lancement officiel du routeur de l'Empire
 pg = st.navigation(navigation_dict)
 pg.run()
-
