@@ -4,11 +4,10 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre, DICTIONNA
 
 # 🔒 Verrouillage plein écran permanent
 st.set_page_config(page_title="Cascade Comptes Épargnes - Monde 8", layout="wide", initial_sidebar_state="expanded")
-
 st.markdown("<style>.block-container { max-width: 100% !important; padding: 2rem !important; }</style>", unsafe_allow_html=True)
 
 st.title("📈 Moteur de Cascade : Les Comptes Épargnes")
-st.info("🕒 Échelle : **1 jour de jeu = 1 mois réel**. Un livret annuel à terme prend **12 jours de jeu**.")
+st.info("🕒 Règle temporelle : **1 mois de jeu = 1 jour réel**. Les intérêts travaillent lors du renouvellement automatique à échéance.")
 
 PLAFOND_EPARGNE = 4 * DICTIONNAIRE_PALIERS.get("R", 10**27)
 
@@ -21,8 +20,21 @@ seuils_officiels = [
     {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
 ]
 
-saisie_somme = st.text_input("Capital global à fragmenter (Max 4 R) :", value="4 R", key="somme_cascade_comptes")
-capital_brut = convertir_saisie_en_nombre(saisie_somme)
+# Zone de configuration des montants et des délais de l'Empire
+col_cfg1, col_col_cfg2 = st.columns(2)
+with col_cfg1:
+    saisie_somme = st.text_input("Capital global à fragmenter (Max 4 R) :", value="4 R", key="somme_cascade_comptes")
+    capital_brut = convertir_saisie_en_nombre(saisie_somme)
+with col_col_cfg2:
+    # 🔥 INTÉGRATION DE TOUS LES DÉLAIS OFFICIELS DU JEU
+    choix_delai_roulement = st.selectbox(
+        "Sélectionnez le délai de blocage de votre stratégie de roulement :",
+        options=[6, 8, 12, 18, 24, 36, 48],
+        format_func=lambda x: f"{x} mois de jeu ({x} jours réels)",
+        index=0,
+        key="delai_epargne_roulement"
+    )
+
 st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**")
 
 if capital_brut > 0:
@@ -34,7 +46,7 @@ if capital_brut > 0:
     total_interets_paliers_de_base = 0
     capital_deja_place = 0
     
-    # 🎯 Calcul de la Cascade Cumulative
+    # Calcul de la saturation des paliers par tranches cumulatives (Règle d'origine)
     for palier in seuils_officiels:
         if capital_base_calcul <= capital_deja_place:
             break
@@ -73,37 +85,71 @@ if capital_brut > 0:
     st.dataframe(pd.DataFrame(repartition_livrets), use_container_width=True, hide_index=True, column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")})
 
     # =========================================================================
-    # 🧮 IMPACT FINANCIER SÉCURISÉ CONTRE LE BLOCAGE DU APPORT (4 R)
+    # 🧮 SIMULATION DYNAMIQUE ADAPTÉE AU DÉLAI SÉLECTIONNÉ SUR L'HORIZON GLOBAL
     # =========================================================================
-    interets_gros_bloc = total_interets_paliers_de_base
-    bloque_par_le_plafond = (capital_base_calcul >= PLAFOND_EPARGNE)
+    # Horizon fixe d'analyse poussé au maximum de 48 jours réels
+    HORIZON_SIMULATION = 48
+    
+    gain_jour_fixe_lineaire = total_interets_paliers_de_base // 12
+    taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
 
-    if bloque_par_le_plafond:
-        st.error("🚨 **ALERTE SÉCURITÉ COMPTE ÉPARGNE** : Vous avez atteint le plafond absolu de **4 R**. Tout retrait ou clôture anticipée bloquera définitivement vos droits de dépôt ! Le pivot quotidien est IMPOSSIBLE.")
-        total_interets_cascade_simulee = total_interets_paliers_de_base
-        gain_jour_optimise = total_interets_paliers_de_base // 12
-    else:
-        gain_jour_fixe_lineaire = interets_gros_bloc // 12
-        taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
+    suivi_cascade_pivot = []
+    suivi_unique_bloque = []
+    
+    # État initial de la Méthode 1 (Roulement glissant à échéance)
+    capital_courant_m1 = int(capital_base_calcul)
+    base_cycle_courant_m1 = int(capital_base_calcul)
+    gain_journalier_courant_m1 = int(gain_jour_fixe_lineaire)
+    total_interets_m1_cumules = 0
+
+    for jour in range(1, HORIZON_SIMULATION + 1):
+        # --- STRATÉGIE 1 : Capitalisation des intérêts au terme du délai choisi ---
+        solde_dep_m1 = capital_courant_m1
+        int_acquis_ce_jour_m1 = gain_journalier_courant_m1
+        solde_fin_m1 = solde_dep_m1 + int_acquis_ce_jour_m1
+        total_interets_m1_cumules += int_acquis_ce_jour_m1
         
-        total_interets_cascade_simulee = 0
-        capital_courant_cascade = int(capital_base_calcul)
-        for jour in range(1, 13):
-            int_j_cas = int(capital_courant_cascade * taux_journalier_moyen_paliers)
-            total_interets_cascade_simulee += int_j_cas
-            capital_courant_cascade += int_j_cas
-        gain_jour_optimise = total_interets_cascade_simulee // 12
+        # Si on atteint un multiple exact du délai choisi (Ex: Jour 6, 12, 18 ou 8, 16, 24...)
+        if jour % choix_delai_roulement == 0:
+            # L'argent est disponible : on valide et on fusionne la cagnotte avec le capital
+            capital_courant_m1 = solde_fin_m1
+            base_cycle_courant_m1 = solde_fin_m1
+            # Recalcul du nouveau rendement quotidien sur la base augmentée de l'Empire
+            gain_journalier_courant_m1 = int(capital_courant_m1 * taux_journalier_moyen_paliers)
+        else:
+            capital_courant_m1 = solde_fin_m1
 
-    gain_jour_brut_unique = interets_gros_bloc // 12
-    argent_sauve = max(0, total_interets_cascade_simulee - interets_gros_bloc)
+        suivi_cascade_pivot.append({
+            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
+            "Solde Départ": solde_dep_m1,
+            "Intérêts acquis": int_acquis_ce_jour_m1,
+            "Solde Cumulé": solde_fin_m1
+        })
 
-    # Règle de bascule des lettres (10 à 9999.99)
+        # --- STRATÉGIE 2 : Dépôt Unique bloqué passif linéaire sur toute la durée ---
+        solde_dep_m2 = capital_base_calcul + (gain_jour_fixe_lineaire * (jour - 1))
+        solde_fin_m2 = capital_base_calcul + (gain_jour_fixe_lineaire * jour)
+        
+        suivi_unique_bloque.append({
+            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
+            "Solde Départ": solde_dep_m2,
+            "Intérêts acquis": gain_jour_fixe_lineaire,
+            "Solde Cumulé": solde_fin_m2
+        })
+
+    # =========================================================================
+    # 📊 IMPACT FINANCIER & RÈGLE DE BASCULE EN MILLIERS (10 À 9999.99)
+    # =========================================================================
+    interets_total_m2_lineaire = gain_jour_fixe_lineaire * HORIZON_SIMULATION
+    argent_sauve = max(0, total_interets_m1_cumules - interets_total_m2_lineaire)
+
     paliers_ordonnes = [
         ("Q", 10**30), ("R", 10**27), ("Y", 10**24), ("Z", 10**21),
         ("E", 10**18), ("P", 10**15), ("T", 10**12), ("G", 10**9), ("M", 10**6)
     ]
-    valeur_repere = max(total_interets_cascade_simulee, capital_base_calcul)
+    valeur_repere = max(total_interets_m1_cumules, capital_base_calcul)
     lettre_choisie, diviseur_choisi = "Ø", 1
+    
     for lettre, valeur_palier in paliers_ordonnes:
         if valeur_repere >= valeur_palier:
             valeur_exprimee = float(valeur_repere) / valeur_palier
@@ -111,84 +157,88 @@ if capital_brut > 0:
                 lettre_choisie, diviseur_choisi = lettre, valeur_palier
                 break
 
-    txt_optimise = f"{float(total_interets_cascade_simulee) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
-    txt_brut = f"{float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+    txt_optimise = f"{float(total_interets_m1_cumules) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+    txt_brut = f"{float(interets_total_m2_lineaire) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
     txt_sauve = f"{float(argent_sauve) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
 
-    st.markdown("### 📊 Impact Financier (Ajusté)")
-    rendement_reel_cascade = (float(total_interets_cascade_simulee) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
-    rendement_reel_brut = (float(interets_gros_bloc) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
+    st.markdown("### 📊 Impact Financier Global (Projection sur 48 Mois)")
+    rendement_m1 = (float(total_interets_m1_cumules) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
+    rendement_m2 = (float(interets_total_m2_lineaire) / float(capital_base_calcul) * 100) if capital_base_calcul > 0 else 0.0
     
     c_op1, c_op2, c_op3 = st.columns(3)
-    with c_op1: st.metric(label="🎯 Gain OPTIMISÉ (Cascade)", value=txt_optimise, delta=f"📈 Rendement : {rendement_reel_cascade:.2f}%")
-    with c_op2: st.metric(label="🛑 Gain BRUT (Unique Bloqué)", value=txt_brut, delta=f"📉 Rendement : {rendement_reel_brut:.2f}%", delta_color="inverse")
-    with c_op3: st.metric(label="👑 Surplus Net Sauvé", value=txt_sauve, delta=f"🔥 Écart : +{rendement_reel_cascade - rendement_reel_brut:.2f}%")
+    with c_op1: st.metric(label=f"🎯 Méthode 1 : Roulement cumulé ({choix_delai_roulement}m)", value=txt_optimise, delta=f"📈 Rendement : {rendement_m1:.2f}%")
+    with c_op2: st.metric(label="🛑 Méthode 2 : Unique Bloqué passif", value=txt_brut, delta=f"📉 Rendement : {rendement_m2:.2f}%", delta_color="inverse")
+    with c_op3: st.metric(label="👑 Surplus Net créé par le Réinvestissement", value=txt_sauve, delta=f"🔥 Écart de rendement : +{rendement_m1 - rendement_m2:.2f}%")
 
-    st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par jour réel (24h)")
+    st.markdown("##### ⚡ Comparatif des gains d'intérêts moyens par mois (jour réel)")
     cj1, cj2, cj3 = st.columns(3)
-    with cj1: st.metric("✨ Intérêts / Jour (Cascade)", f"{float(gain_jour_optimise) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with cj2: st.metric("⏳ Intérêts / Jour (Unique Bloqué)", f"{float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-    with cj3: st.metric("👑 Surplus Moyen / Jour", f"{float((total_interets_cascade_simulee - interets_gros_bloc) // 12) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj1: st.metric("✨ Intérêts / Mois moyen (Méthode 1)", f"{float(total_interets_m1_cumules // HORIZON_SIMULATION) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj2: st.metric("⏳ Intérêts / Mois moyen (Méthode 2)", f"{float(gain_jour_fixe_lineaire) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
+    with cj3: st.metric("👑 Surplus Moyen / Mois", f"{float(argent_sauve // HORIZON_SIMULATION) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
 
-    st.markdown("##### 💰 Solde Total Cumulé (Capital + Intérêts)")
-    solde_final_cascade = capital_base_calcul + total_interets_cascade_simulee
-    solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
+    st.markdown("##### 💰 Solde Total Cumulé au terme de la projection (Capital + Intérêts)")
+    solde_final_m1 = capital_base_calcul + total_interets_m1_cumules
+    solde_final_m2 = capital_base_calcul + interets_total_m2_lineaire
 
     ct1, ct2, ct3 = st.columns(3)
     with ct1: 
-        st.metric(label="🧱 Fortune Finale (Cascade)", value=f"{float(solde_final_cascade) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-        st.caption("Capital + Intérêts découpés")
+        st.metric(
+            label="🧱 Fortune Finale (Méthode 1)", 
+            value=f"{float(solde_final_m1) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        )
+        st.caption(f"Capital + Intérêts réinvestis tous les {choix_delai_roulement} jours")
     with ct2: 
-        st.metric(label="📦 Fortune Finale (Unique)", value=f"{float(solde_final_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " "))
-        st.caption("Capital + Intérêts unifiés")
+        st.metric(
+            label="📦 Fortune Finale (Méthode 2)", 
+            value=f"{float(solde_final_m2) / diviseur_choisi:,.2f} {lettre_choisie} Ø".replace(",", " ")
+        )
+        st.caption("Capital + Intérêts bloqués passifs sans roulement")
     with ct3: 
-        st.metric(label="👑 Surplus Net sur la Fortune", value=txt_sauve)
-        st.caption("Trésorerie bonus créée")
+        st.metric(
+            label="👑 Surplus Net sur la Fortune", 
+            value=txt_sauve
+        )
+        st.caption("Trésorerie nette bonus créée")
 
-    # Re-génération des structures de grilles linéaires
+    # Formatage final complet des tableaux en milliers de 10.00 à 9 999.99
     suivi_cascade_formate = []
     suivi_unique_formate = []
 
-    for jour in range(1, 13):
-        cas_dep = capital_base_calcul + (gain_jour_optimise * (jour - 1))
-        cas_fin = capital_base_calcul + (gain_jour_optimise * jour)
+    for r in suivi_cascade_pivot:
         suivi_cascade_formate.append({
-            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{float(cas_dep) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {float(gain_jour_optimise) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{float(cas_fin) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+            "Mois de Jeu (Jour Réel)": r["Jour de Jeu (Mois)"],
+            "Solde Départ (Ø)": f"{float(r['Solde Départ']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {float(r['Intérêts acquis']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{float(r['Solde Cumulé']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
         })
 
-        uni_dep = capital_base_calcul + (gain_jour_brut_unique * (jour - 1))
-        uni_fin = capital_base_calcul + (gain_jour_brut_unique * jour)
+    for r in suivi_unique_bloque:
         suivi_unique_formate.append({
-            "Jour de Jeu (Mois)": f"Mois {jour:02d}",
-            "Solde Départ (Ø)": f"{float(uni_dep) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-            "Intérêts acquis (Ø)": f"+ {float(gain_jour_brut_unique) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-            "Solde Cumulé (Ø)": f"{float(uni_fin) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+            "Mois de Jeu (Jour Réel)": r["Jour de Jeu (Mois)"],
+            "Solde Départ (Ø)": f"{float(r['Solde Départ']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Intérêts acquis (Ø)": f"+ {float(r['Intérêts acquis']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+            "Solde Cumulé (Ø)": f"{float(r['Solde Cumulé']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
         })
 
-    # Lignes de Totaux formatées et alignées avec l'Impact Central
+    # Ajout des lignes de Totaux formatées en fin de tableaux
     suivi_cascade_formate.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
+        "Mois de Jeu (Jour Réel)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{float(capital_base_calcul) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {float(total_interets_cascade_simulee) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + total_interets_cascade_simulee) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+        "Intérêts acquis (Ø)": f"∑ + {float(total_interets_m1_cumules) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + total_interets_m1_cumules) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
     })
     suivi_unique_formate.append({
-        "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
+        "Mois de Jeu (Jour Réel)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{float(capital_base_calcul) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-        "Intérêts acquis (Ø)": f"∑ + {float(interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
-        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + interets_gros_bloc) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
+        "Intérêts acquis (Ø)": f"∑ + {float(interets_total_m2_lineaire) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
+        "Solde Cumulé (Ø)": f"{float(capital_base_calcul + interets_total_m2_lineaire) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
     })
 
     st.markdown("---")
-    st.subheader("📅 Plan de Tir Journalier : Comparatif des Gains sur 12 Jours")
+    st.subheader(f"📅 Plan de Tir Comptable (Horizon 48 Mois — Échéance de roulement : {choix_delai_roulement}m)")
     
-    st.markdown("#### **🔒 Méthode 1 : Évolution de la Cascade Fractionnée (Statut Bloqué si ≥ 4 R)**")
+    st.markdown(f"#### **🔒 Méthode 1 : Évolution du Roulement à Échéance Fixe de {choix_delai_roulement} Jours**")
     st.dataframe(pd.DataFrame(suivi_cascade_formate), use_container_width=True, hide_index=True, height=500)
-    
-    st.markdown("<br>", unsafe_allow_html=True) # Espace propre entre les deux blocs
-    
-    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Bloqué 12 mois avec saturation)**")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### **🛑 Méthode 2 : Évolution du Dépôt Unique (Bloqué Passif Linéaire)**")
     st.dataframe(pd.DataFrame(suivi_unique_formate), use_container_width=True, hide_index=True, height=500)
