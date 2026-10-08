@@ -8,8 +8,13 @@ if not st.session_state.get("holding_chargee", False):
     st.warning("⚠️ Veuillez synchroniser vos tableaux sur l'accueil 🏠.")
 else:
     try:
+        # --- PARSING DU TABLEAU FINANCE ---
         data_fin = {}
-        for l in st.session_state["tab_finance"].strip().split('\n')[1:]:
+        lignes_f = st.session_state["tab_finance"].strip().split('\n')
+        # Détection intelligente : si le premier mot contient "filiale", c'est un en-tête, on commence à 1
+        idx_f = 1 if lignes_f and "filiale" in lignes_f[0].lower() else 0
+        
+        for l in lignes_f[idx_f:]:
             if not l.strip(): continue
             cols = [c.strip() for c in l.split('\t')]
             if len(cols) < 5: continue
@@ -20,8 +25,12 @@ else:
                 "prof": convertir_saisie_en_nombre(cols[4])
             }
 
+        # --- PARSING DU TABLEAU CAPITAL ---
         data_cap = {}
-        for l in st.session_state["tab_capital"].strip().split('\n')[1:]:
+        lignes_c = st.session_state["tab_capital"].strip().split('\n')
+        idx_c = 1 if lignes_c and "filiale" in lignes_c[0].lower() else 0
+        
+        for l in lignes_c[idx_c:]:
             if not l.strip(): continue
             cols = [c.strip() for c in l.split('\t')]
             if len(cols) < 4: continue
@@ -31,6 +40,7 @@ else:
                 "latence": convertir_saisie_en_nombre(cols[3])
             }
 
+        # --- COMPILATION ET CALCULS DE PERFORMANCE ---
         rows = []
         for f, fin in data_fin.items():
             if f not in data_cap: continue
@@ -48,8 +58,9 @@ else:
         df = pd.DataFrame(rows)
         if not df.empty:
             df["Rendement (%)"] = df["Rendement (%)"].apply(lambda x: f"{x:.2f}%")
-            
-        st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.info("⚪ Aucune donnée concordante trouvée entre vos tableaux Finance et Capital.")
         
     except Exception as e: 
         st.error(f"⚠️ Erreur de compilation : {e}")
