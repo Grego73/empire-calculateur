@@ -136,69 +136,40 @@ def home_page():
 
 
 # =========================================================================
-# ⚙️ 3. FONCTION DE SÉCURITÉ DE VÉRIFICATION DES FICHIERS (ANTI-CRASH)
-# =========================================================================
-def securiser_page(chemin, title, icon, url_explicite=None):
-    if os.path.exists(chemin):
-        # On force un url_path pour éviter que Streamlit ne confonde deux pages
-        if url_explicite:
-            return st.Page(chemin, title=title, icon=icon, url_path=url_explicite)
-        return st.Page(chemin, title=title, icon=icon)
-    return None
-
-
-# =========================================================================
-# 🧭 4. CARTOGRAPHIE DYNAMIQUE DU MOTEUR DE NAVIGATION (CORRIGÉE DES DOUBLONS)
+# 🧭 3. CONFIGURATION DES PAGES SÉCURISÉES DE L'EMPIRE (ROUTES STRICTES)
 # =========================================================================
 
-# Déclaration sécurisée de l'accueil
+# Déclaration de l'accueil principal
 page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", default=True)
 
-# 🏛️ Pôle Holding & Comptabilité
-list_holding = [
-    securiser_page("pages/01_frais_gestion.py", "Frais de Gestion", "📊", "frais_gestion"),
-    securiser_page("pages/02_primes.py", "Gestion des Primes", "💰", "primes_gestion"),
-    securiser_page("pages/03_performance.py", "Analyse de Performance", "📈", "performance_analyse"),
-    securiser_page("pages/04_equilibrage.py", "Équilibrage & Injection", "⚖️", "equilibrage_propres")
-]
-menu_holding = [p for p in list_holding if p is not None]
+# Déclinaison explicite des objets Pages pour forcer des adresses d'URL uniques sans doublon possible
+# Format : st.Page("chemin_relatif.py", title="Label", icon="emoji", url_path="identifiant_unique")
+p_frais = st.Page("pages/01_frais_gestion.py", title="Frais de Gestion", icon="📊", url_path="route_frais_exploitation")
+p_primes = st.Page("pages/02_primes.py", title="Gestion des Primes", icon="💰", url_path="route_primes_gestion")
+p_performance = st.Page("pages/03_performance.py", title="Analyse de Performance", icon="📈", url_path="route_performance_comptable")
+p_equilibrage = st.Page("pages/04_equilibrage.py", title="Équilibrage & Injection", icon="⚖️", url_path="route_equilibrage_propres")
 
-# 🏦 Pôle Bancaire Fédéral (Dédoublonné via les url_explicites)
-list_banque = [
-    securiser_page("pages/10_banque_cascade_livrets.py", "🔒 Cascade Livrets I", "⚔️", "cascade_livrets"),
-    securiser_page("pages/11_banque_cascade_comptes.py", "📈 Cascade Comptes Épargnes", "⚖️", "cascade_comptes_epargne"),
-    securiser_page("pages/12_banque_epargne.py", "💵 Épargne Progressive", "📊", "epargne_progressive"),
-    securiser_page("pages/13_banque_credits.py", "🏦 Emprunts & Crédits", "📉", "credits_banque")
-]
-menu_banque = [p for p in list_banque if p is not None]
+p_livrets = st.Page("pages/10_banque_cascade_livrets.py", title="🔒 Cascade Livrets I", icon="⚔️", url_path="route_banque_cascade_livrets")
+p_comptes = st.Page("pages/11_banque_cascade_comptes.py", title="📈 Cascade Comptes Épargnes", icon="⚖️", url_path="route_banque_cascade_comptes")
+p_epargne = st.Page("pages/12_banque_epargne.py", title="💵 Épargne Progressive", icon="📊", url_path="route_banque_epargne_progressive")
+p_credits = st.Page("pages/13_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉", url_path="route_banque_credits_federaux")
 
-# 📋 Pôle Calculs de Rentabilité
-list_renta = [
-    securiser_page("pages/05_analyse_locative.py", "Analyse Locative & R.O.I", "📋", "analyse_locative"),
-    securiser_page("pages/06_chantiers_et_embellissement.py", "Chantiers & Embellissement", "🏗️", "arbitrage_chantiers"),
-    securiser_page("pages/07_synthese_opportunites.py", "🌟 Top Opportunités", "✨", "synthese_promotions")
-]
-menu_renta = [p for p in list_renta if p is not None]
+p_locative = st.Page("pages/05_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📋", url_path="route_rentabilite_locative")
+p_chantiers = st.Page("pages/06_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️", url_path="route_arbitrage_chantiers")
+p_promos = st.Page("pages/07_synthese_opportunites.py", title="🌟 Top Opportunités", icon="✨", url_path="route_synthese_promotions")
 
-# 🛠️ Administration & Crons
-list_admin = [
-    securiser_page("pages/08_admin.py", "Espace Administration", "🛠️", "admin_cloud"),
-    # securiser_page("pages/09_cron_trigger_taux.py", "Déclencheur Crons", "⚙️", "trigger_cron_taux")
-]
-menu_admin = [p for p in list_admin if p is not None]
+p_admin = st.Page("pages/08_admin.py", title="Espace Administration", icon="🛠️", url_path="route_admin_cloud")
+#p_trigger = st.Page("pages/09_cron_trigger_taux.py", title="Déclencheur Crons", icon="⚙️", url_path="route_trigger_cron_taux")
 
-# Assemblage du dictionnaire final filtré
-navigation_dict = {"Accueil": [page_home]}
+# Assemblage direct du dictionnaire de navigation
+navigation_dict = {
+    "Accueil": [page_home],
+    "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
+    "🏦 Pôle Bancaire Fédéral": [p_livrets, p_comptes, p_epargne, p_credits],
+    "Calculs de Rentabilité": [p_locative, p_chantiers, p_promos],
+    "Administration": [p_admin, p_trigger]
+}
 
-if menu_holding: 
-    navigation_dict["🏛️ Gestion Holding"] = menu_holding
-if menu_banque: 
-    navigation_dict["🏦 Pôle Bancaire Fédéral"] = menu_banque
-if menu_renta: 
-    navigation_dict["Calculs de Rentabilité"] = menu_renta
-if menu_admin: 
-    navigation_dict["Administration"] = menu_admin
-
-# Lancement sécurisé de l'infrastructure
+# Lancement officiel du routeur de l'Empire (100% immunisé contre le doublon)
 pg = st.navigation(navigation_dict)
 pg.run()
