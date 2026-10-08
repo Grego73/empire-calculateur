@@ -2,7 +2,9 @@ name: ⏱️ Synchro Taux Promoteur Automatique (4H)
 
 on:
   schedule:
-    - cron: '1 22,23,2,3,6,7,10,11,14,15,18,19 * * *'
+    # Déclenchements précis toutes les 4 heures (minute 01) couvrant parfaitement l'alternance Été/Hiver
+    - cron: '1 22,2,6,10,14,18 * * *'
+    - cron: '1 23,3,7,11,15,19 * * *'
   workflow_dispatch:
 
 jobs:
@@ -16,12 +18,14 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        cache: 'pip'
 
     - name: 📦 Installation des dépendances
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    # 👀 DIAGNOSTIC SYSTÈME DIRECT (Pour voir pourquoi Python coupe)
+
+    # Inspection conservée à des fins de diagnostic en cas de coupure système
     - name: 🔍 Inspection des Fichiers Disponibles
       run: |
         echo "=== Emplacement actuel ==="
