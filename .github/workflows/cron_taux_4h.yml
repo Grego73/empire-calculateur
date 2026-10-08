@@ -6,6 +6,8 @@ on:
     - cron: '1 22,2,6,10,14,18 * * *'
     - cron: '1 23,3,7,11,15,19 * * *'
   workflow_dispatch:
+  repository_dispatch: # NOUVEAU : Permet au Cron Job externe de le lancer
+  types: [run_taux]
 
 jobs:
   execution_cron:
