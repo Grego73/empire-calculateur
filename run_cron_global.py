@@ -23,8 +23,12 @@ force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
 print(f"[TRACE] Heure système UTC : {datetime.now().strftime('%H:%M:%S')}")
 print(f"[TRACE] Heure locale France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
 
-# 2. Validation de la fenêtre cible : Autorisé à 3h et 4h du matin (Tolérance retard GitHub)
-heures_autorisees_global = [3, 4]
+# 2. Validation de la fenêtre cible (CORRIGÉ)
+heures_autorisees_global = [2, 3, 4]
+
+if force_run or (heure_locale in heures_autorisees_global):
+    print("🚀 Fenêtre horaire confirmée par l'horloge. Démarrage de la mise à jour complète...")
+
 
 if force_run or (heure_locale in heures_autorisees_global):
     print("🚀 Fenêtre horaire confirmée par l'horloge. Démarrage de la mise à jour complète...")
