@@ -25,15 +25,24 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 def executer_mise_a_jour_cron(exclure_players=False):
+    import zoneinfo
     logs_session = []
     
+    # Configuration du fuseau horaire de l'Empire (Heure française de ta montre)
+    tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
+    
     def notifier(texte):
-        print(texte)
-        logs_session.append(f"[{datetime.now().strftime('%H:%M:%S')}] {texte}")
+        # On force la capture de l'heure sur le fuseau de Paris pour chaque ligne de log
+        heure_france = datetime.now(tz_paris).strftime('%H:%M:%S')
+        print(f"[{heure_france}] {texte}")
+        logs_session.append(f"[{heure_france}] {texte}")
 
     notifier("⏰ [CRON CLOUD] Démarrage de la récupération...")
-    date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # On synchronise aussi l'écriture des dates en base NoSQL sur l'heure française
+    date_now = datetime.now(tz_paris).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp_id = datetime.now(tz_paris).strftime("%Y%m%d_%H%M%S")
+
 
     # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (ISOLÉE EN DUR)
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
