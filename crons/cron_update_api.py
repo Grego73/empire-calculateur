@@ -1,4 +1,3 @@
-import streamlit as st
 import os
 import sys
 import requests
@@ -24,31 +23,34 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-def executer_mise_a_jour_cron(exclure_players=False):
+# RÈGLE ARCHITECTURALE : Sécurisé par défaut à True pour préserver les quotas NoSQL
+def executer_mise_a_jour_cron(exclure_players=True):
     import zoneinfo
     logs_session = []
     
-    # Configuration du fuseau horaire de l'Empire (Heure française de ta montre)
+    # Configuration du fuseau horaire de l'Empire
     tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
     
     def notifier(texte):
-        # On force la capture de l'heure sur le fuseau de Paris pour chaque ligne de log
         heure_france = datetime.now(tz_paris).strftime('%H:%M:%S')
         print(f"[{heure_france}] {texte}")
         logs_session.append(f"[{heure_france}] {texte}")
 
     notifier("⏰ [CRON CLOUD] Démarrage de la récupération...")
     
-    # On synchronise aussi l'écriture des dates en base NoSQL sur l'heure française
     date_now = datetime.now(tz_paris).strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now(tz_paris).strftime("%Y%m%d_%H%M%S")
 
-
-    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8 (ISOLÉE EN DUR)
+    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
-    BASE_URL = "https://monde8.empireimmo.com"
+    BASE_URL = "https://empireimmo.com"
+    
+    # En-tête obligatoire requis par la charte d'extraction du jeu
+    headers_navigation = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Application-Empire-Calculateur",
+        "Accept": "application/json"
+    }
 
-    # Limites des entiers signés 64-bits pour Firestore Google Cloud
     MAX_INT64 = 9223372036854775807
     MIN_INT64 = -9223372036854775808
 
@@ -61,14 +63,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
         except (ValueError, TypeError):
             return 0
 
-    # --- 1. MATÉRIAUX & USINES (PLURIEL OFFICIEL) ---
+    # --- 1. MATÉRIAUX & USINES ---
     try:
         url_mat = f"{BASE_URL}/api/materials.json?key={API_KEY}"
-        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_mat}")
         notifier("==========================================================================")
-        req = requests.get(url_mat, timeout=15)
+        req = requests.get(url_mat, headers=headers_navigation, timeout=15)
         notifier(f"📡 API Matériaux — Code : {req.status_code}")
         
         if req.status_code == 200:
@@ -131,14 +132,13 @@ def executer_mise_a_jour_cron(exclure_players=False):
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
-    # --- 2. BÂTIMENTS (PLURIEL OFFICIEL) ---
+    # --- 2. BÂTIMENTS ---
     try:
         url_bld = f"{BASE_URL}/api/buildings.json?key={API_KEY}"
-        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_bld}")
         notifier("==========================================================================")
-        req = requests.get(url_bld, timeout=15)
+        req = requests.get(url_bld, headers=headers_navigation, timeout=15)
         notifier(f"📡 API Bâtiments — Code : {req.status_code}")
         
         if req.status_code == 200:
@@ -204,111 +204,15 @@ def executer_mise_a_jour_cron(exclure_players=False):
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
-    # --- 3. TRAVAUX (PLURIEL OFFICIEL) ---
+    # --- 3. TRAVAUX ---
     try:
         url_wrk = f"{BASE_URL}/api/works.json?key={API_KEY}"
-        # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_wrk}")
         notifier("==========================================================================")
-        req = requests.get(url_wrk, timeout=15)
+        req = requests.get(url_wrk, headers=headers_navigation, timeout=15)
         notifier(f"📡 API Travaux — Code : {req.status_code}")
         
         if req.status_code == 200:
             data_json = req.json()
             liste_t_perso = data_json.get("travaux_perso", [])
-            liste_t_entreprise = data_json.get("travaux_entreprises", [])
-            
-            notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
-            
-            categories_travaux = [
-                ("perso", liste_t_perso),
-                ("entreprise", liste_t_entreprise)
-            ]
-            
-            batch = db.batch()
-            c_batch = 0
-            total_travaux_enregistre = 0
-            
-            for categorie, liste in categories_travaux:
-                for w in liste:
-                    id_w = w.get('id', 0)
-                    t_type = w.get('type', 'Construction')
-                    b_name = w.get('nom', 'Inconnu')
-                    
-                    doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
-                    doc_ref = db.collection("travaux").document(doc_id)
-                    
-                    batch.set(doc_ref, {
-                        "id_jeu": int(id_w),
-                        "type_travaux": str(t_type), 
-                        "building_name": str(b_name), 
-                        "terrain_requis": str(w.get("terrain", "Aucun")),
-                        "cout_estime": securiser_entier(w.get("cout", 0)), 
-                        "duree_mois": securiser_entier(w.get("duree", 0)), 
-                        "categorie": categorie,
-                        "date_extraction": date_now
-                    })
-                    c_batch += 1
-                    total_travaux_enregistre += 1
-                    
-                    if c_batch >= 500:
-                        batch.commit()
-                        batch = db.batch()
-                        c_batch = 0
-            if c_batch > 0:
-                batch.commit()
-            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes).")
-        else:
-            notifier(f"❌ Erreur API Travaux : {req.status_code}")
-    except Exception as e: 
-        notifier(f"💥 Crash Travaux : {e}")
-
-    # --- 4. CLASSEMENT DES JOUEURS (SOUMIS AU FILTRE QUOTIDIEN DE 03H30) ---
-    if not exclure_players:
-        try:
-            url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
-            # 🔥 AFFICHAGE CLAIR DU LIEN COMPLET DANS LES LOGS JOUEURS
-            notifier("==========================================================================")
-            notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_ply}")
-            notifier("==========================================================================")
-            req = requests.get(url_ply, timeout=15)
-            notifier(f"📡 API Players — Code : {req.status_code}")
-            if req.status_code == 200:
-                players_list = req.json().get("players", [])
-                notifier(f"🏆 {len(players_list)} comptes de joueurs détectés. Écriture NoSQL...")
-                
-                batch = db.batch()
-                c_batch = 0
-                for p in players_list:
-                    pseudo_j = p.get('pseudo', 'Inconnu')
-                    doc_id = f"{pseudo_j.replace(' ', '_')}_{timestamp_id}"
-                    doc_ref = db.collection("players").document(doc_id)
-                    
-                    batch.set(doc_ref, {
-                        "pseudo": pseudo_j,
-                        "classement": securiser_entier(p.get("classement", 0)),
-                        "niveau": securiser_entier(p.get("niveau", 0)),
-                        "points": securiser_entier(p.get("points", 0)),
-                        "date_extraction": date_now
-                    })
-                    c_batch += 1
-                    if c_batch >= 500:
-                        batch.commit()
-                        batch = db.batch()
-                        c_batch = 0
-                if c_batch > 0:
-                    batch.commit()
-                notifier("✅ Collection 'players' entièrement mise à jour dans le Cloud.")
-            else:
-                notifier(f"❌ Erreur API Players : {req.text[:200]}")
-        except Exception as e:
-            notifier(f"💥 Crash Classement Players : {e}")
-    else:
-        notifier("⏭️ Table 'players' volontairement ignorée pour ce créneau quotidien d'optimisation des quotas.")
-
-    notifier("🏁 [CRON CLOUD] Fin du processus de synchronisation.")
-    return logs_session
-
-if __name__ == "__main__":
-    executer_mise_a_jour_cron()
