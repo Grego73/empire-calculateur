@@ -4,7 +4,24 @@ import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
+import time  # Permet de faire une pause si l'API est fatiguée
 
+def requete_api_securisee(url):
+    """Effectue l'appel API avec gestion du blocage (Rate Limiting)"""
+    try:
+        # Premier essai
+        response = requests.get(url, timeout=15)
+        
+        # Si l'API nous bloque temporairement (Code 429)
+        if response.status_code == 429:
+            print("⚠️ [API EMPIRE] Trop de requêtes ! Pause de 5 secondes avant de réessayer...")
+            time.sleep(5)
+            response = requests.get(url, timeout=15) # Deuxième essai
+            
+        return response
+    except Exception as e:
+        print(f"💥 Erreur de connexion réseau : {e}")
+        return None
 # Alignement du chemin d'importation NoSQL
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -45,7 +62,7 @@ def executer_mise_a_jour_cron(exclure_players=True):
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
     BASE_URL = "https://empireimmo.com"
     
-    # En-tête obligatoire requis par la charte d'extraction du jeu
+    # En-tête obligatoire uis par la charte d'extraction du jeu
     headers_navigation = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Application-Empire-Calculateur",
         "Accept": "application/json"
@@ -69,8 +86,17 @@ def executer_mise_a_jour_cron(exclure_players=True):
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_mat}")
         notifier("==========================================================================")
-        req = requests.get(url_mat, headers=headers_navigation, timeout=15)
-        notifier(f"📡 API Matériaux — Code : {req.status_code}")
+        # Remplacement dans votre script principal :
+        req = requete_api_securisee(url_mat)
+        
+        if req and req.status_code == 200:
+            # ... tout votre code d'écriture Firebase reste identique ...
+        elif req and req.status_code == 429:
+            notifier("❌ [BLOCAGE] Empire Immo a bloqué notre clé pour cette heure-ci. On réessaiera au prochain cron.")
+        else:
+            notifier(f"❌ Erreur API : Code {req.status_code if req else 'Inconnu'}")
+        
+                notifier(f"📡 API Matériaux — Code : {req.status_code}")
         
         if req.status_code == 200:
             data_json = req.json()
