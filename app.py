@@ -136,32 +136,31 @@ def home_page():
 
 
 # =========================================================================
-# 🧭 3. CONFIGURATION DES PAGES SÉCURISÉES DE L'EMPIRE (ROUTES STRICTES)
+# 🧭 3. CONFIGURATION DES PAGES SÉCURISÉES DE L'EMPIRE (DOSSIER MODULES/)
 # =========================================================================
 
 # Déclaration de l'accueil principal
 page_home = st.Page(home_page, title="Accueil & Saisie Unique", icon="🏠", default=True)
 
-# Déclinaison explicite des objets Pages pour forcer des adresses d'URL uniques sans doublon possible
-# Format : st.Page("chemin_relatif.py", title="Label", icon="emoji", url_path="identifiant_unique")
-p_frais = st.Page("pages/01_frais_gestion.py", title="Frais de Gestion", icon="📊", url_path="route_frais_exploitation")
-p_primes = st.Page("pages/02_primes.py", title="Gestion des Primes", icon="💰", url_path="route_primes_gestion")
-p_performance = st.Page("pages/03_performance.py", title="Analyse de Performance", icon="📈", url_path="route_performance_comptable")
-p_equilibrage = st.Page("pages/04_equilibrage.py", title="Équilibrage & Injection", icon="⚖️", url_path="route_equilibrage_propres")
+# Pointage direct vers le nouveau dossier modules/ pour contourner le scan automatique du Cloud
+p_frais = st.Page("modules/01_frais_gestion.py", title="Frais de Gestion", icon="📊", url_path="frais_holding")
+p_primes = st.Page("modules/02_primes.py", title="Gestion des Primes", icon="💰", url_path="primes_holding")
+p_performance = st.Page("modules/03_performance.py", title="Analyse de Performance", icon="📈", url_path="performance_holding")
+p_equilibrage = st.Page("modules/04_equilibrage.py", title="Équilibrage & Injection", icon="⚖️", url_path="equilibrage_holding")
 
-p_livrets = st.Page("pages/10_banque_cascade_livrets.py", title="🔒 Cascade Livrets I", icon="⚔️", url_path="route_banque_cascade_livrets")
-p_comptes = st.Page("pages/11_banque_cascade_comptes.py", title="📈 Cascade Comptes Épargnes", icon="⚖️", url_path="route_banque_cascade_comptes")
-p_epargne = st.Page("pages/12_banque_epargne.py", title="💵 Épargne Progressive", icon="📊", url_path="route_banque_epargne_progressive")
-p_credits = st.Page("pages/13_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉", url_path="route_banque_credits_federaux")
+p_livrets = st.Page("modules/10_banque_cascade_livrets.py", title="🔒 Cascade Livrets I", icon="⚔️", url_path="banque_livrets")
+p_comptes = st.Page("modules/11_banque_cascade_comptes.py", title="📈 Cascade Comptes Épargnes", icon="⚖️", url_path="banque_comptes")
+p_epargne = st.Page("modules/12_banque_epargne.py", title="💵 Épargne Progressive", icon="📊", url_path="banque_epargne_progressive")
+p_credits = st.Page("modules/13_banque_credits.py", title="🏦 Emprunts & Crédits", icon="📉", url_path="banque_credits")
 
-p_locative = st.Page("pages/05_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📋", url_path="route_rentabilite_locative")
-p_chantiers = st.Page("pages/06_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️", url_path="route_arbitrage_chantiers")
-p_promos = st.Page("pages/07_synthese_opportunites.py", title="🌟 Top Opportunités", icon="✨", url_path="route_synthese_promotions")
+p_locative = st.Page("modules/05_analyse_locative.py", title="Analyse Locative & R.O.I", icon="📋", url_path="rentabilite_locative")
+p_chantiers = st.Page("modules/06_chantiers_et_embellissement.py", title="Chantiers & Embellissement", icon="🏗️", url_path="rentabilite_chantiers")
+p_promos = st.Page("modules/07_synthese_opportunites.py", title="🌟 Top Opportunités", icon="✨", url_path="rentabilite_promotions")
 
-p_admin = st.Page("pages/08_admin.py", title="Espace Administration", icon="🛠️", url_path="route_admin_cloud")
-#p_trigger = st.Page("pages/09_cron_trigger_taux.py", title="Déclencheur Crons", icon="⚙️", url_path="route_trigger_cron_taux")
+p_admin = st.Page("modules/08_admin.py", title="Espace Administration", icon="🛠️", url_path="admin_general")
+#p_trigger = st.Page("modules/09_cron_trigger_taux.py", title="Déclencheur Crons", icon="⚙️", url_path="admin_crons")
 
-# Assemblage direct du dictionnaire de navigation
+# Assemblage de la structure finale
 navigation_dict = {
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
@@ -170,6 +169,6 @@ navigation_dict = {
     "Administration": [p_admin, p_trigger]
 }
 
-# Lancement officiel du routeur de l'Empire (100% immunisé contre le doublon)
+# Lancement
 pg = st.navigation(navigation_dict)
 pg.run()
