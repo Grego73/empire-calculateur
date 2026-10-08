@@ -7,7 +7,7 @@ import firebase_admin
 from firebase_admin import credentials
 
 print("==========================================================================")
-print("🔍 SCRIPT GITHUB ACTIONS — CRON GLOBAL LOURD 03H30")
+print("🔍 SCRIPT GITHUB ACTIONS — CRON GLOBAL LOURD 03H30 (SÉCURISÉ)")
 print("==========================================================================")
 
 # 1. Détermination de l'heure légale en France
@@ -20,11 +20,14 @@ minute_locale = heure_actuelle_france.minute
 evenement_github = os.environ.get("GITHUB_EVENT_NAME", "").strip().lower()
 force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
 
+print(f"[TRACE] Heure système UTC : {datetime.now().strftime('%H:%M:%S')}")
 print(f"[TRACE] Heure locale France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
 
-# 2. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h00 et 3h59)
-if force_run or (heure_locale == 3):
-    print("🚀 Fenêtre de 03h30 confirmée. Démarrage de la mise à jour complète...")
+# 2. Validation de la fenêtre cible : Autorisé à 3h du matin (et tolérance à 4h en cas de décalage ou retard GitHub)
+heures_autorisees_global = 
+
+if force_run or (heure_locale in heures_autorisees_global):
+    print("🚀 Fenêtre horaire confirmée par l'horloge. Démarrage de la mise à jour complète...")
     
     secret_credentials = os.environ.get("FIREBASE_CREDENTIALS_JSON", "")
     if not secret_credentials:
@@ -47,7 +50,7 @@ if force_run or (heure_locale == 3):
         sys.path.append(os.path.abspath(os.path.dirname(__file__)))
         from crons.cron_update_api import executer_mise_a_jour_cron
 
-        print("[TRACE] Déclenchement du traitement global (Exclure_players = True pour économiser les quotas)...")
+        print("[TRACE] Déclenchement du traitement global (Exclure_players = True pour économiser les quotas NoSQL)...")
         journaux_execution = executer_mise_a_jour_cron(exclure_players=True)
         
         print("\n------------------- JOURNAUX DU ROBOT GLOBAL -------------------")
@@ -62,5 +65,5 @@ if force_run or (heure_locale == 3):
         traceback.print_exc()
         sys.exit(1)
 else:
-    print(f"💤 Créneau ignoré ({heure_locale}h{minute_locale}). Ce déclenchement automatique est réservé à l'autre saison. Veille automatique.")
+    print(f"💤 Créneau ignoré ({heure_locale}h{minute_locale}). Ce déclenchement automatique est réservé au créneau de 03h30. Veille automatique.")
     sys.exit(0)
