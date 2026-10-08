@@ -2,6 +2,7 @@ import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
+from crons.cron_update_taux import executer_mise_a_jour_taux_uniquement
 
 def executer_mise_a_jour_taux_uniquement():
     import zoneinfo
