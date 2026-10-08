@@ -1,61 +1,60 @@
 import os
 import sys
+import json
 from datetime import datetime
 import zoneinfo
 import firebase_admin
 from firebase_admin import credentials
 
-# 1. Analyse du type de déclenchement GitHub
-evenement_github = os.environ.get("GITHUB_EVENT_NAME", "").strip().lower()
-force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
+print("==========================================================================")
+print("🔍 SCRIPT GITHUB ACTIONS — CRON GLOBAL LOURD 03H30")
+print("==========================================================================")
 
-# 2. Détermination de l'heure légale en France (Heure du serveur du jeu)
+# 1. Détermination de l'heure légale en France
 tz_france = zoneinfo.ZoneInfo("Europe/Paris")
 heure_actuelle_france = datetime.now(tz_france)
 
 heure_locale = heure_actuelle_france.hour
 minute_locale = heure_actuelle_france.minute
 
-print("==========================================================================")
-print("🔍 SCRIPT CRON GLOBAL — DIAGNOSTIC HORLOGE")
-print("==========================================================================")
-print(f"[TRACE] Heure France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
+evenement_github = os.environ.get("GITHUB_EVENT_NAME", "").strip().lower()
+force_run = (evenement_github == "workflow_dispatch" or evenement_github == "")
 
-# 3. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h25 et 3h55)
+print(f"[TRACE] Heure locale France détectée : {heure_locale}h{minute_locale} (Événement : '{evenement_github}')")
+
+# 2. Validation de la fenêtre cible : 3h du matin (Autorisé entre 3h00 et 3h59)
 if force_run or (heure_locale == 3):
-    print("🚀 Créneau de 03h30 validé ou Exécution forcée. Démarrage de la mise à jour complète...")
+    print("🚀 Fenêtre de 03h30 confirmée. Démarrage de la mise à jour complète...")
     
-    # Lecture du secret d'accès Firebase NoSQL
     secret_credentials = os.environ.get("FIREBASE_CREDENTIALS_JSON", "")
     if not secret_credentials:
-        print("❌ Erreur critique : Le secret 'FIREBASE_CREDENTIALS_JSON' est manquant dans les paramètres GitHub.")
+        print("❌ Erreur critique : Le secret 'FIREBASE_CREDENTIALS_JSON' est manquant dans GitHub Secrets.")
         sys.exit(1)
 
     if not firebase_admin._apps:
-        import json
         try:
             info_cles = json.loads(secret_credentials)
             info_cles["private_key"] = info_cles["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(info_cles)
             firebase_admin.initialize_app(cred)
-            print("[✅] Connexion établie avec succès à Firebase Cloud Firestore.")
+            print("[✅] Connexion établie avec Firebase Cloud Firestore.")
         except Exception as err_json:
             print(f"❌ Erreur lors du chargement de la clé Firebase : {err_json}")
             sys.exit(1)
 
-    # 4. Chargement et exécution de votre script d'origine
+    # 3. Chargement et exécution du traitement lourd
     try:
         sys.path.append(os.path.abspath(os.path.dirname(__file__)))
         from crons.cron_update_api import executer_mise_a_jour_cron
 
-        print("[TRACE] Déclenchement du traitement lourd (sans la table 'players')...")
+        print("[TRACE] Déclenchement du traitement global (Exclure_players = True pour économiser les quotas)...")
         journaux_execution = executer_mise_a_jour_cron(exclure_players=True)
         
         print("\n------------------- JOURNAUX DU ROBOT GLOBAL -------------------")
         print("\n".join(journaux_execution) if isinstance(journaux_execution, list) else str(journaux_execution))
         print("-----------------------------------------------------------------\n")
         
-        print("✅ Base NoSQL entièrement synchronisée (hors players) avec succès.")
+        print("✅ Base NoSQL entièrement synchronisée avec succès.")
         sys.exit(0)
     except Exception as err_cron:
         print(f"💥 Échec critique durant l'exécution du cron global : {err_cron}")
@@ -63,6 +62,5 @@ if force_run or (heure_locale == 3):
         traceback.print_exc()
         sys.exit(1)
 else:
-    # Arrêt propre si ce n'est pas la bonne saison horaire
-    print(f"💤 Créneau ignoré ({heure_locale}h{minute_locale}). Ce déclenchement correspond à l'autre saison. Veille automatique.")
+    print(f"💤 Créneau ignoré ({heure_locale}h{minute_locale}). Ce déclenchement automatique est réservé à l'autre saison. Veille automatique.")
     sys.exit(0)
