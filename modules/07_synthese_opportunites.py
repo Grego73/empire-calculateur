@@ -21,7 +21,7 @@ taux_batiments_actuel = config_taux.get("batiments", 0)
 taux_materiaux_actuel = config_taux.get("materiaux", 0)
 
 # =========================================================
-# 🧮 EXTRACTION DIRECTE ET CALCULS COMPTABLES INVERSÉS
+# 🧮 AFFICHAGE DIRECT DES TABLEAUX EN HAUT DE PAGE
 # =========================================================
 if df_batiments is None or df_batiments.empty:
     st.error("🚨 Base de données des bâtiments indisponible ou vide.")
@@ -87,26 +87,22 @@ else:
         st.error(f"⚠️ Erreur lors du traitement comptable : {e}")
 
 # =========================================================
-# 📈 EXTRACTEUR NO SQL & SUIVI DES COURBES PROMOTEURS
+# 📈 EXTRACTEUR NO SQL & GRAPHATIQUES DES TAUX TOUT EN BAS
 # =========================================================
 st.markdown("---")
-st.subheader("🏛️ Suivi Temporel de l'Évolution des Taux")
+st.subheader("🏛 McKinney-Suivi Temporel de l'Évolution des Taux")
 
-@st.cache_data(ttl=600)  # Mise en cache 10 minutes pour économiser vos quotas Firestore
+@st.cache_data(ttl=600)
 def extraire_historique_taux_cloud():
-    import zoneinfo  # Ajout pour la gestion stricte du fuseau horaire de l'Empire
+    import zoneinfo
     try:
-        # Récupération de l'ensemble des configurations historisées
         docs = db.collection("configuration").stream()
         points_historiques = []
-        
-        # Définition des fuseaux horaires pour la conversion
         tz_utc = zoneinfo.ZoneInfo("UTC")
         tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
         
         for doc in docs:
             d = doc.to_dict()
-            # Ignorer le document maître statique
             if doc.id == "config_actuelle": 
                 continue
                 
@@ -116,17 +112,10 @@ def extraire_historique_taux_cloud():
             
             if extraction_brute and t_bat is not None and t_mat is not None:
                 try:
-                    # 1. On lit la date brute (stockée en format standard)
-                    dt = datetime.strptime(extraction_brute, "%Y-%m-%d %H:%M:%S")
-                    
-                    # 2. Si le serveur ou le script l'a enregistrée en UTC, on lui donne son fuseau d'origine
-                    dt = dt.replace(tzinfo=tz_utc)
-                    
-                    # 3. CONVERSION STRICTE VERS L'HEURE DE PARIS (Gère l'heure d'été/hiver automatiquement)
+                    dt = datetime.strptime(extraction_brute, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz_utc)
                     dt_paris = dt.astimezone(tz_paris)
                     label_date = dt_paris.strftime("%d/%m %H:%M")
                 except:
-                    # En cas de structure de date alternative
                     label_date = extraction_brute
                     
                 points_historiques.append({
@@ -139,9 +128,7 @@ def extraire_historique_taux_cloud():
         if not points_historiques:
             return None
             
-        # Tri chronologique selon la date brute
-        df_hist = pd.DataFrame(points_historiques).sort_values(by="Date_RAW")
-        return df_hist
+        return pd.DataFrame(points_historiques).sort_values(by="Date_RAW")
     except Exception as e:
         print(f"Erreur historique global taux : {e}")
         return None
@@ -149,29 +136,16 @@ def extraire_historique_taux_cloud():
 with st.spinner("Compilation des courbes historiques..."):
     df_suivi_taux = extraire_historique_taux_cloud()
 
-# Affichage adaptatif des graphiques
 if df_suivi_taux is not None and len(df_suivi_taux) > 1:
-    
-    # 📉 1. COURBE DU HAUT : Taux Bâtiments
     st.markdown(f"📉 **Évolution — Taux Promoteur Bâtiment (Actuel : `{taux_batiments_actuel}%`)**")
     st.line_chart(data=df_suivi_taux, x="Date", y="Taux Bâtiments (%)", color="#FF4B4B", use_container_width=True)
-    
     st.markdown("---")
-    
-    # 📈 2. COURBE DU BAS : Taux Matériaux
     st.markdown(f"📈 **Évolution — Taux Promoteur Matériau / Terrains (Actuel : `{taux_materiaux_actuel}%`)**")
     st.line_chart(data=df_suivi_taux, x="Date", y="Taux Matériaux (%)", color="#00C49F", use_container_width=True)
-    
 else:
-    # Mode secours si l'historique NoSQL ne contient pas assez d'éléments
     st.info("⚪ Historique en cours de constitution. Affichage des taux instantanés actuels.")
-    
     st.markdown(f"**Taux Promoteur Bâtiment : `{taux_batiments_actuel}%`**")
-    df_jauge_bat = pd.DataFrame({"Taux (%)": [taux_batiments_actuel]}, index=["Bâtiment"])
-    st.bar_chart(df_jauge_bat, y_label="Pourcentage", color="#FF4B4B", use_container_width=True)
-    
+    st.bar_chart(pd.DataFrame({"Taux (%)": [taux_batiments_actuel]}, index=["Bâtiment"]), color="#FF4B4B", use_container_width=True)
     st.markdown("---")
-    
     st.markdown(f"**Taux Promoteur Matériau (Terrains) : `{taux_materiaux_actuel}%`**")
-    df_jauge_mat = pd.DataFrame({"Taux (%)": [taux_materiaux_actuel]}, index=["Matériau"])
-    st.bar_chart(df_jauge_mat, y_label="Pourcentage", color="#00C49F", use_container_width=True)
+    st.bar_chart(pd.DataFrame({"Taux (%)": [taux_materiaux_actuel]}, index=["Matériau"]), color="#00C49F", use_container_width=True)
