@@ -216,3 +216,50 @@ def executer_mise_a_jour_cron(exclure_players=True):
         if req.status_code == 200:
             data_json = req.json()
             liste_t_perso = data_json.get("travaux_perso", [])
+            liste_t_perso = data_json.get("travaux_perso", [])
+            liste_t_entreprise = data_json.get("travaux_entreprises", [])
+            
+            notifier(f"🏗️ Détection JSON : {len(liste_t_perso)} travaux personnels, {len(liste_t_entreprise)} travaux entreprises.")
+            
+            categories_travaux = [
+                ("perso", liste_t_perso),
+                ("entreprise", liste_t_entreprise)
+            ]
+            
+            batch = db.batch()
+            c_batch = 0
+            total_travaux_enregistre = 0
+            
+            for categorie, liste in categories_travaux:
+                for w in liste:
+                    id_w = w.get('id', 0)
+                    t_type = w.get('type', 'Construction')
+                    b_name = w.get('nom', 'Inconnu')
+                    
+                    doc_id = f"{id_w}_{t_type.lower()}_{timestamp_id}"
+                    doc_ref = db.collection("travaux").document(doc_id)
+                    
+                    batch.set(doc_ref, {
+                        "id_jeu": int(id_w),
+                        "type_travaux": str(t_type), 
+                        "building_name": str(b_name), 
+                        "terrain_requis": str(w.get("terrain", "Aucun")),
+                        "cout_estime": securiser_entier(w.get("cout", 0)), 
+                        "duree_mois": securiser_entier(w.get("duree", 0)), 
+                        "categorie": categorie,
+                        "date_extraction": date_now
+                    })
+                    c_batch += 1
+                    total_travaux_enregistre += 1
+                    
+                    if c_batch >= 500:
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
+            if c_batch > 0:
+                batch.commit()
+            notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes).")
+        else:
+            notifier(f"❌ Erreur API Travaux : {req.status_code}")
+    except Exception as e: 
+        notifier(f"💥 Crash Travaux : {e}")
