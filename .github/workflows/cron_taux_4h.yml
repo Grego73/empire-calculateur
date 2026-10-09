@@ -2,12 +2,11 @@ name: ⏱️ Synchro Taux Promoteur Automatique (4H)
 
 on:
   schedule:
-    # Déclenchements précis toutes les 4 heures (minute 01) couvrant parfaitement l'alternance Été/Hiver
+    # Fréquence toutes les 4h basée sur l'heure UTC brute (ex: 22h, 02h, 06h...)
     - cron: '1 22,2,6,10,14,18 * * *'
-    - cron: '1 23,3,7,11,15,19 * * *'
   workflow_dispatch:
-  repository_dispatch: # NOUVEAU : Permet au Cron Job externe de le lancer
-  types: [run_taux]
+  repository_dispatch: 
+    types: [run_taux] # ✅ Corrigé : Parfaitement imbriqué sous repository_dispatch
 
 jobs:
   execution_cron:
@@ -27,15 +26,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # Inspection conservée à des fins de diagnostic en cas de coupure système
     - name: 🔍 Inspection des Fichiers Disponibles
       run: |
         echo "=== Emplacement actuel ==="
         pwd
         echo "=== Liste des fichiers à la racine ==="
         ls -la
-        echo "=== Vérification de la version Python ==="
-        python --version
 
     - name: 🚀 Lancement de la synchronisation des Taux
       env:
