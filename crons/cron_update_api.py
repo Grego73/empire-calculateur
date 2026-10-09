@@ -4,25 +4,22 @@ import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-import time  # Permet de faire une pause si l'API est fatiguée
+import time
+import streamlit as st  # ✅ Ajouté pour éviter le crash sur st.secrets
 
-def requete_api_securisee(url):
+def requete_api_securisee(url, headers=None):
     """Effectue l'appel API avec gestion du blocage (Rate Limiting)"""
     try:
-        # Premier essai
-        response = requests.get(url, timeout=15)
-        
-        # Si l'API nous bloque temporairement (Code 429)
+        response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 429:
             print("⚠️ [API EMPIRE] Trop de requêtes ! Pause de 5 secondes avant de réessayer...")
             time.sleep(5)
-            response = requests.get(url, timeout=15) # Deuxième essai
-            
+            response = requests.get(url, headers=headers, timeout=15)
         return response
     except Exception as e:
         print(f"💥 Erreur de connexion réseau : {e}")
         return None
-# Alignement du chemin d'importation NoSQL
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 if not firebase_admin._apps:
@@ -40,12 +37,9 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# RÈGLE ARCHITECTURALE : Sécurisé par défaut à True pour préserver les quotas NoSQL
 def executer_mise_a_jour_cron(exclure_players=True):
     import zoneinfo
     logs_session = []
-    
-    # Configuration du fuseau horaire de l'Empire
     tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
     
     def notifier(texte):
@@ -54,15 +48,12 @@ def executer_mise_a_jour_cron(exclure_players=True):
         logs_session.append(f"[{heure_france}] {texte}")
 
     notifier("⏰ [CRON CLOUD] Démarrage de la récupération...")
-    
     date_now = datetime.now(tz_paris).strftime("%Y-%m-%d %H:%M:%S")
     timestamp_id = datetime.now(tz_paris).strftime("%Y%m%d_%H%M%S")
 
-    # 🌐 CONFIGURATION FINALE DU SERVEUR MONDE 8
     API_KEY = "eiK8_110b18473efc48e9c63f76b5494ea18f"
     BASE_URL = "https://empireimmo.com"
     
-    # En-tête obligatoire uis par la charte d'extraction du jeu
     headers_navigation = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Application-Empire-Calculateur",
         "Accept": "application/json"
@@ -86,19 +77,11 @@ def executer_mise_a_jour_cron(exclure_players=True):
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_mat}")
         notifier("==========================================================================")
-        # Remplacement dans votre script principal :
-        req = requete_api_securisee(url_mat)
+        
+        req = requete_api_securisee(url_mat, headers=headers_navigation)
         
         if req and req.status_code == 200:
-            # ... tout votre code d'écriture Firebase reste identique ...
-        elif req and req.status_code == 429:
-            notifier("❌ [BLOCAGE] Empire Immo a bloqué notre clé pour cette heure-ci. On réessaiera au prochain cron.")
-        else:
-            notifier(f"❌ Erreur API : Code {req.status_code if req else 'Inconnu'}")
-        
-                notifier(f"📡 API Matériaux — Code : {req.status_code}")
-        
-        if req.status_code == 200:
+            notifier(f"📡 API Matériaux — Code : {req.status_code}")
             data_json = req.json()
             taux_materiaux = securiser_entier(data_json.get("taux_promoteur", 0))
             
@@ -153,8 +136,10 @@ def executer_mise_a_jour_cron(exclure_players=True):
             if c_batch > 0:
                 batch.commit()
             notifier("✅ Collection 'usines' synchronisée avec succès.")
+        elif req and req.status_code == 429:
+            notifier("❌ [BLOCAGE] Empire Immo a bloqué notre clé pour cette heure-ci. On réessaiera au prochain cron.")
         else:
-            notifier(f"❌ Erreur API Matériaux : {req.text[:200]}")
+            notifier(f"❌ Erreur API : Code {req.status_code if req else 'Inconnu'}")
     except Exception as e: 
         notifier(f"💥 Crash Matériaux/Usines : {e}")
 
@@ -164,10 +149,10 @@ def executer_mise_a_jour_cron(exclure_players=True):
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_bld}")
         notifier("==========================================================================")
-        req = requests.get(url_bld, headers=headers_navigation, timeout=15)
-        notifier(f"📡 API Bâtiments — Code : {req.status_code}")
+        req = requete_api_securisee(url_bld, headers=headers_navigation)
+        notifier(f"📡 API Bâtiments — Code : {req.status_code if req else 'Inconnu'}")
         
-        if req.status_code == 200:
+        if req and req.status_code == 200:
             data_json = req.json()
             taux_batiments = securiser_entier(data_json.get("taux_promoteur", 0))
             
@@ -180,14 +165,10 @@ def executer_mise_a_jour_cron(exclure_players=True):
             db.collection("configuration").document("config_actuelle").set(payload_config, merge=True)
             notifier(f"⚙️ Configuration : Taux Promoteur BÂTIMENTS mis à jour ({taux_batiments}%).")
 
-            liste_perso = data_json.get("batiments_perso", [])
-            liste_entreprise = data_json.get("batiments_entreprise", [])
-            liste_terrain = data_json.get("batiments_terrain", [])
-            
             categories_batiments = [
-                ("perso", liste_perso),
-                ("entreprise", liste_entreprise),
-                ("terrain", liste_terrain)
+                ("perso", data_json.get("batiments_perso", [])),
+                ("entreprise", data_json.get("batiments_entreprise", [])),
+                ("terrain", data_json.get("batiments_terrain", []))
             ]
             
             batch = db.batch()
@@ -226,7 +207,7 @@ def executer_mise_a_jour_cron(exclure_players=True):
                 batch.commit()
             notifier(f"✅ Collection 'batiments' entièrement synchronisée ({total_enregistre} lignes).")
         else:
-            notifier(f"❌ Erreur API Bâtiments : {req.text[:200]}")
+            notifier(f"❌ Erreur API Bâtiments : {req.text[:200] if req else 'Inconnu'}")
     except Exception as e: 
         notifier(f"💥 Crash Bâtiments : {e}")
 
@@ -236,12 +217,11 @@ def executer_mise_a_jour_cron(exclure_players=True):
         notifier("==========================================================================")
         notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_wrk}")
         notifier("==========================================================================")
-        req = requests.get(url_wrk, headers=headers_navigation, timeout=15)
-        notifier(f"📡 API Travaux — Code : {req.status_code}")
+        req = requete_api_securisee(url_wrk, headers=headers_navigation)
+        notifier(f"📡 API Travaux — Code : {req.status_code if req else 'Inconnu'}")
         
-        if req.status_code == 200:
+        if req and req.status_code == 200:
             data_json = req.json()
-            liste_t_perso = data_json.get("travaux_perso", [])
             liste_t_perso = data_json.get("travaux_perso", [])
             liste_t_entreprise = data_json.get("travaux_entreprises", [])
             
@@ -256,8 +236,8 @@ def executer_mise_a_jour_cron(exclure_players=True):
             c_batch = 0
             total_travaux_enregistre = 0
             
-            for categorie, liste in categories_travaux:
-                for w in liste:
+            for categorie, listes in categories_travaux:
+                for w in listes:
                     id_w = w.get('id', 0)
                     t_type = w.get('type', 'Construction')
                     b_name = w.get('nom', 'Inconnu')
@@ -286,6 +266,58 @@ def executer_mise_a_jour_cron(exclure_players=True):
                 batch.commit()
             notifier(f"✅ Collection 'travaux' entièrement synchronisée ({total_travaux_enregistre} lignes).")
         else:
-            notifier(f"❌ Erreur API Travaux : {req.status_code}")
+            notifier(f"❌ Erreur API Travaux : {req.status_code if req else 'Inconnu'}")
     except Exception as e: 
         notifier(f"💥 Crash Travaux : {e}")
+
+    # --- 4. CLASSEMENT DES JOUEURS (PLAYERS) ---
+    # Soumis au paramètre d'exclusion pour préserver drastiquement les quotas NoSQL Firestore
+    if exclure_players:
+        notifier("⚠️ [QUOTAS] Le paramètre 'exclure_players' est activé. Saut de la synchronisation du classement.")
+    else:
+        try:
+            url_ply = f"{BASE_URL}/api/players.json?key={API_KEY}"
+            notifier("==========================================================================")
+            notifier(f"🚀 [ADRESSE APPELÉE EN DIRECT] : {url_ply}")
+            notifier("==========================================================================")
+            req = requete_api_securisee(url_ply, headers=headers_navigation)
+            notifier(f"📡 API Joueurs — Code : {req.status_code if req else 'Inconnu'}")
+            
+            if req and req.status_code == 200:
+                players_list = req.json().get("joueurs", [])
+                notifier(f"🏆 {len(players_list)} joueurs détectés dans le classement. Alignement en base...")
+                
+                batch = db.batch()
+                c_batch = 0
+                total_players_enregistre = 0
+                
+                for p in players_list:
+                    pseudo_j = p.get('pseudo', 'Inconnu')
+                    # Création d'un identifiant stable associant le pseudo à la date d'extraction
+                    doc_id = f"{pseudo_j.replace(' ', '_')}_{timestamp_id}"
+                    doc_ref = db.collection("players").document(doc_id)
+                    
+                    batch.set(doc_ref, {
+                        "pseudo": str(pseudo_j),
+                        "classement": securiser_entier(p.get("classement", 0)),
+                        "niveau": securiser_entier(p.get("niveau", 1)),
+                        "points": securiser_entier(p.get("points", 0)),
+                        "date_extraction": date_now
+                    })
+                    c_batch += 1
+                    total_players_enregistre += 1
+                    
+                    if c_batch >= 500:
+                        batch.commit()
+                        batch = db.batch()
+                        c_batch = 0
+                if c_batch > 0:
+                    batch.commit()
+                notifier(f"✅ Collection 'players' entièrement rafraîchie ({total_players_enregistre} profils).")
+            else:
+                notifier(f"❌ Erreur API Joueurs : {req.status_code if req else 'Inconnu'}")
+        except Exception as e:
+            notifier(f"💥 Crash Classement Joueurs : {e}")
+
+    notifier("🏁 [CRON CLOUD] Fin de la session d'extraction avec succès.")
+    return logs_session
