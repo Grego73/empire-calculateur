@@ -41,12 +41,40 @@ def determiner_taux(capital, grille):
 
 saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
-st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**")
 
+# =========================================================================
+# ⏱️ AJOUT : CALCUL DU TEMPS RESTANT AVANT LE BLOCAGE (PLAFOND)
+# =========================================================================
+txt_temps_saturation = ""
 if capital_brut > 0:
     capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
-    if int(capital_brut) > int(PLAFOND_LIVRET_I):
-        st.error(f"🛑 Enveloppe bridée au plafond maximum légal des livrets : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
+    
+    if capital_base_calcul >= int(PLAFOND_LIVRET_I):
+        txt_temps_saturation = " | 🛑 **Compte saturé/bloqué au maximum**"
+    else:
+        # Intérêts générés au premier jour basé sur l'enveloppe
+        gain_jour_fixe_lineaire = total_interets_paliers_de_base // 12
+        taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
+        
+        # Simulation rapide en intérêts composés (Méthode 1 Cascade Pivotée)
+        capital_courant_sim = int(capital_base_calcul)
+        jours_necessaires = 0
+        
+        while capital_courant_sim < int(PLAFOND_LIVRET_I) and jours_necessaires < 365:
+            interets_du_jour = int(capital_courant_sim * taux_journalier_moyen_paliers)
+            if interets_du_jour <= 0:
+                break
+            capital_courant_sim += interets_du_jour
+            jours_necessaires += 1
+            
+        if capital_courant_sim >= int(PLAFOND_LIVRET_I):
+            txt_temps_saturation = f" | ⏳ **Temps requis pour saturer le compte (6 R) : {jours_necessaires} jours de jeu**"
+        else:
+            txt_temps_saturation = " | ⚠️ **Rendement résiduel trop faible pour atteindre le plafond**"
+
+# Affichage de la ligne d'information mise à jour
+st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**{txt_temps_saturation}")
+
     
     repartition_livrets = []
     total_interets_paliers_de_base = 0
