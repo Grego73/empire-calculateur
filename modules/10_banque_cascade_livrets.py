@@ -39,48 +39,20 @@ def determiner_taux(capital, grille):
             taux_trouve = tranche["taux"]
     return taux_trouve
 
-    saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
-    capital_brut = convertir_saisie_en_nombre(saisie_somme)
-    
-    # =========================================================================
-    # ⏱️ AJOUT : CALCUL DU TEMPS RESTANT AVANT LE BLOCAGE (PLAFOND)
-    # =========================================================================
-    txt_temps_saturation = ""
-    if capital_brut > 0:
-        capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
-        
-        if capital_base_calcul >= int(PLAFOND_LIVRET_I):
-            txt_temps_saturation = " | 🛑 **Compte saturé/bloqué au maximum**"
-        else:
-            # Intérêts générés au premier jour basé sur l'enveloppe
-            gain_jour_fixe_lineaire = total_interets_paliers_de_base // 12
-            taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
-            
-            # Simulation rapide en intérêts composés (Méthode 1 Cascade Pivotée)
-            capital_courant_sim = int(capital_base_calcul)
-            jours_necessaires = 0
-            
-            while capital_courant_sim < int(PLAFOND_LIVRET_I) and jours_necessaires < 365:
-                interets_du_jour = int(capital_courant_sim * taux_journalier_moyen_paliers)
-                if interets_du_jour <= 0:
-                    break
-                capital_courant_sim += interets_du_jour
-                jours_necessaires += 1
-                
-            if capital_courant_sim >= int(PLAFOND_LIVRET_I):
-                txt_temps_saturation = f" | ⏳ **Temps requis pour saturer le compte (6 R) : {jours_necessaires} jours de jeu**"
-            else:
-                txt_temps_saturation = " | ⚠️ **Rendement résiduel trop faible pour atteindre le plafond**"
-    
-    # Affichage de la ligne d'information mise à jour
-    st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**{txt_temps_saturation}")
+# ✅ Correction de l'alignement : Le code principal repart bien à la racine du fichier (sans espaces devant)
+saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
+capital_brut = convertir_saisie_en_nombre(saisie_somme)
 
+if capital_brut > 0:
+    capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
+    if int(capital_brut) > int(PLAFOND_LIVRET_I):
+        st.error(f"🛑 Enveloppe bridée au plafond maximum légal des livrets : {formater_monnaie_empire(PLAFOND_LIVRET_I)} Ø.")
     
     repartition_livrets = []
     total_interets_paliers_de_base = 0
     capital_deja_place = 0
     
-    # 🎯 Calcul de la Cascade Cumulative
+    # 🎯 1. Calcul initial des paliers de la Cascade Cumulative
     for palier in seuils_officiels:
         if capital_base_calcul <= capital_deja_place:
             break
@@ -116,13 +88,48 @@ def determiner_taux(capital, grille):
         })
         total_interets_paliers_de_base += gain_residu
 
-    st.dataframe(pd.DataFrame(repartition_livrets), use_container_width=True, hide_index=True, column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")})
+    # =========================================================================
+    # ⏱️ ESTIMATION COMPOSÉE DU TEMPS DE BLOCAGE (Après initialisation des taux)
+    # =========================================================================
+    txt_temps_saturation = ""
+    if capital_base_calcul >= int(PLAFOND_LIVRET_I):
+        txt_temps_saturation = " | 🛑 **Compte saturé/bloqué au maximum**"
+    else:
+        gain_jour_fixe_lineaire_init = total_interets_paliers_de_base // 12
+        taux_journalier_moyen_init = float(gain_jour_fixe_lineaire_init) / capital_base_calcul if capital_base_calcul > 0 else 0.0
+        
+        capital_courant_sim = int(capital_base_calcul)
+        jours_necessaires = 0
+        
+        while capital_courant_sim < int(PLAFOND_LIVRET_I) and jours_necessaires < 365:
+            interets_du_jour = int(capital_courant_sim * taux_journalier_moyen_init)
+            if interets_du_jour <= 0:
+                break
+            capital_courant_sim += interets_du_jour
+            jours_necessaires += 1
+            
+        if capital_courant_sim >= int(PLAFOND_LIVRET_I):
+            txt_temps_saturation = f" | ⏳ **Temps requis pour saturer le compte (6 R) : {jours_necessaires} jours de jeu**"
+        else:
+            txt_temps_saturation = " | ⚠️ **Rendement résiduel trop faible pour atteindre le plafond**"
+
+    # Affichage sécurisé des éléments d'en-tête du capital
+    st.caption(f"💰 Volume financier : **{formater_monnaie_empire(capital_brut)} Ø**{txt_temps_saturation}")
+    st.markdown("---")
+
+    # Affichage du premier grand tableau de répartition
+    st.dataframe(
+        pd.DataFrame(repartition_livrets), 
+        use_container_width=True, 
+        hide_index=True, 
+        column_config={"Valeur Brute (À COPIER EN JEU)": st.column_config.TextColumn("Valeur Brute (À COPIER EN JEU)")}
+    )
 
     # =========================================================================
     # 🧮 CALCUL DES DEUX STRATÉGIES (MÉTHODE 1 PIVOTÉE VS MÉTHODE 2 BLOQUÉE)
     # =========================================================================
     taux_base_brut = determiner_taux(capital_base_calcul, GRILLE_EPARGNE)
-    interets_gros_bloc = total_interets_paliers_de_base # La méthode 2 sature comme la 1 au niveau des paliers
+    interets_gros_bloc = total_interets_paliers_de_base
     
     gain_jour_fixe_lineaire = interets_gros_bloc // 12
     taux_journalier_moyen_paliers = float(gain_jour_fixe_lineaire) / capital_base_calcul if capital_base_calcul > 0 else 0.0
@@ -204,7 +211,7 @@ def determiner_taux(capital, grille):
     solde_final_cascade = capital_base_calcul + total_interets_cascade_compose
     solde_final_brut_unique = capital_base_calcul + interets_gros_bloc
 
-     # =========================================================================
+    # =========================================================================
     # 💰 AFFICHAGE DE LA RANGÉE 3 : SOLDE CUMULÉ (FORTUNE FINALE CORRIGÉE)
     # =========================================================================
     ct1, ct2, ct3 = st.columns(3)
@@ -229,7 +236,8 @@ def determiner_taux(capital, grille):
             value=txt_sauve
         )
         st.caption("Trésorerie bonus créée")
-    # Formatage des dictionnaires de tableaux pour appliquer ta règle d'affichage large de 10 à 9999.99
+
+    # Formatage des dictionnaires de tableaux pour appliquer la règle d'affichage large
     suivi_cascade_formate = []
     suivi_unique_formate = []
 
@@ -249,7 +257,7 @@ def determiner_taux(capital, grille):
             "Solde Cumulé (Ø)": f"{float(r['Solde Cumulé']) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " ")
         })
 
-    # Ajout des lignes de Totaux formatées
+    # Ajout des lignes de Totaux formatées en fin de matrice
     suivi_cascade_formate.append({
         "Jour de Jeu (Mois)": "📊 TOTAL CUMULÉ",
         "Solde Départ (Ø)": f"{float(capital_base_calcul) / diviseur_choisi:,.2f} {lettre_choisie}".replace(",", " "),
