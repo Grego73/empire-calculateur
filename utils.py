@@ -295,17 +295,15 @@ def recuperer_derniers_taux_configuration():
         return {"batiments": 0, "materiaux": 0}
 
 def recuperer_configuration_banque():
-    """Récupère dynamiquement les plafonds et paliers depuis Firestore avec support des chaînes pour les grands nombres"""
+    """Récupère dynamiquement les plafonds et paliers depuis Firestore avec support complet du format texte"""
     try:
         doc = db.collection("configuration").document("config_banque").get()
         if doc.exists:
             d = doc.to_dict()
             
-            # Lecture des paliers bruts
             paliers_bruts = d.get("paliers", [])
             paliers_convertis = []
             
-            # Conversion à la volée des chaînes en entiers Python de taille infinie
             for p in paliers_bruts:
                 paliers_convertis.append({
                     "nom": p.get("nom"),
@@ -314,14 +312,14 @@ def recuperer_configuration_banque():
                 })
                 
             return {
-                "plafond_livret_i": int(convertir_saisie_en_nombre(d.get("plafond_livret_i", 20 * 10**27))),
-                "plafond_epargne": int(convertir_saisie_en_nombre(d.get("plafond_epargne", 20 * 10**27))),
+                "plafond_livret_i": int(convertir_saisie_en_nombre(d.get("plafond_livret_i", "20 R"))),
+                "plafond_epargne": int(convertir_saisie_en_nombre(d.get("plafond_epargne", "20 R"))),
                 "paliers": paliers_convertis
             }
     except Exception as e:
-        print(f"❌ Erreur lecture config_banque (Interprétation chaînes) : {e}")
+        print(f"❌ Erreur lecture config_banque : {e}")
         
-    # Secours Monde 8 par défaut si la base est inaccessible
+    # Secours Monde 8 par défaut si la base est vide
     return {
         "plafond_livret_i": 20 * 10**27,
         "plafond_epargne": 20 * 10**27,
@@ -334,3 +332,4 @@ def recuperer_configuration_banque():
             {"nom": "Palier 6 (Taux 10%)", "seuil_max": 20_000_001 * 10**18, "taux": 10.0}
         ]
     }
+
