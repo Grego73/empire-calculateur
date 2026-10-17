@@ -29,8 +29,17 @@ def determiner_taux(capital, grille):
     return taux_trouve
 
 # ✅ Correction de l'alignement : Le code principal repart bien à la racine du fichier (sans espaces devant)
-saisie_somme = st.text_input("Capital global à fragmenter (Max 6 R) :", value="6 R", key="somme_cascade_livrets")
+# 1. On récupère la valeur lisible du plafond depuis la base (ex: "20 R") pour l'afficher par défaut
+valeur_plafond_cloud_lisible = formater_monnaie_empire(PLAFOND_LIVRET_I)
+
+# 2. Le champ de saisie utilise maintenant dynamiquement la configuration NoSQL du Cloud
+saisie_somme = st.text_input(
+    f"Capital global à fragmenter (Max {valeur_plafond_cloud_lisible}) :", 
+    value=valeur_plafond_cloud_lisible, 
+    key="somme_cascade_livrets"
+)
 capital_brut = convertir_saisie_en_nombre(saisie_somme)
+
 
 if capital_brut > 0:
     capital_base_calcul = min(int(capital_brut), int(PLAFOND_LIVRET_I))
