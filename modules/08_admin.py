@@ -145,19 +145,22 @@ else:
         
         if st.button("💾 Pousser les nouveaux barèmes sur le Cloud", use_container_width=True):
             with st.spinner("Mise à jour des règles bancaires de l'Empire..."):
-                val_i = convertir_saisie_en_nombre(nouveau_plaf_i)
-                val_e = convertir_saisie_en_nombre(nouveau_plaf_e)
+                # On nettoie et on garde le format texte brut pour Firestore
+                str_plafond_i = str(nouveau_plaf_i).strip()
+                str_plafond_e = str(nouveau_plaf_e).strip()
                 paliers_valides = json.loads(paliers_json_brut)
                 
+                # Sauvegarde au format String pour contourner la limite Int64 de Firestore
                 db.collection("configuration").document("config_banque").set({
-                    "plafond_livret_i": int(val_i),
-                    "plafond_epargne": int(val_e),
+                    "plafond_livret_i": str_plafond_i,
+                    "plafond_epargne": str_plafond_e,
                     "paliers": paliers_valides,
                     "derniere_maj_banque": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }, merge=True)
                 
-                st.success("🔥 Règles bancaires synchronisées à 100% avec succès !")
+                st.success("🔥 Règles bancaires synchronisées au format texte avec succès !")
                 st.rerun()
+
                 
     except Exception as e_admin_bank:
         st.error(f"Impossible de charger le gestionnaire de barèmes : {e_admin_bank}")
