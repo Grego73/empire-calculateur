@@ -1,7 +1,16 @@
 import streamlit as st
+import pandas as pd
 import os
 import sys
-import pandas as pd
+import json  # <-- Ajouté pour la gestion des barèmes bancaires
+from datetime import datetime
+from utils import (
+    formater_monnaie_empire,  # <-- Ajouté pour corriger l'erreur de chargement
+    convertir_saisie_en_nombre, 
+    recuperer_derniere_donnee_table,
+    db
+)
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
