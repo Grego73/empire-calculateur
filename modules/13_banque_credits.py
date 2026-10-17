@@ -15,16 +15,17 @@ st.caption(f"💰 Somme du crédit demandée : **{formater_monnaie_empire(montan
 st.markdown("---")
 
 if montant_pret > 0:
-    # Barème officiel des taux d'emprunts Monde 8
+    # 📊 Nouveau barème officiel des taux d'emprunts (Image officielle du 17/10/2026)
     taux_emprunt = 2.0
-    if montant_pret >= 5_000_000_100 * 10**18: taux_emprunt = 10.0
-    if montant_pret >= 6_000_000_100 * 10**18: taux_emprunt = 20.0
-    if montant_pret >= 10_000_001_000 * 10**18: taux_emprunt = 35.0
-    if montant_pret >= 15_000_001_000 * 10**18: taux_emprunt = 60.0
-    if montant_pret >= 20_000_001_000 * 10**18: taux_emprunt = 80.0
-    if montant_pret >= 30_000_001_000 * 10**18: taux_emprunt = 100.0
+    if montant_pret >= 10_000_000_100 * 10**18: taux_emprunt = 10.0
+    if montant_pret >= 12_000_000_100 * 10**18: taux_emprunt = 20.0
+    if montant_pret >= 20_000_001_000 * 10**18: taux_emprunt = 35.0
+    if montant_pret >= 30_000_001_000 * 10**18: taux_emprunt = 60.0
+    if montant_pret >= 40_000_001_000 * 10**18: taux_emprunt = 80.0
+    if montant_pret >= 60_000_001_000 * 10**18: taux_emprunt = 100.0
 
     st.write(f"📊 Tranche de taux d'intérêt détectée : **{taux_emprunt:.2f}% / an**")
+
 
     # Choix de la durée (Section 6.3)
     duree_credit = st.slider("Sélectionnez la durée de remboursement (en mois de jeu / jours réels) :", 6, 48, 12, 1)
