@@ -295,36 +295,42 @@ def recuperer_derniers_taux_configuration():
         return {"batiments": 0, "materiaux": 0}
 
 def recuperer_configuration_banque():
-    """Récupère dynamiquement les plafonds et paliers de la Banque Fédérale depuis Firestore"""
+    """Récupère dynamiquement les plafonds et paliers depuis Firestore avec support des chaînes pour les grands nombres"""
     try:
         doc = db.collection("configuration").document("config_banque").get()
         if doc.exists:
             d = doc.to_dict()
+            
+            # Lecture des paliers bruts
+            paliers_bruts = d.get("paliers", [])
+            paliers_convertis = []
+            
+            # Conversion à la volée des chaînes en entiers Python de taille infinie
+            for p in paliers_bruts:
+                paliers_convertis.append({
+                    "nom": p.get("nom"),
+                    "seuil_max": int(convertir_saisie_en_nombre(p.get("seuil_max"))),
+                    "taux": float(p.get("taux", 0.0))
+                })
+                
             return {
-                "plafond_livret_i": int(d.get("plafond_livret_i", 6 * 10**27)),
-                "plafond_epargne": int(d.get("plafond_epargne", 4 * 10**27)),
-                "paliers": d.get("paliers", [
-                    {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
-                    {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
-                    {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
-                    {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
-                    {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
-                    {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
-                ])
+                "plafond_livret_i": int(convertir_saisie_en_nombre(d.get("plafond_livret_i", 20 * 10**27))),
+                "plafond_epargne": int(convertir_saisie_en_nombre(d.get("plafond_epargne", 20 * 10**27))),
+                "paliers": paliers_convertis
             }
     except Exception as e:
-        print(f"❌ Erreur lecture config_banque : {e}")
+        print(f"❌ Erreur lecture config_banque (Interprétation chaînes) : {e}")
         
-    # Secours strict par défaut (Monde 8 initial)
+    # Secours Monde 8 par défaut si la base est inaccessible
     return {
-        "plafond_livret_i": 6 * 10**27,
-        "plafond_epargne": 4 * 10**27,
+        "plafond_livret_i": 20 * 10**27,
+        "plafond_epargne": 20 * 10**27,
         "paliers": [
-            {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
-            {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
-            {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
-            {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
-            {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
-            {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
+            {"nom": "Palier 1 (Taux 100%)", "seuil_max": 100_000_001 * 10**18, "taux": 100.0},
+            {"nom": "Palier 2 (Taux 80%)", "seuil_max": 150_000_000 * 10**18, "taux": 80.0},
+            {"nom": "Palier 3 (Taux 60%)", "seuil_max": 3_000_000_100 * 10**18, "taux": 60.0},
+            {"nom": "Palier 4 (Taux 40%)", "seuil_max": 7_000_000_100 * 10**18, "taux": 40.0},
+            {"nom": "Palier 5 (Taux 20%)", "seuil_max": 15_000_001 * 10**18, "taux": 20.0},
+            {"nom": "Palier 6 (Taux 10%)", "seuil_max": 20_000_001 * 10**18, "taux": 10.0}
         ]
     }
