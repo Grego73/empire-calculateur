@@ -289,8 +289,42 @@ def recuperer_derniers_taux_configuration():
                 "batiments": int(d_s.get("taux_promoteur_batiments", 0)),
                 "materiaux": int(d_s.get("taux_promoteur_materiaux", 0))
             }
-            
         return {"batiments": 0, "materiaux": 0}
     except Exception as e:
         print(f"❌ Erreur récupération configuration : {e}")
         return {"batiments": 0, "materiaux": 0}
+
+def recuperer_configuration_banque():
+    """Récupère dynamiquement les plafonds et paliers de la Banque Fédérale depuis Firestore"""
+    try:
+        doc = db.collection("configuration").document("config_banque").get()
+        if doc.exists:
+            d = doc.to_dict()
+            return {
+                "plafond_livret_i": int(d.get("plafond_livret_i", 6 * 10**27)),
+                "plafond_epargne": int(d.get("plafond_epargne", 4 * 10**27)),
+                "paliers": d.get("paliers", [
+                    {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
+                    {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
+                    {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
+                    {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
+                    {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
+                    {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
+                ])
+            }
+    except Exception as e:
+        print(f"❌ Erreur lecture config_banque : {e}")
+        
+    # Secours strict par défaut (Monde 8 initial)
+    return {
+        "plafond_livret_i": 6 * 10**27,
+        "plafond_epargne": 4 * 10**27,
+        "paliers": [
+            {"nom": "Palier 1 (Taux 100%)", "seuil_max": 300_000_010 * 10**18, "taux": 100.0},
+            {"nom": "Palier 2 (Taux 80%)", "seuil_max": 600_000_010 * 10**18, "taux": 80.0},
+            {"nom": "Palier 3 (Taux 60%)", "seuil_max": 2_000_000_100 * 10**18, "taux": 60.0},
+            {"nom": "Palier 4 (Taux 40%)", "seuil_max": 5_000_000_100 * 10**18, "taux": 40.0},
+            {"nom": "Palier 5 (Taux 20%)", "seuil_max": 10_000_001_000 * 10**18, "taux": 20.0},
+            {"nom": "Palier 6 (Taux 10%)", "seuil_max": 15_000_001_000 * 10**18, "taux": 10.0}
+        ]
+    }
