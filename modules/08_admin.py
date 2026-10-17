@@ -110,3 +110,45 @@ else:
                     )
             except Exception as e:
                 st.error(f"💥 Impossible de charger la table '{table_selectionnee}' : {e}")
+
+        st.markdown("---")
+    st.subheader("🏦 Panel de Modulation de la Banque Fédérale")
+    st.markdown("Modifiez ici les constantes monétaires de l'Empire. Tout changement impactera instantanément les livrets et comptes épargnes.")
+
+    try:
+        from utils import recuperer_configuration_banque
+        config_banque_actuelle = recuperer_configuration_banque()
+        
+        # 1. Champs pour les Plafonds Globaux
+        c_bank1, c_bank2 = st.columns(2)
+        with c_bank1:
+            nouveau_plaf_i = st.text_input("Plafond Max Livrets I :", value=formater_monnaie_empire(config_banque_actuelle["plafond_livret_i"]))
+        with c_bank2:
+            nouveau_plaf_e = st.text_input("Plafond Max Comptes Épargne :", value=formater_monnaie_empire(config_banque_actuelle["plafond_epargne"]))
+            
+        # 2. Zone d'édition brute du JSON des paliers (pour aller très vite)
+        st.markdown("##### ⚙️ Édition des Paliers & Taux (Format Structuré)")
+        paliers_json_brut = st.text_area(
+            "Bloc de configuration NoSQL des tranches d'intérêts :", 
+            value=json.dumps(config_banque_actuelle["paliers"], indent=2, ensure_ascii=False),
+            height=250
+        )
+        
+        if st.button("💾 Pousser les nouveaux barèmes sur le Cloud", use_container_width=True):
+            with st.spinner("Mise à jour des règles bancaires de l'Empire..."):
+                val_i = convertir_saisie_en_nombre(nouveau_plaf_i)
+                val_e = convertir_saisie_en_nombre(nouveau_plaf_e)
+                paliers_valides = json.loads(paliers_json_brut)
+                
+                db.collection("configuration").document("config_banque").set({
+                    "plafond_livret_i": int(val_i),
+                    "plafond_epargne": int(val_e),
+                    "paliers": paliers_valides,
+                    "derniere_maj_banque": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }, merge=True)
+                
+                st.success("🔥 Règles bancaires synchronisées à 100% avec succès !")
+                st.rerun()
+                
+    except Exception as e_admin_bank:
+        st.error(f"Impossible de charger le gestionnaire de barèmes : {e_admin_bank}")
