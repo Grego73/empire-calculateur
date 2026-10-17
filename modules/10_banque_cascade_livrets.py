@@ -107,7 +107,7 @@ if capital_brut > 0:
             jours_necessaires += 1
             
         if capital_courant_sim >= int(PLAFOND_LIVRET_I):
-            txt_temps_saturation = f" | ⏳ **Temps requis pour saturer le compte (6 R) : {jours_necessaires} jours de jeu**"
+            txt_temps_saturation = f" | ⏳ **Temps requis pour saturer le compte ({valeur_plafond_cloud_lisible}) : {jours_necessaires} jours de jeu**"
         else:
             txt_temps_saturation = " | ⚠️ **Rendement résiduel trop faible pour atteindre le plafond**"
 
