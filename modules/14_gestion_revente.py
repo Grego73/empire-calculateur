@@ -17,7 +17,8 @@ st.markdown(
 texte_proprietes = st.text_area(
     "📋 Collez ici la liste de vos biens (Nom, Quantité, Valeur totale Ø) :",
     height=220,
-    placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
+    placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif...",
+    key="textarea_revente_proprietes"
 )
 
 col_param1, col_param2 = st.columns([1, 2])
@@ -84,7 +85,7 @@ def analyser_lignes_proprietes(texte, pourcentage):
                 
     return resultats
 
-if st.button("🧮 Calculer les prix de revente", type="primary", use_container_width=True):
+if st.button("🧮 Calculer les prix de revente", type="primary", use_container_width=True, key="btn_calcul_revente"):
     if not texte_proprietes.strip():
         st.warning("⚠️ Veuillez coller la liste de vos propriétés avant de lancer le calcul.")
     else:
@@ -99,14 +100,14 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
             st.subheader("📋 Copie rapide (cliquez sur l'icône à droite du rectangle)")
             
-            h1, h2 = st.columns([1, 2])
+            h1, h2 = st.columns([2, 3])
             with h1:
                 st.markdown("**Nom du bien**")
             with h2:
                 st.markdown("**Valeur à copier**")
                 
             for item in donnees:
-                c1, c2 = st.columns([1, 2], vertical_alignment="center")
+                c1, c2 = st.columns([2, 3], vertical_alignment="center")
                 with c1:
                     st.write(item["Bâtiment"])
                 with c2:
