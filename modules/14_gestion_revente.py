@@ -3,10 +3,14 @@ import pandas as pd
 import re
 from utils import formater_monnaie_empire
 
-st.title("🏷️ Gestion Revente (+15 %)")
+# Récupération dynamique du pourcentage avant d'afficher le titre
+marge_actuelle = st.session_state.get("input_marge_revente", 15)
+signe = "+" if marge_actuelle >= 0 else ""
+
+st.title(f"🏷️ Gestion Revente ({signe}{marge_actuelle} %)")
 st.markdown(
-    "Collez directement le tableau de vos propriétés depuis la page **Immobilisation** d'Empire Immo. "
-    "Le module calcule le prix unitaire exact et le prix de revente majoré de **+15 % (arrondi à l'inférieur)**."
+    f"Collez directement le tableau de vos propriétés depuis la page **Immobilisation** d'Empire Immo. "
+    f"Le module calcule le prix unitaire exact et le prix de revente ajusté de **{signe}{marge_actuelle} % (arrondi à l'inférieur)**."
 )
 
 # Zone de saisie
@@ -16,16 +20,23 @@ texte_proprietes = st.text_area(
     placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
 )
 
-col_param1, col_param2 = st.columns(2)
+col_param1, col_param2 = st.columns()
 with col_param1:
-    marge_pourcent = st.number_input("Pourcentage de majoration (%)", min_value=0, max_value=500, value=15, step=1)
+    marge_pourcent = st.number_input(
+        "Pourcentage d'ajustement (%)", 
+        min_value=-99, 
+        max_value=500, 
+        value=15, 
+        step=1, 
+        key="input_marge_revente"
+    )
 
 def analyser_lignes_proprietes(texte, pourcentage):
     resultats = []
     lignes = texte.strip().split('\n')
     multiplicateur = 100 + int(pourcentage)
+    signe_col = "+" if pourcentage >= 0 else ""
     
-    # Expression régulière de secours : cherche 2 espaces ou plus entre colonnes
     pattern_espaces = re.compile(r"^\s*(.+?)\s{2,}([\d\s]+?)\s{2,}([\d\s]+)\s*Ø")
     
     for ligne in lignes:
@@ -37,15 +48,13 @@ def analyser_lignes_proprietes(texte, pourcentage):
         qte_str = ""
         val_totale_str = ""
         
-        # 1. Méthode prioritaire : découpage exact par tabulation
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 3 and "Ø" in colonnes[2]:
-                nom_bien = colonnes[0]
-                qte_str = re.sub(r"\s+", "", colonnes[1])
-                val_totale_str = re.sub(r"[\sØ]+", "", colonnes[2])
+            if len(colonnes) >= 3 and "Ø" in colonnes:
+                nom_bien = colonnes
+                qte_str = re.sub(r"\s+", "", colonnes)
+                val_totale_str = re.sub(r"[\sØ]+", "", colonnes)
         
-        # 2. Méthode de secours : si les tabulations ont été remplacées par plusieurs espaces
         if not nom_bien:
             match = pattern_espaces.search(ligne_propre)
             if match:
@@ -58,7 +67,6 @@ def analyser_lignes_proprietes(texte, pourcentage):
             valeur_totale = int(val_totale_str)
             
             if quantite > 0:
-                # Arithmétique entière exacte
                 prix_unitaire = valeur_totale // quantite
                 prix_revente = (prix_unitaire * multiplicateur) // 100
                 total_revente_lot = prix_revente * quantite
@@ -67,7 +75,7 @@ def analyser_lignes_proprietes(texte, pourcentage):
                     "Bâtiment": nom_bien,
                     "Quantité": f"{quantite:,}".replace(",", " "),
                     "Prix Unitaire (Base)": f"{prix_unitaire:,}".replace(",", " ") + " Ø",
-                    f"Prix Revente (+{pourcentage}%)": f"{prix_revente:,}".replace(",", " ") + " Ø",
+                    f"Prix Revente ({signe_col}{pourcentage}%)": f"{prix_revente:,}".replace(",", " ") + " Ø",
                     "Valeur à copier": str(prix_revente),
                     "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø",
                     "_raw_qte": quantite,
@@ -86,18 +94,19 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             st.error("❌ Aucun bâtiment reconnu. Vérifiez que les lignes contiennent bien le nom, la quantité et la valeur suivie de 'Ø'.")
         else:
             st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) avec succès !")
+            signe_tab = "+" if marge_pourcent >= 0 else ""
             
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
             st.subheader("📋 Copie rapide (cliquez sur l'icône à droite du rectangle)")
             
-            h1, h2 = st.columns([2, 3])
+            h1, h2 = st.columns()
             with h1:
                 st.markdown("**Nom du bien**")
             with h2:
                 st.markdown("**Valeur à copier**")
                 
             for item in donnees:
-                c1, c2 = st.columns([2, 3], vertical_alignment="center")
+                c1, c2 = st.columns(, vertical_alignment="center")
                 with c1:
                     st.write(item["Bâtiment"])
                 with c2:
@@ -116,18 +125,17 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
                     "Bâtiment": item["Bâtiment"],
                     "Quantité": item["Quantité"],
                     "Prix Unitaire (Base)": item["Prix Unitaire (Base)"],
-                    f"Prix Revente (+{marge_pourcent}%)": item[f"Prix Revente (+{marge_pourcent}%)"],
+                    f"Prix Revente ({signe_tab}{marge_pourcent}%)": item[f"Prix Revente ({signe_tab}{marge_pourcent}%)"],
                     "Total Lot Revente": item["Total Lot Revente"]
                 }
                 for item in donnees
             ]
             
-            # Ajout de la ligne de total général
             lignes_tableau.append({
                 "Bâtiment": "TOTAL GÉNÉRAL",
                 "Quantité": f"{total_qte_globale:,}".replace(",", " "),
                 "Prix Unitaire (Base)": "—",
-                f"Prix Revente (+{marge_pourcent}%)": "—",
+                f"Prix Revente ({signe_tab}{marge_pourcent}%)": "—",
                 "Total Lot Revente": formater_monnaie_empire(total_revente_globale) + " Ø"
             })
             
