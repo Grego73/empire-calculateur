@@ -16,7 +16,7 @@ texte_proprietes = st.text_area(
     placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
 )
 
-col_param1, col_param2 = st.columns([1, 3])
+col_param1, col_param2 = st.columns(2)
 with col_param1:
     marge_pourcent = st.number_input("Pourcentage de majoration (%)", min_value=0, max_value=500, value=15, step=1)
 
@@ -69,7 +69,9 @@ def analyser_lignes_proprietes(texte, pourcentage):
                     "Prix Unitaire (Base)": f"{prix_unitaire:,}".replace(",", " ") + " Ø",
                     f"Prix Revente (+{pourcentage}%)": f"{prix_revente:,}".replace(",", " ") + " Ø",
                     "Valeur à copier": str(prix_revente),
-                    "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø"
+                    "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø",
+                    "_raw_qte": quantite,
+                    "_raw_total_lot": total_revente_lot
                 })
                 
     return resultats
@@ -88,7 +90,6 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
             st.subheader("📋 Copie rapide (cliquez sur l'icône à droite du rectangle)")
             
-            # En-têtes de colonnes
             h1, h2 = st.columns([2, 3])
             with h1:
                 st.markdown("**Nom du bien**")
@@ -104,11 +105,35 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             
             st.markdown("---")
             
-            # 2. SECOND TABLEAU : Détail complet
+            # 2. SECOND TABLEAU : Détail complet avec ligne TOTAL
             st.subheader("📊 Tableau détaillé")
-            df_res = pd.DataFrame(donnees)
+            
+            total_qte_globale = sum(item["_raw_qte"] for item in donnees)
+            total_revente_globale = sum(item["_raw_total_lot"] for item in donnees)
+            
+            lignes_tableau = [
+                {
+                    "Bâtiment": item["Bâtiment"],
+                    "Quantité": item["Quantité"],
+                    "Prix Unitaire (Base)": item["Prix Unitaire (Base)"],
+                    f"Prix Revente (+{marge_pourcent}%)": item[f"Prix Revente (+{marge_pourcent}%)"],
+                    "Total Lot Revente": item["Total Lot Revente"]
+                }
+                for item in donnees
+            ]
+            
+            # Ajout de la ligne de total général
+            lignes_tableau.append({
+                "Bâtiment": "TOTAL GÉNÉRAL",
+                "Quantité": f"{total_qte_globale:,}".replace(",", " "),
+                "Prix Unitaire (Base)": "—",
+                f"Prix Revente (+{marge_pourcent}%)": "—",
+                "Total Lot Revente": formater_monnaie_empire(total_revente_globale) + " Ø"
+            })
+            
+            df_res = pd.DataFrame(lignes_tableau)
             st.dataframe(
-                df_res[["Bâtiment", "Quantité", "Prix Unitaire (Base)", f"Prix Revente (+{marge_pourcent}%)", "Total Lot Revente"]],
+                df_res,
                 use_container_width=True,
                 hide_index=True
             )
