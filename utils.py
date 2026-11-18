@@ -333,3 +333,30 @@ def recuperer_configuration_banque():
         ]
     }
 
+def sauvegarder_promos_jour(texte_promos):
+    """Enregistre les promotions du jour dans Firestore en écrasant la précédente."""
+    try:
+        db = initialiser_firebase() # Utilise votre fonction d'initialisation existante dans utils.py
+        if db:
+            doc_ref = db.collection("config_empire").document("promos_du_jour")
+            doc_ref.set({
+                "texte_brut": texte_promos,
+                "date_maj": datetime.now().strftime("%d/%m/%Y à %H:%M")
+            })
+            return True
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des promotions : {e}")
+    return False
+
+def charger_promos_jour():
+    """Récupère les dernières promotions enregistrées depuis Firestore."""
+    try:
+        db = initialiser_firebase()
+        if db:
+            doc = db.collection("config_empire").document("promos_du_jour").get()
+            if doc.exists:
+                data = doc.to_dict()
+                return data.get("texte_brut", ""), data.get("date_maj", "")
+    except Exception:
+        pass
+    return "", ""
