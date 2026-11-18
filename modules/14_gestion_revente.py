@@ -3,6 +3,50 @@ import pandas as pd
 import re
 from utils import formater_monnaie_empire
 
+# Ordre officiel du catalogue (du premier au dernier bâtiment)
+ORDRE_CATALOGUE = [
+    "500m² de bureaux vides", "500m² de bureaux aménagés", "500m² de bureaux tout équipés", "500m² de bureaux grand standing",
+    "1300m² de bureaux vides", "1300m² de bureaux aménagés", "1300m² de bureaux tout équipés", "1300m² de bureaux grand standing",
+    "2100m² de bureaux vides", "2100m² de bureaux aménagés", "2100m² de bureaux tout équipés", "2100m² de bureaux grand standing",
+    "3000m² de bureaux vides", "3000m² de bureaux aménagés", "3000m² de bureaux tout équipés", "3000m² de bureaux grand standing",
+    "Immeuble d'entreprise vide", "Immeuble d'entreprise aménagé", "Immeuble d'entreprise tout équipé", "Immeuble d'entreprise grand standing",
+    "Gratte-ciel vide", "Gratte-ciel aménagé", "Gratte-ciel tout équipé", "Gratte-ciel grand standing",
+    "Local vide", "Local aménagé", "Local tout équipé", "Local de haut standing",
+    "Grand local vide", "Grand local aménagé", "Grand local tout équipé", "Grand local de haut standing",
+    "Espace commercial vide", "Espace commercial aménagé", "Espace commercial tout équipé", "Espace commercial de haut standing",
+    "Centre commercial vide", "Centre commercial aménagé", "Centre commercial tout équipé", "Centre commercial de haut standing",
+    "Atelier inexploitable", "Atelier utilisable", "Atelier équipé", "Atelier high-tech",
+    "Entrepôt inexploitable", "Entrepôt utilisable", "Entrepôt équipé", "Entrepôt intégralement optimisé",
+    "Usine inexploitable", "Usine utilisable", "Usine intégralement équipée", "Usine high-tech",
+    "Centre industriel inexploitable", "Centre industriel utilisable", "Centre industriel tout équipé", "Centre industriel high-tech",
+    "Petit terrain", "Terrain moyen", "Grand terrain", "Parc", "Grand parc",
+    "Réseau FreeCycl' 5 arrêts", "Réseau FreeCycl' 10 arrêts", "Réseau FreeCycl' 15 arrêts", "Réseau FreeCycl' 20 arrêts",
+    "Réseau de bus 10 arrêts", "Réseau de bus 25 arrêts", "Réseau de bus 50 arrêts", "Réseau de bus 100 arrêts",
+    "Réseau de métro 1 ligne", "Réseau de métro 2 lignes", "Réseau de métro 3 lignes", "Réseau de métro 4 lignes",
+    "Gare avec 2 terminaux", "Gare avec 4 terminaux", "Gare avec 10 terminaux", "Gare avec 20 terminaux",
+    "Aéroport avec 1 piste", "Aéroport avec 3 pistes", "Aéroport avec 8 pistes", "Aéroport avec 15 pistes",
+    "Plate-forme pétrolière vide", "Plate-forme pétrolière aménagée", "Plate-forme pétrolière améliorée", "Plate-forme pétrolière high-tech",
+    "Centre de recherche désaffecté", "Centre de recherche régional", "Centre de recherche national", "Centre de recherche international",
+    "Zone portuaire désaffectée", "Zone portuaire régionale", "Zone portuaire nationale", "Zone portuaire internationale",
+    "Zone nucléaire désaffectée", "Zone nucléaire régionale", "Zone nucléaire nationale", "Zone nucléaire internationale",
+    "Zone aérospatiale désaffectée", "Zone aérospatiale régionale", "Zone aérospatiale nationale", "Zone aérospatiale internationale",
+    "Technopôle désaffecté", "Technopôle régional", "Technopôle national", "Technopôle international",
+    "Technopôle millenium désaffecté", "Technopôle millenium régional", "Technopôle millenium national", "Technopôle millenium international",
+    "Technopôle titanium désaffecté", "Technopôle titanium régional", "Technopôle titanium national", "Technopôle titanium international",
+    "Technopôle palacium désaffecté", "Technopôle palacium régional", "Technopôle palacium national", "Technopôle palacium international",
+    "Mégapôle millenium désaffecté", "Mégapôle millenium régional", "Mégapôle millenium national", "Mégapôle millenium international",
+    "Mégapôle titanium désaffecté", "Mégapôle titanium régional", "Mégapôle titanium national", "Mégapôle titanium international",
+    "Mégapôle palacium désaffecté", "Mégapôle palacium régional", "Mégapôle palacium national", "Mégapôle palacium international",
+    "Station orbitale basique", "Station orbitale équipée", "Station orbitale hightech", "Station orbitale luxueuse"
+]
+
+INDEX_ORDRE = {nom.lower(): idx for idx, nom in enumerate(ORDRE_CATALOGUE)}
+
+def obtenir_rang_catalogue(nom_batiment):
+    # Nettoie un éventuel tag de promo (-14%, etc.) pour retrouver le nom exact
+    nom_propre = re.sub(r"\s*-\d+%$", "", nom_batiment.strip()).lower()
+    return INDEX_ORDRE.get(nom_propre, 9999)
+
 # Récupération dynamique du pourcentage avant d'afficher le titre
 marge_actuelle = st.session_state.get("input_marge_revente", 15)
 signe = "+" if marge_actuelle >= 0 else ""
@@ -10,7 +54,7 @@ signe = "+" if marge_actuelle >= 0 else ""
 st.title(f"🏷️ Gestion Revente ({signe}{marge_actuelle} %)")
 st.markdown(
     f"Collez directement le tableau de vos propriétés depuis la page **Immobilisation** d'Empire Immo. "
-    f"Le module calcule le prix unitaire exact et le prix de revente ajusté de **{signe}{marge_actuelle} % (arrondi à l'inférieur)**."
+    f"Le module classe vos biens selon **l'ordre officiel du catalogue** et calcule le prix de revente ajusté de **{signe}{marge_actuelle} % (arrondi à l'inférieur)**."
 )
 
 # Zone de saisie
@@ -80,9 +124,12 @@ def analyser_lignes_proprietes(texte, pourcentage):
                     "Valeur à copier": str(prix_revente),
                     "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø",
                     "_raw_qte": quantite,
-                    "_raw_total_lot": total_revente_lot
+                    "_raw_total_lot": total_revente_lot,
+                    "_ordre": obtenir_rang_catalogue(nom_bien)
                 })
                 
+    # Tri selon l'ordre exact du catalogue
+    resultats.sort(key=lambda x: x["_ordre"])
     return resultats
 
 if st.button("🧮 Calculer les prix de revente", type="primary", use_container_width=True, key="btn_calcul_revente"):
@@ -94,7 +141,7 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
         if not donnees:
             st.error("❌ Aucun bâtiment reconnu. Vérifiez que les lignes contiennent bien le nom, la quantité et la valeur suivie de 'Ø'.")
         else:
-            st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) avec succès !")
+            st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) et classé(s) selon l'ordre du catalogue !")
             signe_tab = "+" if marge_pourcent >= 0 else ""
             
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
@@ -121,7 +168,7 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             total_qte_globale = sum(item["_raw_qte"] for item in donnees)
             total_revente_globale = sum(item["_raw_total_lot"] for item in donnees)
             
-            lignes_tableau = [
+                    lignes_tableau = [
                 {
                     "Bâtiment": item["Bâtiment"],
                     "Quantité": item["Quantité"],
