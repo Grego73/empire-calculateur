@@ -190,8 +190,3 @@ navigation_dict = {
 
 pg = st.navigation(navigation_dict)
 pg.run()
-
-
-# Lancement sécurisé
-pg = st.navigation(navigation_dict)
-pg.run()
