@@ -165,14 +165,22 @@ p_promos = st.Page(resoudre_chemin("07_synthese_opportunites.py"), title="🌟 T
 
 p_admin = st.Page(resoudre_chemin("08_admin.py"), title="Espace Administration", icon="🛠️", url_path="admin_general")
 
-# Construction finale de la structure (sans le module de trigger)
+p_revente = st.Page(
+    resoudre_chemin("14_gestion_revente.py"), 
+    title="Gestion Revente", 
+    icon="🏷️", 
+    url_path="gestion_revente"
+)
+
 navigation_dict = {
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
+    "🏷️ Gestion Revente": [p_revente],
     "🏦 Pôle Bancaire Fédéral": [p_livrets, p_comptes, p_epargne, p_credits],
     "Calculs de Rentabilité": [p_locative, p_chantiers, p_promos],
     "Administration": [p_admin]
 }
+
 
 # Lancement sécurisé
 pg = st.navigation(navigation_dict)
