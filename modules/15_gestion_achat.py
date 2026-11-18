@@ -58,11 +58,11 @@ def analyser_lignes_promos(texte, budget):
         # Découpage par tabulation (format standard navigateur)
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 2 and "Ø" in colonnes:
-                nom_bien = colonnes
-                prix_str = re.sub(r"[\sØ]+", "", colonnes)
+            if len(colonnes) >= 2 and "Ø" in colonnes[1]:
+                nom_bien = colonnes[0]
+                prix_str = re.sub(r"[\sØ]+", "", colonnes[1])
                 if len(colonnes) >= 6:
-                    stock_str = re.sub(r"\s+", "", colonnes)
+                    stock_str = re.sub(r"\s+", "", colonnes[5])
 
         # Méthode de secours par espaces multiples
         if not nom_bien:
@@ -130,10 +130,10 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
                 achetables = [item for item in donnees if item["_raw_qte"] > 0]
 
                 if achetables:
-                    meilleur_choix = achetables
+                    meilleur_choix = achetables[0]
                     st.success(f"🏆 **Meilleur achat possible (le plus cher accessible) : {meilleur_choix['Bâtiment']}**")
                     
-                    c_top1, c_top2 = st.columns(, vertical_alignment="center")
+                    c_top1, c_top2 = st.columns([2, 3], vertical_alignment="center")
                     with c_top1:
                         st.markdown(
                             f"**Prix unitaire :** {meilleur_choix['Prix Unitaire']}  \n"
@@ -149,16 +149,16 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
                 # 1. BLOC RAPIDE : Toutes les promotions triées du plus cher au moins cher
                 st.subheader("📋 Quantité à acheter par bâtiment (du plus cher au moins cher)")
                 
-                h1, h2 = st.columns()
+                h1, h2 = st.columns([2, 3])
                 with h1:
                     st.markdown("**Nom du bien**")
                 with h2:
                     st.markdown("**Quantité à saisir dans le jeu**")
 
                 for item in donnees:
-                    c1, c2 = st.columns(, vertical_alignment="center")
+                    c1, c2 = st.columns([2, 3], vertical_alignment="center")
                     with c1:
-                        if achetables and item["Bâtiment"] == achetables["Bâtiment"]:
+                        if achetables and item["Bâtiment"] == achetables[0]["Bâtiment"]:
                             st.markdown(f"⭐ **{item['Bâtiment']}** *(Dispo : {item['Stock Dispo']})*")
                         else:
                             st.write(f"{item['Bâtiment']} *(Dispo : {item['Stock Dispo']})*")
