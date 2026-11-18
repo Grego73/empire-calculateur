@@ -25,7 +25,7 @@ def analyser_lignes_proprietes(texte, pourcentage):
     lignes = texte.strip().split('\n')
     multiplicateur = 100 + int(pourcentage)
     
-    # Expression régulière de secours (si pas de tabulations) : cherche 2 espaces ou plus entre colonnes
+    # Expression régulière de secours : cherche 2 espaces ou plus entre colonnes
     pattern_espaces = re.compile(r"^\s*(.+?)\s{2,}([\d\s]+?)\s{2,}([\d\s]+)\s*Ø")
     
     for ligne in lignes:
@@ -37,13 +37,13 @@ def analyser_lignes_proprietes(texte, pourcentage):
         qte_str = ""
         val_totale_str = ""
         
-        # 1. Méthode prioritaire : découpage exact par tabulation (copier-coller navigateur)
+        # 1. Méthode prioritaire : découpage exact par tabulation
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 3 and "Ø" in colonnes:
-                nom_bien = colonnes
-                qte_str = re.sub(r"\s+", "", colonnes)
-                val_totale_str = re.sub(r"[\sØ]+", "", colonnes)
+            if len(colonnes) >= 3 and "Ø" in colonnes[2]:
+                nom_bien = colonnes[0]
+                qte_str = re.sub(r"\s+", "", colonnes[1])
+                val_totale_str = re.sub(r"[\sØ]+", "", colonnes[2])
         
         # 2. Méthode de secours : si les tabulations ont été remplacées par plusieurs espaces
         if not nom_bien:
