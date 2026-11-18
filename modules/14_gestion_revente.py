@@ -40,10 +40,10 @@ def analyser_lignes_proprietes(texte, pourcentage):
         # 1. Méthode prioritaire : découpage exact par tabulation (copier-coller navigateur)
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 3 and "Ø" in colonnes[2]:
-                nom_bien = colonnes[0]
-                qte_str = re.sub(r"\s+", "", colonnes[1])
-                val_totale_str = re.sub(r"[\sØ]+", "", colonnes[2])
+            if len(colonnes) >= 3 and "Ø" in colonnes:
+                nom_bien = colonnes
+                qte_str = re.sub(r"\s+", "", colonnes)
+                val_totale_str = re.sub(r"[\sØ]+", "", colonnes)
         
         # 2. Méthode de secours : si les tabulations ont été remplacées par plusieurs espaces
         if not nom_bien:
@@ -58,6 +58,7 @@ def analyser_lignes_proprietes(texte, pourcentage):
             valeur_totale = int(val_totale_str)
             
             if quantite > 0:
+                # Arithmétique entière exacte
                 prix_unitaire = valeur_totale // quantite
                 prix_revente = (prix_unitaire * multiplicateur) // 100
                 total_revente_lot = prix_revente * quantite
@@ -67,13 +68,11 @@ def analyser_lignes_proprietes(texte, pourcentage):
                     "Quantité": f"{quantite:,}".replace(",", " "),
                     "Prix Unitaire (Base)": f"{prix_unitaire:,}".replace(",", " ") + " Ø",
                     f"Prix Revente (+{pourcentage}%)": f"{prix_revente:,}".replace(",", " ") + " Ø",
-                    "Valeur à copier (sans espace)": str(prix_revente),
-                    "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø",
-                    "_raw_revente": str(prix_revente)
+                    "Valeur à copier": str(prix_revente),
+                    "Total Lot Revente": formater_monnaie_empire(total_revente_lot) + " Ø"
                 })
                 
     return resultats
-
 
 if st.button("🧮 Calculer les prix de revente", type="primary", use_container_width=True):
     if not texte_proprietes.strip():
@@ -87,19 +86,20 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) avec succès !")
             df_res = pd.DataFrame(donnees)
             
-            # Affichage du tableau principal
+            # 1. PREMIER TABLEAU : Uniquement Nom du bien et Valeur à copier
+            st.subheader("📋 Tableau rapide (Copier-Coller)")
             st.dataframe(
-                df_res[["Bâtiment", "Quantité", "Prix Unitaire (Base)", f"Prix Revente (+{marge_pourcent}%)", "Valeur à copier (sans espace)", "Total Lot Revente"]],
+                df_res[["Bâtiment", "Valeur à copier"]],
                 use_container_width=True,
                 hide_index=True
             )
             
-            # Bloc de copie rapide en un clic
             st.markdown("---")
-            st.subheader("📋 Copie rapide (cliquez sur l'icône à droite de chaque montant)")
-            for item in donnees:
-                c1, c2 = st.columns([2, 3])
-                with c1:
-                    st.markdown(f"**{item['Bâtiment']}** *(x{item['Quantité']})*")
-                with c2:
-                    st.code(item["_raw_revente"], language=None)
+            
+            # 2. SECOND TABLEAU : Détail complet
+            st.subheader("📊 Tableau détaillé")
+            st.dataframe(
+                df_res[["Bâtiment", "Quantité", "Prix Unitaire (Base)", f"Prix Revente (+{marge_pourcent}%)", "Total Lot Revente"]],
+                use_container_width=True,
+                hide_index=True
+            )
