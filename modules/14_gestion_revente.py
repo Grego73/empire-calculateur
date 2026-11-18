@@ -16,7 +16,7 @@ texte_proprietes = st.text_area(
     placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
 )
 
-col_param1, col_param2 = st.columns(2)
+col_param1, col_param2 = st.columns([1, 3])
 with col_param1:
     marge_pourcent = st.number_input("Pourcentage de majoration (%)", min_value=0, max_value=500, value=15, step=1)
 
@@ -84,20 +84,29 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             st.error("❌ Aucun bâtiment reconnu. Vérifiez que les lignes contiennent bien le nom, la quantité et la valeur suivie de 'Ø'.")
         else:
             st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) avec succès !")
-            df_res = pd.DataFrame(donnees)
             
-            # 1. PREMIER TABLEAU : Uniquement Nom du bien et Valeur à copier
-            st.subheader("📋 Tableau rapide (Copier-Coller)")
-            st.dataframe(
-                df_res[["Bâtiment", "Valeur à copier"]],
-                use_container_width=True,
-                hide_index=True
-            )
+            # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
+            st.subheader("📋 Copie rapide (cliquez sur l'icône à droite du rectangle)")
+            
+            # En-têtes de colonnes
+            h1, h2 = st.columns([2, 3])
+            with h1:
+                st.markdown("**Nom du bien**")
+            with h2:
+                st.markdown("**Valeur à copier**")
+                
+            for item in donnees:
+                c1, c2 = st.columns([2, 3], vertical_alignment="center")
+                with c1:
+                    st.write(item["Bâtiment"])
+                with c2:
+                    st.code(item["Valeur à copier"], language=None)
             
             st.markdown("---")
             
             # 2. SECOND TABLEAU : Détail complet
             st.subheader("📊 Tableau détaillé")
+            df_res = pd.DataFrame(donnees)
             st.dataframe(
                 df_res[["Bâtiment", "Quantité", "Prix Unitaire (Base)", f"Prix Revente (+{marge_pourcent}%)", "Total Lot Revente"]],
                 use_container_width=True,
