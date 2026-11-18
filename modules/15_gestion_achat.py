@@ -6,7 +6,7 @@ from utils import formater_monnaie_empire, convertir_saisie_en_nombre
 st.title("🛒 Gestion Achat — Promotions & Catalogue")
 st.markdown(
     "Renseignez votre **budget** et collez directement le tableau des **4 promotions** depuis l'Agence d'Empire Immo. "
-    "Le module calcule votre capacité d'achat en tenant compte du **stock disponible**."
+    "Le module met automatiquement en avant **le bien le plus cher accessible** avec votre budget."
 )
 
 # 1. Case pour le budget
@@ -88,9 +88,13 @@ def analyser_lignes_promos(texte, budget):
                     "Max Budget": f"{qte_max_budget:,}".replace(",", " "),
                     "Quantité à acheter": str(qte_achetable_reelle),
                     "Coût Total": formater_monnaie_empire(cout_total) + " Ø",
-                    "Budget Restant": formater_monnaie_empire(reste_budget) + " Ø"
+                    "Budget Restant": formater_monnaie_empire(reste_budget) + " Ø",
+                    "_raw_prix": prix_unit,
+                    "_raw_qte": qte_achetable_reelle
                 })
 
+    # Tri du bâtiment LE PLUS CHER au moins cher
+    resultats.sort(key=lambda x: x["_raw_prix"], reverse=True)
     return resultats
 
 if st.button("🧮 Calculer mes achats possibles", type="primary", use_container_width=True, key="btn_calcul_achat"):
@@ -106,10 +110,28 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
         if not donnees:
             st.error("❌ Aucune promotion reconnue. Vérifiez que le texte collé contient bien les prix suivis de 'Ø'.")
         else:
-            st.success(f"✅ {len(donnees)} promotion(s) analysée(s) avec succès !")
+            # Recherche du bâtiment le plus cher où l'on peut acheter au moins 1 unité
+            achetables = [item for item in donnees if item["_raw_qte"] > 0]
 
-            # 1. BLOC RAPIDE : Quantité réelle à copier en 1 clic
-            st.subheader("📋 Quantité à acheter (cliquez sur l'icône à droite du rectangle)")
+            if achetables:
+                meilleur_choix = achetables[0]
+                st.success(f"🏆 **Meilleur achat possible (le plus cher accessible) : {meilleur_choix['Bâtiment']}**")
+                
+                c_top1, c_top2 = st.columns([2, 3], vertical_alignment="center")
+                with c_top1:
+                    st.markdown(
+                        f"**Prix unitaire :** {meilleur_choix['Prix Unitaire']}  \n"
+                        f"**Coût total :** {meilleur_choix['Coût Total']} *(Reste : {meilleur_choix['Budget Restant']})*"
+                    )
+                with c_top2:
+                    st.code(meilleur_choix["Quantité à acheter"], language=None)
+            else:
+                st.warning("⚠️ Votre budget actuel ne permet d'acheter aucun de ces bâtiments (quantité = 0 pour tous).")
+
+            st.markdown("---")
+
+            # 1. BLOC RAPIDE : Toutes les promotions triées du plus cher au moins cher
+            st.subheader("📋 Quantité à acheter par bâtiment (du plus cher au moins cher)")
             
             h1, h2 = st.columns([2, 3])
             with h1:
@@ -120,7 +142,10 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
             for item in donnees:
                 c1, c2 = st.columns([2, 3], vertical_alignment="center")
                 with c1:
-                    st.write(f"{item['Bâtiment']} *(Dispo : {item['Stock Dispo']})*")
+                    if achetables and item["Bâtiment"] == achetables[0]["Bâtiment"]:
+                        st.markdown(f"⭐ **{item['Bâtiment']}** *(Dispo : {item['Stock Dispo']})*")
+                    else:
+                        st.write(f"{item['Bâtiment']} *(Dispo : {item['Stock Dispo']})*")
                 with c2:
                     st.code(item["Quantité à acheter"], language=None)
 
