@@ -168,7 +168,7 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             total_qte_globale = sum(item["_raw_qte"] for item in donnees)
             total_revente_globale = sum(item["_raw_total_lot"] for item in donnees)
             
-                    lignes_tableau = [
+            lignes_tableau = [
                 {
                     "Bâtiment": item["Bâtiment"],
                     "Quantité": item["Quantité"],
