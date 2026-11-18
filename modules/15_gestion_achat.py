@@ -1,12 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from utils import (
-    formater_monnaie_empire, 
-    convertir_saisie_en_nombre,
-    sauvegarder_promos_jour,
-    charger_promos_jour
-)
+import utils
 
 st.title("🛒 Gestion Achat — Promotions & Catalogue")
 st.markdown(
@@ -14,8 +9,11 @@ st.markdown(
     "et mises à jour dès que vous en collez de nouvelles."
 )
 
-# Chargement automatique des promotions enregistrées en base
-promos_enregistrees, date_derniere_maj = charger_promos_jour()
+# Chargement sécurisé des promotions enregistrées en base
+promos_enregistrees = ""
+date_derniere_maj = ""
+if hasattr(utils, "charger_promos_jour"):
+    promos_enregistrees, date_derniere_maj = utils.charger_promos_jour()
 
 if date_derniere_maj:
     st.info(f"📅 Promotions en mémoire (dernière mise à jour : **{date_derniere_maj}**)")
@@ -42,7 +40,7 @@ def nettoyer_grand_entier(valeur_str):
     propre = re.sub(r"[\sØ€]+", "", str(valeur_str))
     if propre.isdigit():
         return int(propre)
-    return int(convertir_saisie_en_nombre(valeur_str))
+    return int(utils.convertir_saisie_en_nombre(valeur_str))
 
 def analyser_lignes_promos(texte, budget):
     resultats = []
@@ -60,11 +58,11 @@ def analyser_lignes_promos(texte, budget):
         # Découpage par tabulation (format standard navigateur)
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 2 and "Ø" in colonnes[1]:
-                nom_bien = colonnes[0]
-                prix_str = re.sub(r"[\sØ]+", "", colonnes[1])
+            if len(colonnes) >= 2 and "Ø" in colonnes:
+                nom_bien = colonnes
+                prix_str = re.sub(r"[\sØ]+", "", colonnes)
                 if len(colonnes) >= 6:
-                    stock_str = re.sub(r"\s+", "", colonnes[5])
+                    stock_str = re.sub(r"\s+", "", colonnes)
 
         # Méthode de secours par espaces multiples
         if not nom_bien:
@@ -99,8 +97,8 @@ def analyser_lignes_promos(texte, budget):
                     "Stock Dispo": dispo_affiche,
                     "Max Budget": f"{qte_max_budget:,}".replace(",", " "),
                     "Quantité à acheter": str(qte_achetable_reelle),
-                    "Coût Total": formater_monnaie_empire(cout_total) + " Ø",
-                    "Budget Restant": formater_monnaie_empire(reste_budget) + " Ø",
+                    "Coût Total": utils.formater_monnaie_empire(cout_total) + " Ø",
+                    "Budget Restant": utils.formater_monnaie_empire(reste_budget) + " Ø",
                     "_raw_prix": prix_unit,
                     "_raw_qte": qte_achetable_reelle
                 })
@@ -115,28 +113,27 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
     if not texte_promos.strip():
         st.warning("⚠️ Veuillez coller les lignes de vos 4 promotions.")
     else:
-        donnees = analyser_lignes_promos(texte_promos, budget if budget > 0 else 1)
+        donnees_test = analyser_lignes_promos(texte_promos, budget if budget > 0 else 1)
 
-        if not donnees:
+        if not donnees_test:
             st.error("❌ Aucune promotion reconnue. Vérifiez que le texte collé contient bien les prix suivis de 'Ø'.")
         else:
             # Si le texte a changé par rapport à la base, on écrase l'ancienne sauvegarde
-            if texte_promos.strip() != promos_enregistrees.strip():
-                if sauvegarder_promos_jour(texte_promos.strip()):
+            if texte_promos.strip() != promos_enregistrees.strip() and hasattr(utils, "sauvegarder_promos_jour"):
+                if utils.sauvegarder_promos_jour(texte_promos.strip()):
                     st.toast("💾 Nouvelles promotions enregistrées en base !")
 
             if budget <= 0:
                 st.warning("⚠️ Promotions sauvegardées. Entrez maintenant un budget supérieur à 0 pour voir les quantités.")
             else:
-                # Recalcul exact avec le vrai budget
                 donnees = analyser_lignes_promos(texte_promos, budget)
                 achetables = [item for item in donnees if item["_raw_qte"] > 0]
 
                 if achetables:
-                    meilleur_choix = achetables[0]
+                    meilleur_choix = achetables
                     st.success(f"🏆 **Meilleur achat possible (le plus cher accessible) : {meilleur_choix['Bâtiment']}**")
                     
-                    c_top1, c_top2 = st.columns([2, 3], vertical_alignment="center")
+                    c_top1, c_top2 = st.columns(, vertical_alignment="center")
                     with c_top1:
                         st.markdown(
                             f"**Prix unitaire :** {meilleur_choix['Prix Unitaire']}  \n"
@@ -152,16 +149,16 @@ if st.button("🧮 Calculer mes achats possibles", type="primary", use_container
                 # 1. BLOC RAPIDE : Toutes les promotions triées du plus cher au moins cher
                 st.subheader("📋 Quantité à acheter par bâtiment (du plus cher au moins cher)")
                 
-                h1, h2 = st.columns([2, 3])
+                h1, h2 = st.columns()
                 with h1:
                     st.markdown("**Nom du bien**")
                 with h2:
                     st.markdown("**Quantité à saisir dans le jeu**")
 
                 for item in donnees:
-                    c1, c2 = st.columns([2, 3], vertical_alignment="center")
+                    c1, c2 = st.columns(, vertical_alignment="center")
                     with c1:
-                        if achetables and item["Bâtiment"] == achetables[0]["Bâtiment"]:
+                        if achetables and item["Bâtiment"] == achetables["Bâtiment"]:
                             st.markdown(f"⭐ **{item['Bâtiment']}** *(Dispo : {item['Stock Dispo']})*")
                         else:
                             st.write(f"{item['Bâtiment']} *(Dispo : {item['Stock Dispo']})*")
