@@ -43,7 +43,6 @@ ORDRE_CATALOGUE = [
 INDEX_ORDRE = {nom.lower(): idx for idx, nom in enumerate(ORDRE_CATALOGUE)}
 
 def obtenir_rang_catalogue(nom_batiment):
-    # Nettoie un éventuel tag de promo (-14%, etc.) pour retrouver le nom exact
     nom_propre = re.sub(r"\s*-\d+%$", "", nom_batiment.strip()).lower()
     return INDEX_ORDRE.get(nom_propre, 9999)
 
@@ -54,7 +53,7 @@ signe = "+" if marge_actuelle >= 0 else ""
 st.title(f"🏷️ Gestion Revente ({signe}{marge_actuelle} %)")
 st.markdown(
     f"Collez directement le tableau de vos propriétés depuis la page **Immobilisation** d'Empire Immo. "
-    f"Le module classe vos biens selon **l'ordre officiel du catalogue** et calcule le prix de revente ajusté de **{signe}{marge_actuelle} % (arrondi à l'inférieur)**."
+    f"Le module élimine les doublons, classe vos biens selon **l'ordre officiel du catalogue** et calcule le prix de revente ajusté de **{signe}{marge_actuelle} % (arrondi à l'inférieur)**."
 )
 
 # Zone de saisie
@@ -78,6 +77,8 @@ with col_param1:
 
 def analyser_lignes_proprietes(texte, pourcentage):
     resultats = []
+    biens_deja_vus = set()
+    doublons_ignores = 0
     lignes = texte.strip().split('\n')
     multiplicateur = 100 + int(pourcentage)
     signe_col = "+" if pourcentage >= 0 else ""
@@ -108,10 +109,16 @@ def analyser_lignes_proprietes(texte, pourcentage):
                 val_totale_str = re.sub(r"\s+", "", match.group(3))
                 
         if nom_bien and qte_str.isdigit() and val_totale_str.isdigit():
+            cle_doublon = nom_bien.strip().lower()
+            if cle_doublon in biens_deja_vus:
+                doublons_ignores += 1
+                continue
+                
             quantite = int(qte_str)
             valeur_totale = int(val_totale_str)
             
             if quantite > 0:
+                biens_deja_vus.add(cle_doublon)
                 prix_unitaire = valeur_totale // quantite
                 prix_revente = (prix_unitaire * multiplicateur) // 100
                 total_revente_lot = prix_revente * quantite
@@ -130,18 +137,22 @@ def analyser_lignes_proprietes(texte, pourcentage):
                 
     # Tri selon l'ordre exact du catalogue
     resultats.sort(key=lambda x: x["_ordre"])
-    return resultats
+    return resultats, doublons_ignores
 
 if st.button("🧮 Calculer les prix de revente", type="primary", use_container_width=True, key="btn_calcul_revente"):
     if not texte_proprietes.strip():
         st.warning("⚠️ Veuillez coller la liste de vos propriétés avant de lancer le calcul.")
     else:
-        donnees = analyser_lignes_proprietes(texte_proprietes, marge_pourcent)
+        donnees, nb_doublons = analyser_lignes_proprietes(texte_proprietes, marge_pourcent)
         
         if not donnees:
             st.error("❌ Aucun bâtiment reconnu. Vérifiez que les lignes contiennent bien le nom, la quantité et la valeur suivie de 'Ø'.")
         else:
-            st.success(f"✅ {len(donnees)} bâtiment(s) analysé(s) et classé(s) selon l'ordre du catalogue !")
+            msg_succes = f"✅ {len(donnees)} bâtiment(s) unique(s) analysé(s) et classé(s) selon l'ordre du catalogue !"
+            if nb_doublons > 0:
+                msg_succes += f" ({nb_doublons} doublon(s) ignoré(s))"
+            st.success(msg_succes)
+            
             signe_tab = "+" if marge_pourcent >= 0 else ""
             
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
