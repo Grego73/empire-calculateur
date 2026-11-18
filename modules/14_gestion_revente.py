@@ -3,9 +3,7 @@ import pandas as pd
 import re
 from utils import formater_monnaie_empire
 
-st.set_page_config(page_title="Revente Petites Annonces (+15%)", page_icon="🏷️", layout="wide")
-
-st.title("🏷️ Calculateur de Revente — Petites Annonces (+15 %)")
+st.title("🏷️ Gestion Revente (+15 %)")
 st.markdown(
     "Collez directement le tableau de vos propriétés depuis la page **Immobilisation** d'Empire Immo. "
     "Le module calcule le prix unitaire exact et le prix de revente majoré de **+15 % (arrondi à l'inférieur)**."
@@ -13,12 +11,12 @@ st.markdown(
 
 # Zone de saisie
 texte_proprietes = st.text_area(
-    "📋 Collez ici la liste de vos biens (ex: Nom, Quantité, Valeur totale Ø) :",
+    "📋 Collez ici la liste de vos biens (Nom, Quantité, Valeur totale Ø) :",
     height=220,
     placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
 )
 
-col_param1, col_param2 = st.columns([1, 2])
+col_param1, col_param2 = st.columns(2)
 with col_param1:
     marge_pourcent = st.number_input("Pourcentage de majoration (%)", min_value=0, max_value=500, value=15, step=1)
 
@@ -26,9 +24,8 @@ def analyser_lignes_proprietes(texte, pourcentage):
     resultats = []
     lignes = texte.strip().split('\n')
     
-    # Expression régulière : capture [Nom du bien] [Quantité avec espaces] [Valeur totale avec espaces] Ø
+    # Capture [Nom du bien] [Quantité] [Valeur totale] Ø
     pattern = re.compile(r"^\s*(.+?)\s+([\d\s]+?)\s+([\d\s]+)\s*Ø")
-    
     multiplicateur = 100 + int(pourcentage)
     
     for ligne in lignes:
@@ -47,9 +44,8 @@ def analyser_lignes_proprietes(texte, pourcentage):
                 valeur_totale = int(val_totale_str)
                 
                 if quantite > 0:
-                    # Division entière exacte (précision illimitée en Python)
+                    # Arithmétique entière exacte (sans perte de précision sur les grands nombres)
                     prix_unitaire = valeur_totale // quantite
-                    # Calcul +15 % arrondi à l'inférieur en arithmétique entière exacte
                     prix_revente = (prix_unitaire * multiplicateur) // 100
                     total_revente_lot = prix_revente * quantite
                     
@@ -83,7 +79,7 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
                 hide_index=True
             )
             
-            # Bloc de copie rapide en un clic pour chaque bâtiment
+            # Bloc de copie rapide en un clic
             st.markdown("---")
             st.subheader("📋 Copie rapide (cliquez sur l'icône à droite de chaque montant)")
             for item in donnees:
