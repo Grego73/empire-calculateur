@@ -20,7 +20,7 @@ texte_proprietes = st.text_area(
     placeholder="Zone aérospatiale internationale\t293\t5 479 256 642 733 534 Ø\n+12,1 %\tInactif..."
 )
 
-col_param1, col_param2 = st.columns()
+col_param1, col_param2 = st.columns([1, 2])
 with col_param1:
     marge_pourcent = st.number_input(
         "Pourcentage d'ajustement (%)", 
@@ -50,10 +50,10 @@ def analyser_lignes_proprietes(texte, pourcentage):
         
         if "\t" in ligne_propre:
             colonnes = [c.strip() for c in ligne_propre.split("\t") if c.strip()]
-            if len(colonnes) >= 3 and "Ø" in colonnes:
-                nom_bien = colonnes
-                qte_str = re.sub(r"\s+", "", colonnes)
-                val_totale_str = re.sub(r"[\sØ]+", "", colonnes)
+            if len(colonnes) >= 3 and "Ø" in colonnes[2]:
+                nom_bien = colonnes[0]
+                qte_str = re.sub(r"\s+", "", colonnes[1])
+                val_totale_str = re.sub(r"[\sØ]+", "", colonnes[2])
         
         if not nom_bien:
             match = pattern_espaces.search(ligne_propre)
@@ -99,14 +99,14 @@ if st.button("🧮 Calculer les prix de revente", type="primary", use_container_
             # 1. PREMIERE PARTIE : Liste avec rectangle et icône de copie en 1 clic
             st.subheader("📋 Copie rapide (cliquez sur l'icône à droite du rectangle)")
             
-            h1, h2 = st.columns()
+            h1, h2 = st.columns([1, 2])
             with h1:
                 st.markdown("**Nom du bien**")
             with h2:
                 st.markdown("**Valeur à copier**")
                 
             for item in donnees:
-                c1, c2 = st.columns(, vertical_alignment="center")
+                c1, c2 = st.columns([1, 2], vertical_alignment="center")
                 with c1:
                     st.write(item["Bâtiment"])
                 with c2:
