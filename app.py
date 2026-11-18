@@ -163,8 +163,7 @@ p_locative = st.Page(resoudre_chemin("05_analyse_locative.py"), title="Analyse L
 p_chantiers = st.Page(resoudre_chemin("06_chantiers_et_embellissement.py"), title="Chantiers & Embellissement", icon="🏗️", url_path="rentabilite_chantiers")
 p_promos = st.Page(resoudre_chemin("07_synthese_opportunites.py"), title="🌟 Top Opportunités", icon="✨", url_path="rentabilite_promotions")
 
-p_admin = st.Page(resoudre_chemin("08_admin.py"), title="Espace Administration", icon="🛠️", url_path="admin_general")
-
+# Pages du menu Gestion Free
 p_revente = st.Page(
     resoudre_chemin("14_gestion_revente.py"), 
     title="Gestion Revente", 
@@ -172,14 +171,28 @@ p_revente = st.Page(
     url_path="gestion_revente"
 )
 
+p_achat = st.Page(
+    resoudre_chemin("15_gestion_achat.py"), 
+    title="Gestion Achat", 
+    icon="🛒", 
+    url_path="gestion_achat"
+)
+
+p_admin = st.Page(resoudre_chemin("08_admin.py"), title="Espace Administration", icon="🛠️", url_path="admin_general")
+
+# Construction finale de la structure
 navigation_dict = {
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
-    "🏷️ Gestion Revente": [p_revente],
+    "🆓 Gestion Free": [p_revente, p_achat],
     "🏦 Pôle Bancaire Fédéral": [p_livrets, p_comptes, p_epargne, p_credits],
     "Calculs de Rentabilité": [p_locative, p_chantiers, p_promos],
     "Administration": [p_admin]
 }
+
+# Lancement sécurisé
+pg = st.navigation(navigation_dict)
+pg.run()
 
 
 # Lancement sécurisé
