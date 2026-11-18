@@ -163,7 +163,6 @@ p_locative = st.Page(resoudre_chemin("05_analyse_locative.py"), title="Analyse L
 p_chantiers = st.Page(resoudre_chemin("06_chantiers_et_embellissement.py"), title="Chantiers & Embellissement", icon="🏗️", url_path="rentabilite_chantiers")
 p_promos = st.Page(resoudre_chemin("07_synthese_opportunites.py"), title="🌟 Top Opportunités", icon="✨", url_path="rentabilite_promotions")
 
-# Pages du menu Gestion Free
 p_revente = st.Page(
     resoudre_chemin("14_gestion_revente.py"), 
     title="Gestion Revente", 
@@ -180,7 +179,6 @@ p_achat = st.Page(
 
 p_admin = st.Page(resoudre_chemin("08_admin.py"), title="Espace Administration", icon="🛠️", url_path="admin_general")
 
-# Construction finale de la structure
 navigation_dict = {
     "Accueil": [page_home],
     "🏛️ Gestion Holding": [p_frais, p_primes, p_performance, p_equilibrage],
@@ -190,7 +188,6 @@ navigation_dict = {
     "Administration": [p_admin]
 }
 
-# Lancement sécurisé
 pg = st.navigation(navigation_dict)
 pg.run()
 
